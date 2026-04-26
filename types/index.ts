@@ -18,6 +18,7 @@ export interface Analysis {
   error_message: string | null;
   created_at: string;
   overall_brain_activations: ROIActivations | null;
+  is_mock: boolean | null;
 }
 
 export interface FeedbackPoint {

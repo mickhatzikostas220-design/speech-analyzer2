@@ -12,7 +12,7 @@ image = (
         extra_index_url="https://download.pytorch.org/whl/cu121",
     )
     .run_commands(
-        "apt-get install -y git",
+        "apt-get install -y git ffmpeg",   # ffmpeg required by moviepy for video decoding
         "pip install git+https://github.com/facebookresearch/tribev2.git",
     )
 )
@@ -26,6 +26,8 @@ LANGUAGE  = list(range(1300, 2200))  + list(range(11541, 12442))
 ATTENTION = list(range(4500, 5000))  + list(range(14742, 15242))
 DMN       = list(range(6000, 7500))  + list(range(16000, 17500))
 
+AUDIO_EXTENSIONS = {"mp3", "wav", "flac", "ogg", "m4a", "aac"}
+
 
 @app.function(
     gpu="T4",
@@ -37,6 +39,7 @@ DMN       = list(range(6000, 7500))  + list(range(16000, 17500))
 def predict(body: dict):
     import os
     import tempfile
+    import traceback
     import urllib.request
     import numpy as np
 
@@ -45,19 +48,27 @@ def predict(body: dict):
     file_url = body.get("file_url", "")
     duration_seconds = float(body.get("duration_seconds", 60))
 
-    _preds = None  # raw vertex predictions (n_timesteps × 20484), set if real model runs
+    _preds = None
+    _error = None
 
     try:
         from tribev2 import TribeModel
         model = TribeModel.from_pretrained("facebook/tribev2", cache_folder="/cache")
 
-        suffix = file_url.split("?")[0].rsplit(".", 1)[-1] if file_url else "mp4"
+        suffix = file_url.split("?")[0].rsplit(".", 1)[-1].lower() if file_url else "mp4"
+        is_audio = suffix in AUDIO_EXTENSIONS
+
         with tempfile.NamedTemporaryFile(suffix=f".{suffix}", delete=False) as tmp:
             urllib.request.urlretrieve(file_url, tmp.name)
             tmp_path = tmp.name
 
         try:
-            df = model.get_events_dataframe(video_path=tmp_path)
+            # Pass the correct path kwarg — tribev2 handles audio and video differently
+            if is_audio:
+                df = model.get_events_dataframe(audio_path=tmp_path)
+            else:
+                df = model.get_events_dataframe(video_path=tmp_path)
+
             preds, _ = model.predict(events=df)
             _preds = np.array(preds)
         finally:
@@ -75,7 +86,8 @@ def predict(body: dict):
         scores = scores.clip(0, 100)
 
     except Exception as e:
-        print(f"[warn] Real model failed ({e}), falling back to mock.")
+        _error = traceback.format_exc()
+        print(f"[ERROR] Real model failed — using mock.\n{_error}")
         rng = np.random.default_rng()
         n = max(10, int(duration_seconds))
         scores = np.empty(n)
@@ -145,8 +157,6 @@ def predict(body: dict):
                 "dmn":       roi_act(dmn_arr,  t0, t1),
             })
     else:
-        # Plausible mock: active processing has high auditory/language, suppressed DMN;
-        # low-engagement moments flip this (DMN elevated = mind-wandering).
         rng_b = np.random.default_rng()
         overall_act = {
             "auditory":  float(rng_b.uniform(0.45, 0.72)),
@@ -171,4 +181,6 @@ def predict(body: dict):
             "overall": overall_act,
             "moments": moment_acts,
         },
+        "is_mock":       _preds is None,
+        "error_detail":  _error,   # null when real model ran successfully
     }

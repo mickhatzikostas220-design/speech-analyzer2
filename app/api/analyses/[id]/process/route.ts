@@ -143,6 +143,7 @@ export async function POST(
         overall_score: tribeResult.overall_score,
         status: 'complete',
         overall_brain_activations: tribeResult.brain_activations?.overall ?? null,
+        is_mock: tribeResult.is_mock ?? false,
       })
       .eq('id', params.id);
 

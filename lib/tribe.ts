@@ -13,6 +13,8 @@ export interface TribeResponse {
     overall: ROIActivations;
     moments: ROIActivations[];
   };
+  is_mock?: boolean;
+  error_detail?: string | null;
 }
 
 export async function callTribeV2(
