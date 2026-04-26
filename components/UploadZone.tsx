@@ -58,11 +58,16 @@ export function UploadZone({ onAnalysisCreated }: Props) {
       const [durationSeconds] = await Promise.all([getMediaDuration(file)]);
       setProgress(15);
 
-      const { error: storageErr } = await supabase.storage
-        .from('speeches')
-        .upload(filePath, file, { contentType: file.type, cacheControl: '3600' });
+      const uploadTimeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Upload timed out. Check your connection and try again.')), 120000)
+      );
 
-      if (storageErr) throw storageErr;
+      const { error: storageErr } = await Promise.race([
+        supabase.storage.from('speeches').upload(filePath, file, { contentType: file.type, cacheControl: '3600' }),
+        uploadTimeout,
+      ]);
+
+      if (storageErr) throw new Error(storageErr.message ?? 'Upload failed. Please try again.');
       setProgress(60);
 
       const createRes = await fetch('/api/analyses', {
