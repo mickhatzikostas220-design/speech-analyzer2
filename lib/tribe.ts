@@ -19,7 +19,7 @@ export async function callTribeV2(
     headers['Authorization'] = `Bearer ${process.env.TRIBE_SERVER_SECRET}`;
   }
 
-  const res = await fetch(`${serverUrl}/predict`, {
+  const res = await fetch(serverUrl, {
     method: 'POST',
     headers,
     body: JSON.stringify({ file_url: signedFileUrl, duration_seconds: durationSeconds }),
