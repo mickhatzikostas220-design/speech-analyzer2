@@ -1,7 +1,18 @@
+export interface ROIActivations {
+  auditory: number;
+  language: number;
+  attention: number;
+  dmn: number;
+}
+
 export interface TribeResponse {
   engagement_timeline: { timecode_ms: number; score: number }[];
   overall_score: number;
   low_engagement_moments: { start_ms: number; end_ms: number; score: number }[];
+  brain_activations?: {
+    overall: ROIActivations;
+    moments: ROIActivations[];
+  };
 }
 
 export async function callTribeV2(
@@ -31,6 +42,11 @@ export async function callTribeV2(
   }
 
   return res.json();
+}
+
+function mockROI(base: number, spread = 0.15): ROIActivations {
+  const r = () => Math.max(0, Math.min(1, base + (Math.random() - 0.5) * spread * 2));
+  return { auditory: r(), language: r(), attention: r(), dmn: r() };
 }
 
 // Realistic mock: random walk with mean reversion, seeded drops for demo variety
@@ -75,5 +91,26 @@ function generateMockResponse(durationSeconds: number): TribeResponse {
     }
   }
 
-  return { engagement_timeline: timeline, overall_score: overallScore, low_engagement_moments: lowMoments };
+  // Active speech: auditory/language/attention high, DMN suppressed
+  // Low-engagement moments: opposite — DMN elevated, sensory regions drop
+  const overallAct: ROIActivations = {
+    auditory:  0.55 + Math.random() * 0.20,
+    language:  0.50 + Math.random() * 0.20,
+    attention: 0.45 + Math.random() * 0.20,
+    dmn:       0.20 + Math.random() * 0.20,
+  };
+
+  const momentActs: ROIActivations[] = lowMoments.map(() => ({
+    auditory:  0.18 + Math.random() * 0.24,
+    language:  0.15 + Math.random() * 0.22,
+    attention: 0.12 + Math.random() * 0.22,
+    dmn:       0.55 + Math.random() * 0.28,
+  }));
+
+  return {
+    engagement_timeline: timeline,
+    overall_score: overallScore,
+    low_engagement_moments: lowMoments,
+    brain_activations: { overall: overallAct, moments: momentActs },
+  };
 }

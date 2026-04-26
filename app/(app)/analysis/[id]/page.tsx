@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { VideoPlayer } from '@/components/VideoPlayer';
 import { EngagementChart } from '@/components/EngagementChart';
 import { ScoreRing } from '@/components/ScoreRing';
+import { BrainMap } from '@/components/BrainMap';
 import type { AnalysisDetail, FeedbackPoint } from '@/types';
 
 const POLL_INTERVAL = 2500;
@@ -219,6 +220,39 @@ export default function AnalysisPage() {
             </div>
           )}
 
+          {analysis.overall_brain_activations && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+              <h2 className="text-sm font-medium text-zinc-300 mb-4">Overall Brain Activity</h2>
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                <BrainMap activations={analysis.overall_brain_activations} size={160} />
+                <div className="flex-1 space-y-3 text-sm text-zinc-400">
+                  <p>
+                    This map shows average cortical activation across your speech, derived from Tribe v2&apos;s
+                    fMRI encoding model. Warmer colours indicate higher predicted neural engagement.
+                  </p>
+                  <div className="space-y-1.5">
+                    <div className="flex items-start gap-2">
+                      <span className="text-zinc-300 font-medium w-20 flex-shrink-0">Auditory</span>
+                      <span>Primary and secondary auditory cortex — how strongly the speech sound was processed.</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-zinc-300 font-medium w-20 flex-shrink-0">Language</span>
+                      <span>Left perisylvian network (Broca&apos;s + Wernicke&apos;s) — language comprehension load.</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-zinc-300 font-medium w-20 flex-shrink-0">Attention</span>
+                      <span>Bilateral parietal cortex (IPS) — sustained attention and cognitive control.</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-zinc-300 font-medium w-20 flex-shrink-0">DMN</span>
+                      <span>Default Mode Network — elevated DMN signals mind-wandering and disengagement.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Transcript */}
           {analysis.transcript && (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
@@ -272,25 +306,36 @@ export default function AnalysisPage() {
                 </div>
               </div>
               {feedback_points.map((fp) => (
-                <button
+                <div
                   key={fp.id}
-                  onClick={() => setSeekToMs(fp.timecode_ms)}
-                  className={`w-full text-left border rounded-xl p-4 transition-all hover:border-purple-500/40 ${severityColor(fp.severity)}`}
+                  className={`border rounded-xl transition-all ${severityColor(fp.severity)}`}
                 >
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-xs font-mono text-zinc-500">
-                      {formatMs(fp.timecode_ms)} – {formatMs(fp.timecode_end_ms)}
-                    </span>
-                    <span className={`text-xs font-medium ${severityLabel(fp.severity)}`}>
-                      {fp.engagement_score}/100
-                    </span>
-                    <span className={`text-xs uppercase tracking-wide ${severityLabel(fp.severity)}`}>
-                      {fp.severity} drop
-                    </span>
-                  </div>
-                  <p className="text-white text-sm">{fp.feedback_text}</p>
-                  <p className="text-zinc-400 text-sm mt-1">→ {fp.improvement_suggestion}</p>
-                </button>
+                  <button
+                    onClick={() => setSeekToMs(fp.timecode_ms)}
+                    className="w-full text-left p-4 hover:bg-white/[0.02] rounded-xl transition-colors"
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-xs font-mono text-zinc-500">
+                        {formatMs(fp.timecode_ms)} – {formatMs(fp.timecode_end_ms)}
+                      </span>
+                      <span className={`text-xs font-medium ${severityLabel(fp.severity)}`}>
+                        {fp.engagement_score}/100
+                      </span>
+                      <span className={`text-xs uppercase tracking-wide ${severityLabel(fp.severity)}`}>
+                        {fp.severity} drop
+                      </span>
+                    </div>
+                    <p className="text-white text-sm">{fp.feedback_text}</p>
+                    <p className="text-zinc-400 text-sm mt-1">→ {fp.improvement_suggestion}</p>
+                  </button>
+
+                  {fp.brain_activations && (
+                    <div className="px-4 pb-4 border-t border-white/5 pt-3">
+                      <p className="text-xs text-zinc-600 mb-3">Brain activity at this moment</p>
+                      <BrainMap activations={fp.brain_activations} size={130} />
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )}

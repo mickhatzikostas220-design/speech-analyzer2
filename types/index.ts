@@ -1,3 +1,10 @@
+export interface ROIActivations {
+  auditory: number;
+  language: number;
+  attention: number;
+  dmn: number;
+}
+
 export interface Analysis {
   id: string;
   user_id: string;
@@ -10,6 +17,7 @@ export interface Analysis {
   status: 'pending' | 'processing' | 'complete' | 'error';
   error_message: string | null;
   created_at: string;
+  overall_brain_activations: ROIActivations | null;
 }
 
 export interface FeedbackPoint {
@@ -21,6 +29,7 @@ export interface FeedbackPoint {
   feedback_text: string;
   improvement_suggestion: string;
   severity: 'low' | 'medium' | 'high';
+  brain_activations: ROIActivations | null;
 }
 
 export interface EngagementTimepoint {

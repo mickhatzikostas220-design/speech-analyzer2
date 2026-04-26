@@ -88,7 +88,9 @@ export async function POST(
     }
 
     // Generate GPT-4o feedback for each low engagement moment (cap at 8)
+    const brainMoments = tribeResult.brain_activations?.moments ?? [];
     const feedbackRows = [];
+    let momentIdx = 0;
     for (const moment of tribeResult.low_engagement_moments.slice(0, 8)) {
       const startSec = moment.start_ms / 1000;
       const endSec = moment.end_ms / 1000;
@@ -126,7 +128,9 @@ export async function POST(
         feedback_text: fb.feedback,
         improvement_suggestion: fb.suggestion,
         severity: moment.score < 38 ? 'high' : moment.score < 47 ? 'medium' : 'low',
+        brain_activations: brainMoments[momentIdx] ?? null,
       });
+      momentIdx++;
     }
 
     if (feedbackRows.length > 0) {
@@ -135,7 +139,11 @@ export async function POST(
 
     await supabase
       .from('analyses')
-      .update({ overall_score: tribeResult.overall_score, status: 'complete' })
+      .update({
+        overall_score: tribeResult.overall_score,
+        status: 'complete',
+        overall_brain_activations: tribeResult.brain_activations?.overall ?? null,
+      })
       .eq('id', params.id);
 
     return NextResponse.json({ success: true });
