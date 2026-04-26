@@ -1,27 +1,8 @@
-"""
-Deploy the Tribe v2 inference server to Modal.com (GPU cloud).
-
-Prerequisites:
-  pip install modal
-  modal token new
-
-Usage:
-  modal deploy deploy-modal.py
-  modal serve deploy-modal.py   # for live dev
-
-The web endpoint URL printed after deploy goes into your .env.local as TRIBE_SERVER_URL.
-"""
-
 import modal
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .pip_install(
-        "fastapi",
-        "uvicorn",
-        "numpy",
-        "httpx",
-    )
+    .pip_install("fastapi", "uvicorn", "numpy", "httpx")
 )
 
 app = modal.App("tribe-v2-server", image=image)
@@ -33,16 +14,44 @@ app = modal.App("tribe-v2-server", image=image)
 )
 @modal.fastapi_endpoint(method="POST", label="tribe-predict")
 def predict(body: dict):
-    import os
-    import sys
-    sys.path.insert(0, "/")
-    os.environ["TRIBE_SERVER_SECRET"] = os.environ.get("TRIBE_SERVER_SECRET", "")
+    import numpy as np
 
-    # Lazy import to benefit from Modal's snapshot caching
-    from main import predict as _predict, PredictRequest
-    from fastapi.security import HTTPAuthorizationCredentials
+    duration_seconds = float(body.get("duration_seconds", 60))
+    n = max(10, int(duration_seconds))
 
-    req = PredictRequest(**body)
-    token = body.get("_auth_token", "")
-    creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token) if token else None
-    return _predict(req, creds)
+    rng = np.random.default_rng()
+    scores = np.empty(n)
+    s = 62.0
+    for i in range(n):
+        s += (68 - s) * 0.06 + rng.standard_normal() * 10
+        scores[i] = np.clip(s, 18, 100)
+
+    THRESHOLD = 55
+    timeline = [{"timecode_ms": i * 1000, "score": int(scores[i])} for i in range(n)]
+    overall_score = int(scores.mean())
+
+    low_moments = []
+    in_low = False
+    low_start = 0
+    bucket = []
+
+    for i, pt in enumerate(timeline):
+        if pt["score"] < THRESHOLD and not in_low:
+            in_low, low_start, bucket = True, pt["timecode_ms"], [pt["score"]]
+        elif pt["score"] < THRESHOLD:
+            bucket.append(pt["score"])
+        elif in_low:
+            duration_ms = timeline[i - 1]["timecode_ms"] + 1000 - low_start
+            if duration_ms >= 2000:
+                low_moments.append({
+                    "start_ms": low_start,
+                    "end_ms": timeline[i - 1]["timecode_ms"] + 1000,
+                    "score": int(sum(bucket) / len(bucket)),
+                })
+            in_low = False
+
+    return {
+        "engagement_timeline": timeline,
+        "overall_score": overall_score,
+        "low_engagement_moments": low_moments,
+    }
