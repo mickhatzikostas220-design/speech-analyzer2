@@ -1,0 +1,9 @@
+.next/
+node_modules/
+.env.local
+.env
+*.log
+.DS_Store
+tribe-server/__pycache__/
+tribe-server/.venv/
+tribe-server/cache/

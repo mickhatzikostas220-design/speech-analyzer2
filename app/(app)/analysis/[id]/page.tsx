@@ -1,0 +1,310 @@
+'use client';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { VideoPlayer } from '@/components/VideoPlayer';
+import { EngagementChart } from '@/components/EngagementChart';
+import { ScoreRing } from '@/components/ScoreRing';
+import type { AnalysisDetail, FeedbackPoint } from '@/types';
+
+const POLL_INTERVAL = 2500;
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function severityColor(severity: string) {
+  if (severity === 'high') return 'border-red-500/40 bg-red-500/5';
+  if (severity === 'medium') return 'border-amber-500/40 bg-amber-500/5';
+  return 'border-blue-500/40 bg-blue-500/5';
+}
+
+function severityLabel(severity: string) {
+  if (severity === 'high') return 'text-red-400';
+  if (severity === 'medium') return 'text-amber-400';
+  return 'text-blue-400';
+}
+
+function formatMs(ms: number) {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+export default function AnalysisPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [detail, setDetail] = useState<AnalysisDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [currentTimeMs, setCurrentTimeMs] = useState(0);
+  const [seekToMs, setSeekToMs] = useState<number | undefined>();
+  const [deleting, setDeleting] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchDetail = useCallback(async () => {
+    const res = await fetch(`/api/analyses/${id}`);
+    if (!res.ok) { setError('Analysis not found.'); return; }
+    const data: AnalysisDetail = await res.json();
+    setDetail(data);
+
+    if (data.analysis.status === 'complete' || data.analysis.status === 'error') {
+      if (pollRef.current) clearInterval(pollRef.current);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchDetail();
+    pollRef.current = setInterval(fetchDetail, POLL_INTERVAL);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [fetchDetail]);
+
+  async function handleDelete() {
+    setDeleting(true);
+    const res = await fetch(`/api/analyses/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      router.push('/dashboard');
+    } else {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  }
+
+  async function handleRetry() {
+    setRetrying(true);
+    const res = await fetch(`/api/analyses/${id}/process`, { method: 'POST' });
+    if (res.ok) {
+      // Restart polling
+      if (pollRef.current) clearInterval(pollRef.current);
+      await fetchDetail();
+      pollRef.current = setInterval(fetchDetail, POLL_INTERVAL);
+    }
+    setRetrying(false);
+  }
+
+  function downloadExport(format: 'transcript' | 'feedback' | 'json') {
+    window.open(`/api/analyses/${id}/export?format=${format}`, '_blank');
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-20 text-center">
+        <p className="text-red-400">{error}</p>
+      </div>
+    );
+  }
+
+  if (!detail) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-20 text-center">
+        <div className="w-8 h-8 mx-auto border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const { analysis, feedback_points, engagement_timeline, file_url } = detail;
+  const isPending = analysis.status === 'pending' || analysis.status === 'processing';
+  const isError = analysis.status === 'error';
+
+  const activeFeedback: FeedbackPoint | undefined = feedback_points.find(
+    (fp) => currentTimeMs >= fp.timecode_ms && currentTimeMs < fp.timecode_end_ms + 5000
+  );
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+      {/* Delete confirmation modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="text-white font-semibold mb-2">Delete analysis?</h3>
+            <p className="text-zinc-400 text-sm mb-5">
+              This will permanently delete the recording and all analysis data. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-white">{analysis.title}</h1>
+          <p className="text-zinc-500 text-xs mt-1">{formatDate(analysis.created_at)}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {analysis.overall_score !== null && (
+            <ScoreRing score={analysis.overall_score} size={64} />
+          )}
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+            title="Delete analysis"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Processing state */}
+      {isPending && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center space-y-3">
+          <div className="w-8 h-8 mx-auto border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-white font-medium">
+            {analysis.status === 'pending' ? 'Queued for analysis…' : 'Analyzing neural engagement…'}
+          </p>
+          <p className="text-zinc-500 text-sm">
+            Transcribing speech and running Tribe v2 predictions. This takes 30–120 seconds.
+          </p>
+        </div>
+      )}
+
+      {/* Error state */}
+      {isError && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 text-center space-y-3">
+          <p className="text-red-400 font-medium">Analysis failed</p>
+          {analysis.error_message && (
+            <p className="text-red-400/70 text-sm">{analysis.error_message}</p>
+          )}
+          <button
+            onClick={handleRetry}
+            disabled={retrying}
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors border border-zinc-700"
+          >
+            {retrying ? 'Retrying…' : 'Retry analysis'}
+          </button>
+        </div>
+      )}
+
+      {/* Complete */}
+      {analysis.status === 'complete' && file_url && (
+        <>
+          <VideoPlayer
+            fileUrl={file_url}
+            fileType={analysis.file_type}
+            activeFeedback={activeFeedback}
+            onTimeUpdate={setCurrentTimeMs}
+            seekToMs={seekToMs}
+          />
+
+          {engagement_timeline.length > 0 && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+              <h2 className="text-sm font-medium text-zinc-300 mb-3">Neural Engagement Timeline</h2>
+              <EngagementChart
+                timeline={engagement_timeline}
+                feedbackPoints={feedback_points}
+                currentTimeMs={currentTimeMs}
+                durationMs={(analysis.duration_seconds ?? 60) * 1000}
+                onSeek={(ms) => setSeekToMs(ms)}
+              />
+            </div>
+          )}
+
+          {/* Transcript */}
+          {analysis.transcript && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-medium text-zinc-300">Transcript</h2>
+                <button
+                  onClick={() => downloadExport('transcript')}
+                  className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export .txt
+                </button>
+              </div>
+              <p className="text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap">
+                {analysis.transcript}
+              </p>
+            </div>
+          )}
+
+          {/* Feedback list */}
+          {feedback_points.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-medium text-zinc-300">
+                  {feedback_points.length} Engagement Drop{feedback_points.length !== 1 ? 's' : ''} Detected
+                </h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => downloadExport('feedback')}
+                    className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export .csv
+                  </button>
+                  <button
+                    onClick={() => downloadExport('json')}
+                    className="text-xs text-zinc-500 hover:text-zinc-400 transition-colors flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export .json
+                  </button>
+                </div>
+              </div>
+              {feedback_points.map((fp) => (
+                <button
+                  key={fp.id}
+                  onClick={() => setSeekToMs(fp.timecode_ms)}
+                  className={`w-full text-left border rounded-xl p-4 transition-all hover:border-purple-500/40 ${severityColor(fp.severity)}`}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-xs font-mono text-zinc-500">
+                      {formatMs(fp.timecode_ms)} – {formatMs(fp.timecode_end_ms)}
+                    </span>
+                    <span className={`text-xs font-medium ${severityLabel(fp.severity)}`}>
+                      {fp.engagement_score}/100
+                    </span>
+                    <span className={`text-xs uppercase tracking-wide ${severityLabel(fp.severity)}`}>
+                      {fp.severity} drop
+                    </span>
+                  </div>
+                  <p className="text-white text-sm">{fp.feedback_text}</p>
+                  <p className="text-zinc-400 text-sm mt-1">→ {fp.improvement_suggestion}</p>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {feedback_points.length === 0 && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center">
+              <p className="text-green-400 font-medium">No significant engagement drops detected.</p>
+              <p className="text-zinc-500 text-sm mt-1">
+                Neural engagement stayed above the 55/100 threshold throughout.
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
