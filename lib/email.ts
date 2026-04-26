@@ -1,10 +1,10 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = 'Orator <onboarding@resend.dev>';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3002';
 
 export async function sendApprovalEmail(to: string, name: string, signupUrl: string) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
     from: FROM,
     to,
@@ -22,6 +22,7 @@ export async function sendApprovalEmail(to: string, name: string, signupUrl: str
 }
 
 export async function sendRejectionEmail(to: string, name: string) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
     from: FROM,
     to,
