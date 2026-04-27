@@ -19,12 +19,12 @@ export async function POST(
     .single();
 
   if (!analysis) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  if (analysis.status !== 'pending' && analysis.status !== 'error') {
-    return NextResponse.json({ error: 'Analysis already started' }, { status: 409 });
+  if (analysis.status === 'complete') {
+    return NextResponse.json({ error: 'Analysis already complete' }, { status: 409 });
   }
 
-  // Clear stale results when retrying a failed analysis
-  if (analysis.status === 'error') {
+  // Clear stale results when retrying
+  if (analysis.status === 'error' || analysis.status === 'processing') {
     await Promise.all([
       supabase.from('engagement_timeline').delete().eq('analysis_id', params.id),
       supabase.from('feedback_points').delete().eq('analysis_id', params.id),

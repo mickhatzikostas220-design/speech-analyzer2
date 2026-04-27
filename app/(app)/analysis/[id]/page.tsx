@@ -195,8 +195,12 @@ export default function AnalysisPage() {
             {analysis.status === 'pending' ? 'Queued for analysis…' : 'Analyzing neural engagement…'}
           </p>
           <p className="text-zinc-500 text-sm">
-            Transcribing speech and running Tribe v2 predictions. This takes 30–120 seconds.
+            Running Tribe v2 brain predictions. This takes 10–20 minutes.
           </p>
+          <button onClick={handleRetry} disabled={retrying}
+            className="mt-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-400 text-xs font-medium rounded-lg transition-colors border border-zinc-700">
+            {retrying ? 'Restarting…' : 'Stuck? Force restart'}
+          </button>
         </div>
       )}
 
