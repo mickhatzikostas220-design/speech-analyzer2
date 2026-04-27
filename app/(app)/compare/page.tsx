@@ -124,16 +124,21 @@ function CompareChart({ dataA, dataB, activeMetrics, focusMetric, labelA, labelB
           const pointsA = tsA.map((ms, i) => `${xPct(ms, dataA.maxMs)},${yVal(ptsA[i])}`).join(' ');
           const pointsB = tsB.map((ms, i) => `${xPct(ms, dataB.maxMs)},${yVal(ptsB[i])}`).join(' ');
 
+          const isolated = focusMetric === key;
+          const colorA = color;
+          const colorB = isolated ? '#ffffff' : color;
+          const dashB  = isolated ? undefined : '2,1.5';
+
           return (
             <g key={key} opacity={opacity(key)}>
-              {/* Speech A — solid */}
-              <polyline points={pointsA} fill="none" stroke={color}
+              {/* Speech A — always solid, metric color */}
+              <polyline points={pointsA} fill="none" stroke={colorA}
                 strokeWidth={strokeWidth(key)} strokeLinecap="round" strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke" />
-              {/* Speech B — dashed */}
-              <polyline points={pointsB} fill="none" stroke={color}
+              {/* Speech B — dashed when all shown, white+solid when isolated */}
+              <polyline points={pointsB} fill="none" stroke={colorB}
                 strokeWidth={strokeWidth(key)} strokeLinecap="round" strokeLinejoin="round"
-                strokeDasharray="2,1.5" vectorEffect="non-scaling-stroke" />
+                strokeDasharray={dashB} vectorEffect="non-scaling-stroke" />
             </g>
           );
         })}
@@ -142,11 +147,11 @@ function CompareChart({ dataA, dataB, activeMetrics, focusMetric, labelA, labelB
       {/* A/B labels */}
       <div className="absolute top-2 right-2 flex items-center gap-4 text-xs text-zinc-500">
         <span className="flex items-center gap-1.5">
-          <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="white" strokeWidth="1.5" /></svg>
+          <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={focusMetric ? METRICS.find(m => m.key === focusMetric)?.color ?? 'white' : 'white'} strokeWidth="1.5" /></svg>
           {labelA}
         </span>
         <span className="flex items-center gap-1.5">
-          <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="white" strokeWidth="1.5" strokeDasharray="3,2" /></svg>
+          <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={focusMetric ? 'white' : 'white'} strokeWidth="1.5" strokeDasharray={focusMetric ? undefined : '3,2'} /></svg>
           {labelB}
         </span>
       </div>
