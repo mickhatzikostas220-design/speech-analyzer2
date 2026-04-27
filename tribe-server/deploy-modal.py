@@ -50,7 +50,7 @@ def process_analysis(body: dict):
     hf_token = os.environ.get("HF_TOKEN", "")
     os.environ["HF_TOKEN"] = hf_token
 
-    supabase_url  = os.environ["SUPABASE_URL"]
+    supabase_url  = os.environ["SUPABASE_URL"].rstrip("/").removesuffix("/rest/v1")
     supabase_key  = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
     openai_key    = os.environ["OPENAI_API_KEY"]
 
