@@ -35,7 +35,8 @@ AUDIO_EXTENSIONS = {"mp3", "wav", "flac", "ogg", "m4a", "aac"}
     volumes={"/cache": volume},
     secrets=[
         modal.Secret.from_name("huggingface-secret"),   # HF_TOKEN
-        modal.Secret.from_name("custom-secret-2"),      # SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+        modal.Secret.from_name("custom-secret"),        # SUPABASE_SERVICE_ROLE_KEY
+        modal.Secret.from_name("custom-secret-2"),      # SUPABASE_URL
         modal.Secret.from_name("openai-secret"),        # OPENAI_API_KEY
     ],
 )
@@ -64,13 +65,17 @@ def process_analysis(body: dict):
     }
 
     def sb_patch(table, data, where):
-        httpx.patch(f"{supabase_url}/rest/v1/{table}?{where}",
-                    headers={**sb, "Prefer": "return=minimal"}, json=data, timeout=30)
+        r = httpx.patch(f"{supabase_url}/rest/v1/{table}?{where}",
+                        headers={**sb, "Prefer": "return=minimal"}, json=data, timeout=30)
+        if r.status_code >= 300:
+            print(f"[WARN] sb_patch {table} -> {r.status_code}: {r.text[:300]}")
 
     def sb_insert(table, rows):
         for i in range(0, len(rows), 200):
-            httpx.post(f"{supabase_url}/rest/v1/{table}",
-                       headers={**sb, "Prefer": "return=minimal"}, json=rows[i:i+200], timeout=30)
+            r = httpx.post(f"{supabase_url}/rest/v1/{table}",
+                           headers={**sb, "Prefer": "return=minimal"}, json=rows[i:i+200], timeout=30)
+            if r.status_code >= 300:
+                print(f"[WARN] sb_insert {table} -> {r.status_code}: {r.text[:300]}")
 
     try:
         # ── Tribe v2 ──────────────────────────────────────────────────────────
