@@ -174,99 +174,80 @@ function avgMetric(data: ChartData, key: MetricKey): number {
   return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
 }
 
+function buildParagraph(avgs: { key: MetricKey; a: number; b: number; diff: number }[], labelA: string, labelB: string): string {
+  const get = (key: MetricKey) => avgs.find(m => m.key === key)!;
+  const W = (diff: number, key: MetricKey) => (key === 'dmn' ? diff < 0 : diff > 0) ? labelA : labelB;
+  const sentences: string[] = [];
+
+  const eng = get('engagement');
+  if (eng.diff === 0) {
+    sentences.push(`Overall, both speeches held the audience's attention equally well.`);
+  } else {
+    const engWinner = eng.diff > 0 ? labelA : labelB;
+    const engLoser  = eng.diff > 0 ? labelB : labelA;
+    sentences.push(`Overall, ${engWinner} did a better job keeping the audience's brain engaged — the neural activity was consistently higher throughout, while ${engLoser} had more moments where attention started to slip.`);
+  }
+
+  const aud = get('auditory');
+  if (Math.abs(aud.diff) >= 3) {
+    const w = W(aud.diff, 'auditory'), l = aud.diff > 0 ? labelB : labelA;
+    sentences.push(`When it comes to vocal delivery, ${w} was stronger — the brain responded more to the sound of the voice, which typically means better use of tone, volume, and variation. ${l} sounded more flat by comparison, which makes it easier for listeners to tune out.`);
+  }
+
+  const lang = get('language');
+  if (Math.abs(lang.diff) >= 3) {
+    const w = W(lang.diff, 'language'), l = lang.diff > 0 ? labelB : labelA;
+    sentences.push(`For clarity of ideas, ${w} communicated more effectively — the language network in the brain was more active, meaning the words and sentences were easier to follow and understand. ${l} was harder for the brain to decode, which could mean the language was too complex, too abstract, or just not direct enough.`);
+  }
+
+  const att = get('attention');
+  if (Math.abs(att.diff) >= 3) {
+    const w = W(att.diff, 'attention'), l = att.diff > 0 ? labelB : labelA;
+    sentences.push(`${w} was better at holding focus — the attention networks stayed more active throughout, which means the audience was genuinely paying attention rather than just hearing noise. ${l} had lower attention activation, suggesting it was harder to stay mentally present for.`);
+  }
+
+  const dmn = get('dmn');
+  if (Math.abs(dmn.diff) >= 3) {
+    const higher = dmn.diff > 0 ? labelA : labelB;
+    const lower  = dmn.diff > 0 ? labelB : labelA;
+    sentences.push(`${higher} triggered more mind-wandering — the default mode network, which activates when people drift off, was more active. This usually happens during slow or repetitive sections. ${lower} kept the default mode network quieter, meaning the audience stayed mentally present.`);
+  }
+
+  const pros = get('prosody');
+  if (Math.abs(pros.diff) >= 3) {
+    const w = W(pros.diff, 'prosody'), l = pros.diff > 0 ? labelB : labelA;
+    sentences.push(`In terms of rhythm and pacing, ${w} had the edge — the brain responded more to the natural flow and intonation of the speech. ${l} sounded more robotic or monotone in comparison, which makes it harder to stay engaged over time.`);
+  }
+
+  const emo = get('emotional');
+  if (Math.abs(emo.diff) >= 3) {
+    const w = W(emo.diff, 'emotional'), l = emo.diff > 0 ? labelB : labelA;
+    sentences.push(`Emotionally, ${w} connected better — the insula, which processes emotional and personal reactions, was more active. This means the content felt more real, relatable, or impactful. ${l} was more neutral, which isn't always bad, but it means less of an emotional impression was left.`);
+  }
+
+  const mem = get('memory');
+  if (Math.abs(mem.diff) >= 3) {
+    const w = W(mem.diff, 'memory'), l = mem.diff > 0 ? labelB : labelA;
+    sentences.push(`Finally, ${w} is more likely to be remembered — the memory encoding regions were more active, meaning the content was being stored more deeply. ${l} may fade faster from memory, which is worth fixing if the goal is to leave a lasting impression.`);
+  }
+
+  return sentences.join(' ');
+}
+
 function CompareSummary({ dataA, dataB, labelA, labelB }: { dataA: ChartData; dataB: ChartData; labelA: string; labelB: string }) {
   const avgs = METRICS.map(m => ({
-    ...m,
+    key: m.key,
     a: avgMetric(dataA, m.key),
     b: avgMetric(dataB, m.key),
     diff: avgMetric(dataA, m.key) - avgMetric(dataB, m.key),
   }));
 
-  const overallA = avgs.find(m => m.key === 'engagement')?.a ?? 0;
-  const overallB = avgs.find(m => m.key === 'engagement')?.b ?? 0;
-  const winner = overallA > overallB ? labelA : overallB > overallA ? labelB : null;
-  const margin = Math.abs(overallA - overallB);
-
-  const biggestAWin  = [...avgs].filter(m => m.key !== 'dmn').sort((a, b) => b.diff - a.diff)[0];
-  const biggestBWin  = [...avgs].filter(m => m.key !== 'dmn').sort((a, b) => a.diff - b.diff)[0];
-  const dmnA = avgs.find(m => m.key === 'dmn')!;
-
-  const insights: { text: string; type: 'neutral' | 'a' | 'b' }[] = [];
-
-  if (winner) {
-    insights.push({
-      text: `${winner} had higher overall neural engagement by ${margin} points.`,
-      type: overallA > overallB ? 'a' : 'b',
-    });
-  } else {
-    insights.push({ text: 'Both speeches had identical overall engagement scores.', type: 'neutral' });
-  }
-
-  if (biggestAWin.diff >= 5) {
-    insights.push({
-      text: `${labelA} had a noticeably stronger ${biggestAWin.label.toLowerCase()} score (+${biggestAWin.diff}), meaning ${METRIC_DESCRIPTIONS[biggestAWin.key].high}.`,
-      type: 'a',
-    });
-  }
-  if (biggestBWin.diff <= -5) {
-    insights.push({
-      text: `${labelB} pulled ahead on ${biggestBWin.label.toLowerCase()} (+${Math.abs(biggestBWin.diff)}), meaning ${METRIC_DESCRIPTIONS[biggestBWin.key].high}.`,
-      type: 'b',
-    });
-  }
-
-  if (dmnA.diff > 5) {
-    insights.push({ text: `${labelA} carried a higher mind-wandering risk — the audience's DMN was more active, suggesting some sections felt passive or repetitive.`, type: 'b' });
-  } else if (dmnA.diff < -5) {
-    insights.push({ text: `${labelB} carried a higher mind-wandering risk — the audience's DMN was more active, suggesting some sections felt passive or repetitive.`, type: 'a' });
-  }
-
-  const memA = avgs.find(m => m.key === 'memory')!;
-  if (Math.abs(memA.diff) >= 5) {
-    const memWinner = memA.diff > 0 ? labelA : labelB;
-    insights.push({ text: `${memWinner} scored higher on memory encoding — its content is more likely to be retained by listeners.`, type: memA.diff > 0 ? 'a' : 'b' });
-  }
-
-  const emoA = avgs.find(m => m.key === 'emotional')!;
-  if (Math.abs(emoA.diff) >= 5) {
-    const emoWinner = emoA.diff > 0 ? labelA : labelB;
-    insights.push({ text: `${emoWinner} generated stronger emotional processing in the insula — it connected on a more personal or visceral level.`, type: emoA.diff > 0 ? 'a' : 'b' });
-  }
+  const paragraph = buildParagraph(avgs, labelA, labelB);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-3">
       <h2 className="text-sm font-medium text-zinc-300">Summary</h2>
-
-      {/* Metric averages table */}
-      <div className="space-y-2">
-        {avgs.map(({ key, label, color, a, b, diff }) => {
-          const aWins = key === 'dmn' ? diff < 0 : diff > 0;
-          const bWins = key === 'dmn' ? diff > 0 : diff < 0;
-          return (
-            <div key={key} className="flex items-center gap-3 text-sm">
-              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
-              <span className="text-zinc-400 w-24 flex-shrink-0">{label}</span>
-              <div className="flex-1 flex items-center gap-1 min-w-0">
-                <span className={`font-medium ${aWins ? 'text-white' : 'text-zinc-500'}`}>{a}</span>
-                <span className="text-zinc-700 text-xs mx-1">vs</span>
-                <span className={`font-medium ${bWins ? 'text-white' : 'text-zinc-500'}`}>{b}</span>
-              </div>
-              {Math.abs(diff) >= 3 && (
-                <span className={`text-xs font-medium flex-shrink-0 ${aWins ? 'text-purple-400' : 'text-zinc-400'}`}>
-                  {aWins ? `${labelA} +${Math.abs(diff)}` : `${labelB} +${Math.abs(diff)}`}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Written paragraph */}
-      <div className="border-t border-zinc-800 pt-4">
-        <p className="text-sm text-zinc-400 leading-relaxed">
-          {insights.map(i => i.text).join(' ')}
-        </p>
-      </div>
+      <p className="text-sm text-zinc-400 leading-relaxed">{paragraph}</p>
     </div>
   );
 }
