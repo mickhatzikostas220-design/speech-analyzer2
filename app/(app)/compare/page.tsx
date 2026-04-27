@@ -154,6 +154,133 @@ function CompareChart({ dataA, dataB, activeMetrics, focusMetric, labelA, labelB
   );
 }
 
+const METRIC_DESCRIPTIONS: Record<MetricKey, { high: string; low: string }> = {
+  engagement: { high: 'consistently holding attention',       low: 'struggling to hold attention' },
+  auditory:   { high: 'strong vocal variety and clarity',    low: 'monotone or unclear delivery' },
+  language:   { high: 'ideas landing clearly',               low: 'language too complex or abstract' },
+  attention:  { high: 'keeping the audience focused',        low: 'audience focus drifting' },
+  dmn:        { high: 'high mind-wandering risk',            low: 'low mind-wandering risk' },
+  prosody:    { high: 'rich rhythm and intonation',          low: 'flat or robotic pacing' },
+  emotional:  { high: 'strong emotional resonance',          low: 'low emotional connection' },
+  memory:     { high: 'content likely to be remembered',     low: 'content unlikely to stick' },
+};
+
+function avgMetric(data: ChartData, key: MetricKey): number {
+  if (key === 'engagement') {
+    const vals = Array.from(data.engagementByMs.values());
+    return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+  }
+  const vals = Array.from(data.roiByMs.values()).map(pt => (pt[key as keyof ROITimepoint] as number) ?? 0);
+  return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+}
+
+function CompareSummary({ dataA, dataB, labelA, labelB }: { dataA: ChartData; dataB: ChartData; labelA: string; labelB: string }) {
+  const avgs = METRICS.map(m => ({
+    ...m,
+    a: avgMetric(dataA, m.key),
+    b: avgMetric(dataB, m.key),
+    diff: avgMetric(dataA, m.key) - avgMetric(dataB, m.key),
+  }));
+
+  const overallA = avgs.find(m => m.key === 'engagement')?.a ?? 0;
+  const overallB = avgs.find(m => m.key === 'engagement')?.b ?? 0;
+  const winner = overallA > overallB ? labelA : overallB > overallA ? labelB : null;
+  const margin = Math.abs(overallA - overallB);
+
+  const biggestAWin  = [...avgs].filter(m => m.key !== 'dmn').sort((a, b) => b.diff - a.diff)[0];
+  const biggestBWin  = [...avgs].filter(m => m.key !== 'dmn').sort((a, b) => a.diff - b.diff)[0];
+  const dmnA = avgs.find(m => m.key === 'dmn')!;
+
+  const insights: { text: string; type: 'neutral' | 'a' | 'b' }[] = [];
+
+  if (winner) {
+    insights.push({
+      text: `${winner} had higher overall neural engagement by ${margin} points.`,
+      type: overallA > overallB ? 'a' : 'b',
+    });
+  } else {
+    insights.push({ text: 'Both speeches had identical overall engagement scores.', type: 'neutral' });
+  }
+
+  if (biggestAWin.diff >= 5) {
+    insights.push({
+      text: `${labelA} had a noticeably stronger ${biggestAWin.label.toLowerCase()} score (+${biggestAWin.diff}), meaning ${METRIC_DESCRIPTIONS[biggestAWin.key].high}.`,
+      type: 'a',
+    });
+  }
+  if (biggestBWin.diff <= -5) {
+    insights.push({
+      text: `${labelB} pulled ahead on ${biggestBWin.label.toLowerCase()} (+${Math.abs(biggestBWin.diff)}), meaning ${METRIC_DESCRIPTIONS[biggestBWin.key].high}.`,
+      type: 'b',
+    });
+  }
+
+  if (dmnA.diff > 5) {
+    insights.push({ text: `${labelA} carried a higher mind-wandering risk — the audience's DMN was more active, suggesting some sections felt passive or repetitive.`, type: 'b' });
+  } else if (dmnA.diff < -5) {
+    insights.push({ text: `${labelB} carried a higher mind-wandering risk — the audience's DMN was more active, suggesting some sections felt passive or repetitive.`, type: 'a' });
+  }
+
+  const memA = avgs.find(m => m.key === 'memory')!;
+  if (Math.abs(memA.diff) >= 5) {
+    const memWinner = memA.diff > 0 ? labelA : labelB;
+    insights.push({ text: `${memWinner} scored higher on memory encoding — its content is more likely to be retained by listeners.`, type: memA.diff > 0 ? 'a' : 'b' });
+  }
+
+  const emoA = avgs.find(m => m.key === 'emotional')!;
+  if (Math.abs(emoA.diff) >= 5) {
+    const emoWinner = emoA.diff > 0 ? labelA : labelB;
+    insights.push({ text: `${emoWinner} generated stronger emotional processing in the insula — it connected on a more personal or visceral level.`, type: emoA.diff > 0 ? 'a' : 'b' });
+  }
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
+      <h2 className="text-sm font-medium text-zinc-300">Summary</h2>
+
+      {/* Metric averages table */}
+      <div className="space-y-2">
+        {avgs.map(({ key, label, color, a, b, diff }) => {
+          const aWins = key === 'dmn' ? diff < 0 : diff > 0;
+          const bWins = key === 'dmn' ? diff > 0 : diff < 0;
+          return (
+            <div key={key} className="flex items-center gap-3 text-sm">
+              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+              <span className="text-zinc-400 w-24 flex-shrink-0">{label}</span>
+              <div className="flex-1 flex items-center gap-1 min-w-0">
+                <span className={`font-medium ${aWins ? 'text-white' : 'text-zinc-500'}`}>{a}</span>
+                <span className="text-zinc-700 text-xs mx-1">vs</span>
+                <span className={`font-medium ${bWins ? 'text-white' : 'text-zinc-500'}`}>{b}</span>
+              </div>
+              {Math.abs(diff) >= 3 && (
+                <span className={`text-xs font-medium flex-shrink-0 ${aWins ? 'text-purple-400' : 'text-zinc-400'}`}>
+                  {aWins ? `${labelA} +${Math.abs(diff)}` : `${labelB} +${Math.abs(diff)}`}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Written insights */}
+      <div className="border-t border-zinc-800 pt-4 space-y-2">
+        {insights.map((ins, i) => (
+          <div key={i} className="flex items-start gap-2">
+            <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+              ins.type === 'a' ? 'bg-purple-400' : ins.type === 'b' ? 'bg-zinc-400' : 'bg-zinc-600'
+            }`} />
+            <p className="text-sm text-zinc-400 leading-relaxed">{ins.text}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-4 pt-1 text-xs text-zinc-600">
+        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" /> {labelA} advantage</span>
+        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-zinc-400 inline-block" /> {labelB} advantage</span>
+      </div>
+    </div>
+  );
+}
+
 function StatCard({ label, valA, valB, unit = '' }: { label: string; valA: number | null; valB: number | null; unit?: string }) {
   const a = valA ?? 0;
   const b = valB ?? 0;
@@ -325,6 +452,7 @@ export default function ComparePage() {
               ))}
             </div>
           </div>
+          <CompareSummary dataA={dataA} dataB={dataB} labelA={labelA} labelB={labelB} />
         </>
       )}
     </div>
