@@ -197,10 +197,6 @@ export default function AnalysisPage() {
           <p className="text-zinc-500 text-sm">
             Running Tribe v2 brain predictions. This takes 10–20 minutes.
           </p>
-          <button onClick={handleRetry} disabled={retrying}
-            className="mt-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-400 text-xs font-medium rounded-lg transition-colors border border-zinc-700">
-            {retrying ? 'Restarting…' : 'Stuck? Force restart'}
-          </button>
         </div>
       )}
 
