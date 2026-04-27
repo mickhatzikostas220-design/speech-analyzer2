@@ -12,7 +12,7 @@ image = (
         extra_index_url="https://download.pytorch.org/whl/cu121",
     )
     .run_commands(
-        "apt-get install -y git ffmpeg",
+        "apt-get install -y git",
         "pip install git+https://github.com/facebookresearch/tribev2.git",
     )
 )
