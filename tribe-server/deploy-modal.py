@@ -14,6 +14,7 @@ image = (
     .run_commands(
         "apt-get update && apt-get install -y git ffmpeg",
         "pip install git+https://github.com/facebookresearch/tribev2.git",
+        "python -m spacy download en_core_web_lg",  # bake into image so it doesn't download at runtime
     )
 )
 
@@ -30,7 +31,7 @@ AUDIO_EXTENSIONS = {"mp3", "wav", "flac", "ogg", "m4a", "aac"}
 
 @app.function(
     gpu="T4",
-    timeout=300,
+    timeout=900,
     volumes={"/cache": volume},
     secrets=[modal.Secret.from_name("huggingface-secret")],
 )

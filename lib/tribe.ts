@@ -47,7 +47,7 @@ export async function callTribeV2(
     method: 'POST',
     headers,
     body: JSON.stringify({ file_url: signedFileUrl, duration_seconds: durationSeconds }),
-    signal: AbortSignal.timeout(300_000),
+    signal: AbortSignal.timeout(900_000),
   });
 
   if (!res.ok) {
