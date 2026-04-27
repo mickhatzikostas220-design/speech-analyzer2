@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { VideoPlayer } from '@/components/VideoPlayer';
 import { EngagementChart } from '@/components/EngagementChart';
+import { ROIChart } from '@/components/ROIChart';
 import { ScoreRing } from '@/components/ScoreRing';
 import { BrainMap } from '@/components/BrainMap';
 import type { AnalysisDetail, FeedbackPoint } from '@/types';
@@ -34,6 +35,19 @@ function formatMs(ms: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+function ScorePill({ label, value, description, color }: { label: string; value: number; description: string; color: string }) {
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex-1 min-w-0">
+      <p className="text-xs text-zinc-500 mb-1">{label}</p>
+      <div className="flex items-end gap-2">
+        <span className={`text-2xl font-bold ${color}`}>{value}</span>
+        <span className="text-zinc-600 text-sm mb-0.5">/100</span>
+      </div>
+      <p className="text-zinc-600 text-xs mt-1 leading-snug">{description}</p>
+    </div>
+  );
+}
+
 export default function AnalysisPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -51,7 +65,6 @@ export default function AnalysisPage() {
     if (!res.ok) { setError('Analysis not found.'); return; }
     const data: AnalysisDetail = await res.json();
     setDetail(data);
-
     if (data.analysis.status === 'complete' || data.analysis.status === 'error') {
       if (pollRef.current) clearInterval(pollRef.current);
     }
@@ -66,19 +79,14 @@ export default function AnalysisPage() {
   async function handleDelete() {
     setDeleting(true);
     const res = await fetch(`/api/analyses/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      router.push('/dashboard');
-    } else {
-      setDeleting(false);
-      setShowDeleteConfirm(false);
-    }
+    if (res.ok) { router.push('/dashboard'); }
+    else { setDeleting(false); setShowDeleteConfirm(false); }
   }
 
   async function handleRetry() {
     setRetrying(true);
     const res = await fetch(`/api/analyses/${id}/process`, { method: 'POST' });
     if (res.ok) {
-      // Restart polling
       if (pollRef.current) clearInterval(pollRef.current);
       await fetchDetail();
       pollRef.current = setInterval(fetchDetail, POLL_INTERVAL);
@@ -106,9 +114,10 @@ export default function AnalysisPage() {
     );
   }
 
-  const { analysis, feedback_points, engagement_timeline, file_url } = detail;
+  const { analysis, feedback_points, engagement_timeline, roi_timeline, file_url } = detail;
   const isPending = analysis.status === 'pending' || analysis.status === 'processing';
-  const isError = analysis.status === 'error';
+  const isError   = analysis.status === 'error';
+  const durationMs = (analysis.duration_seconds ?? 60) * 1000;
 
   const activeFeedback: FeedbackPoint | undefined = feedback_points.find(
     (fp) => currentTimeMs >= fp.timecode_ms && currentTimeMs < fp.timecode_end_ms + 5000
@@ -116,6 +125,7 @@ export default function AnalysisPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+
       {/* Delete confirmation modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
@@ -125,17 +135,12 @@ export default function AnalysisPage() {
               This will permanently delete the recording and all analysis data. This cannot be undone.
             </p>
             <div className="flex gap-3">
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
-              >
+              <button onClick={handleDelete} disabled={deleting}
+                className="flex-1 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
                 {deleting ? 'Deleting…' : 'Delete'}
               </button>
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium rounded-lg transition-colors"
-              >
+              <button onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium rounded-lg transition-colors">
                 Cancel
               </button>
             </div>
@@ -153,11 +158,9 @@ export default function AnalysisPage() {
           {analysis.overall_score !== null && (
             <ScoreRing score={analysis.overall_score} size={64} />
           )}
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
+          <button onClick={() => setShowDeleteConfirm(true)}
             className="p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-            title="Delete analysis"
-          >
+            title="Delete analysis">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -165,6 +168,24 @@ export default function AnalysisPage() {
           </button>
         </div>
       </div>
+
+      {/* Mock data warning */}
+      {analysis.status === 'complete' && analysis.is_mock && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 flex items-start gap-3">
+          <svg className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <div>
+            <p className="text-amber-400 text-sm font-medium">Simulated data — Tribe v2 did not run</p>
+            <p className="text-amber-400/70 text-xs mt-0.5">
+              The GPU model failed. Scores are randomly generated and not meaningful.
+              Check that your HuggingFace token in Modal is valid and that you have accepted the
+              facebook/tribev2 license on huggingface.co, then retry.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Processing state */}
       {isPending && (
@@ -186,35 +207,14 @@ export default function AnalysisPage() {
           {analysis.error_message && (
             <p className="text-red-400/70 text-sm">{analysis.error_message}</p>
           )}
-          <button
-            onClick={handleRetry}
-            disabled={retrying}
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors border border-zinc-700"
-          >
+          <button onClick={handleRetry} disabled={retrying}
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors border border-zinc-700">
             {retrying ? 'Retrying…' : 'Retry analysis'}
           </button>
         </div>
       )}
 
-      {/* Mock data warning */}
-      {analysis.status === 'complete' && analysis.is_mock && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 flex items-start gap-3">
-          <svg className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-          </svg>
-          <div>
-            <p className="text-amber-400 text-sm font-medium">Simulated data — Tribe v2 did not run</p>
-            <p className="text-amber-400/70 text-xs mt-0.5">
-              The GPU model failed to load. Scores are randomly generated and not meaningful.
-              Check that your HuggingFace token in Modal is valid and that you have accepted the
-              facebook/tribev2 license on huggingface.co.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Complete */}
+      {/* ── Complete ── */}
       {analysis.status === 'complete' && file_url && (
         <>
           <VideoPlayer
@@ -225,6 +225,37 @@ export default function AnalysisPage() {
             seekToMs={seekToMs}
           />
 
+          {/* Summary stat pills */}
+          {(analysis.cognitive_load_score !== null || analysis.mind_wandering_score !== null) && (
+            <div className="flex gap-3 flex-wrap">
+              {analysis.overall_score !== null && (
+                <ScorePill
+                  label="Overall Engagement"
+                  value={analysis.overall_score}
+                  description="Average predicted neural engagement across the full speech"
+                  color="text-purple-400"
+                />
+              )}
+              {analysis.cognitive_load_score !== null && (
+                <ScorePill
+                  label="Cognitive Load"
+                  value={analysis.cognitive_load_score}
+                  description="How hard the attention network worked — higher means more demanding content"
+                  color="text-green-400"
+                />
+              )}
+              {analysis.mind_wandering_score !== null && (
+                <ScorePill
+                  label="Mind-Wandering Risk"
+                  value={analysis.mind_wandering_score}
+                  description="Average Default Mode Network activity — higher means the audience's mind was more likely to wander"
+                  color={analysis.mind_wandering_score > 60 ? 'text-red-400' : 'text-amber-400'}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Engagement timeline */}
           {engagement_timeline.length > 0 && (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
               <h2 className="text-sm font-medium text-zinc-300 mb-3">Neural Engagement Timeline</h2>
@@ -232,42 +263,94 @@ export default function AnalysisPage() {
                 timeline={engagement_timeline}
                 feedbackPoints={feedback_points}
                 currentTimeMs={currentTimeMs}
-                durationMs={(analysis.duration_seconds ?? 60) * 1000}
+                durationMs={durationMs}
                 onSeek={(ms) => setSeekToMs(ms)}
               />
             </div>
           )}
 
-          {analysis.overall_brain_activations && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-              <h2 className="text-sm font-medium text-zinc-300 mb-4">Overall Brain Activity</h2>
+          {/* ROI timeline (4 brain regions over time) */}
+          {roi_timeline.length > 0 && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+              <h2 className="text-sm font-medium text-zinc-300 mb-1">Brain Region Activity Over Time</h2>
+              <p className="text-zinc-600 text-xs mb-3">
+                How each cortical region&apos;s activation changed second by second. Each line is independently normalized 0–100.
+              </p>
+              <ROIChart
+                timeline={roi_timeline}
+                durationMs={durationMs}
+                currentTimeMs={currentTimeMs}
+                onSeek={(ms) => setSeekToMs(ms)}
+              />
+            </div>
+          )}
+
+          {/* Brain map */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+            <h2 className="text-sm font-medium text-zinc-300 mb-4">Overall Brain Activity Map</h2>
+            {analysis.overall_brain_activations ? (
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
                 <BrainMap activations={analysis.overall_brain_activations} size={160} />
                 <div className="flex-1 space-y-3 text-sm text-zinc-400">
                   <p>
-                    This map shows average cortical activation across your speech, derived from Tribe v2&apos;s
-                    fMRI encoding model. Warmer colours indicate higher predicted neural engagement.
+                    Average cortical activation across your speech, derived from Tribe v2&apos;s fMRI
+                    encoding model. Warmer colours = higher predicted activation.
                   </p>
                   <div className="space-y-1.5">
-                    <div className="flex items-start gap-2">
-                      <span className="text-zinc-300 font-medium w-20 flex-shrink-0">Auditory</span>
-                      <span>Primary and secondary auditory cortex — how strongly the speech sound was processed.</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-zinc-300 font-medium w-20 flex-shrink-0">Language</span>
-                      <span>Left perisylvian network (Broca&apos;s + Wernicke&apos;s) — language comprehension load.</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-zinc-300 font-medium w-20 flex-shrink-0">Attention</span>
-                      <span>Bilateral parietal cortex (IPS) — sustained attention and cognitive control.</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-zinc-300 font-medium w-20 flex-shrink-0">DMN</span>
-                      <span>Default Mode Network — elevated DMN signals mind-wandering and disengagement.</span>
-                    </div>
+                    {[
+                      { name: 'Auditory', desc: 'Primary + secondary auditory cortex — how strongly the speech sound was processed.' },
+                      { name: 'Language', desc: 'Left perisylvian network (Broca\'s + Wernicke\'s) — language comprehension load.' },
+                      { name: 'Attention', desc: 'Bilateral parietal cortex (IPS) — sustained attention and cognitive control.' },
+                      { name: 'DMN',      desc: 'Default Mode Network — elevated DMN = mind-wandering and disengagement.' },
+                    ].map(({ name, desc }) => (
+                      <div key={name} className="flex items-start gap-2">
+                        <span className="text-zinc-300 font-medium w-20 flex-shrink-0">{name}</span>
+                        <span>{desc}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-zinc-500 text-sm">Brain map data not available for this analysis.</p>
+                <p className="text-zinc-600 text-xs mt-1">
+                  Re-run the analysis after deploying the latest Modal server to generate brain maps.
+                </p>
+                {!isError && (
+                  <button onClick={handleRetry} disabled={retrying}
+                    className="mt-3 px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors border border-zinc-700">
+                    {retrying ? 'Retrying…' : 'Re-analyze'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Peak moments */}
+          {analysis.peak_moments && analysis.peak_moments.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-medium text-zinc-300">
+                {analysis.peak_moments.length} Peak Moment{analysis.peak_moments.length !== 1 ? 's' : ''} — Your Best
+              </h2>
+              {analysis.peak_moments.map((pm, i) => (
+                <button
+                  key={i}
+                  onClick={() => setSeekToMs(pm.start_ms)}
+                  className="w-full text-left border border-green-500/30 bg-green-500/5 rounded-xl p-4 transition-all hover:border-green-500/50"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono text-zinc-500">
+                      {formatMs(pm.start_ms)} – {formatMs(pm.end_ms)}
+                    </span>
+                    <span className="text-xs font-medium text-green-400">{pm.score}/100</span>
+                    <span className="text-xs uppercase tracking-wide text-green-500">peak engagement</span>
+                  </div>
+                  <p className="text-zinc-400 text-sm mt-1">
+                    High neural engagement across auditory, language, and attention networks during this segment.
+                  </p>
+                </button>
+              ))}
             </div>
           )}
 
@@ -276,10 +359,8 @@ export default function AnalysisPage() {
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-medium text-zinc-300">Transcript</h2>
-                <button
-                  onClick={() => downloadExport('transcript')}
-                  className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
-                >
+                <button onClick={() => downloadExport('transcript')}
+                  className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -293,7 +374,7 @@ export default function AnalysisPage() {
             </div>
           )}
 
-          {/* Feedback list */}
+          {/* Engagement drops */}
           {feedback_points.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -301,20 +382,16 @@ export default function AnalysisPage() {
                   {feedback_points.length} Engagement Drop{feedback_points.length !== 1 ? 's' : ''} Detected
                 </h2>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => downloadExport('feedback')}
-                    className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
-                  >
+                  <button onClick={() => downloadExport('feedback')}
+                    className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                     Export .csv
                   </button>
-                  <button
-                    onClick={() => downloadExport('json')}
-                    className="text-xs text-zinc-500 hover:text-zinc-400 transition-colors flex items-center gap-1"
-                  >
+                  <button onClick={() => downloadExport('json')}
+                    className="text-xs text-zinc-500 hover:text-zinc-400 transition-colors flex items-center gap-1">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -324,13 +401,10 @@ export default function AnalysisPage() {
                 </div>
               </div>
               {feedback_points.map((fp) => (
-                <div
-                  key={fp.id}
-                  className={`border rounded-xl transition-all ${severityColor(fp.severity)}`}
-                >
+                <div key={fp.id} className={`border rounded-xl transition-all ${severityColor(fp.severity)}`}>
                   <button
                     onClick={() => setSeekToMs(fp.timecode_ms)}
-                    className="w-full text-left p-4 hover:bg-white/[0.02] rounded-xl transition-colors"
+                    className="w-full text-left p-4 hover:bg-white/[0.02] rounded-t-xl transition-colors"
                   >
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-xs font-mono text-zinc-500">
@@ -346,7 +420,6 @@ export default function AnalysisPage() {
                     <p className="text-white text-sm">{fp.feedback_text}</p>
                     <p className="text-zinc-400 text-sm mt-1">→ {fp.improvement_suggestion}</p>
                   </button>
-
                   {fp.brain_activations && (
                     <div className="px-4 pb-4 border-t border-white/5 pt-3">
                       <p className="text-xs text-zinc-600 mb-3">Brain activity at this moment</p>

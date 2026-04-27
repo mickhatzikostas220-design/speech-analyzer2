@@ -5,6 +5,14 @@ export interface ROIActivations {
   dmn: number;
 }
 
+export interface ROITimepoint {
+  timecode_ms: number;
+  auditory: number;
+  language: number;
+  attention: number;
+  dmn: number;
+}
+
 export interface Analysis {
   id: string;
   user_id: string;
@@ -18,6 +26,9 @@ export interface Analysis {
   error_message: string | null;
   created_at: string;
   overall_brain_activations: ROIActivations | null;
+  cognitive_load_score: number | null;
+  mind_wandering_score: number | null;
+  peak_moments: { start_ms: number; end_ms: number; score: number }[] | null;
   is_mock: boolean | null;
 }
 
@@ -44,5 +55,6 @@ export interface AnalysisDetail {
   analysis: Analysis;
   feedback_points: FeedbackPoint[];
   engagement_timeline: EngagementTimepoint[];
+  roi_timeline: ROITimepoint[];
   file_url: string | null;
 }

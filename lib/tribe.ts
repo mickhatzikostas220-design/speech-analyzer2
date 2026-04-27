@@ -5,16 +5,27 @@ export interface ROIActivations {
   dmn: number;
 }
 
+export interface ROITimepoint {
+  timecode_ms: number;
+  auditory: number;
+  language: number;
+  attention: number;
+  dmn: number;
+}
+
 export interface TribeResponse {
   engagement_timeline: { timecode_ms: number; score: number }[];
+  roi_timeline: ROITimepoint[];
   overall_score: number;
+  cognitive_load_score: number;
+  mind_wandering_score: number;
   low_engagement_moments: { start_ms: number; end_ms: number; score: number }[];
+  peak_moments: { start_ms: number; end_ms: number; score: number }[];
   brain_activations?: {
     overall: ROIActivations;
     moments: ROIActivations[];
   };
   is_mock?: boolean;
-  error_detail?: string | null;
 }
 
 export async function callTribeV2(
@@ -45,4 +56,3 @@ export async function callTribeV2(
 
   return res.json();
 }
-

@@ -70,9 +70,10 @@ export async function GET(
   }
 
   return NextResponse.json({
-    analysis: analysisRes.data,
-    feedback_points: feedbackRes.data ?? [],
+    analysis:           analysisRes.data,
+    feedback_points:    feedbackRes.data ?? [],
     engagement_timeline: timelineRes.data ?? [],
-    file_url: fileUrl,
+    roi_timeline:       analysisRes.data.roi_timeline ?? [],
+    file_url:           fileUrl,
   });
 }

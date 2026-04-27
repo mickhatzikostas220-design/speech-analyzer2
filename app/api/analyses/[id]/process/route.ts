@@ -140,10 +140,14 @@ export async function POST(
     await supabase
       .from('analyses')
       .update({
-        overall_score: tribeResult.overall_score,
-        status: 'complete',
+        overall_score:             tribeResult.overall_score,
+        status:                    'complete',
         overall_brain_activations: tribeResult.brain_activations?.overall ?? null,
-        is_mock: tribeResult.is_mock ?? false,
+        cognitive_load_score:      tribeResult.cognitive_load_score,
+        mind_wandering_score:      tribeResult.mind_wandering_score,
+        peak_moments:              tribeResult.peak_moments,
+        roi_timeline:              tribeResult.roi_timeline,
+        is_mock:                   tribeResult.is_mock ?? false,
       })
       .eq('id', params.id);
 
