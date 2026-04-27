@@ -261,21 +261,11 @@ function CompareSummary({ dataA, dataB, labelA, labelB }: { dataA: ChartData; da
         })}
       </div>
 
-      {/* Written insights */}
-      <div className="border-t border-zinc-800 pt-4 space-y-2">
-        {insights.map((ins, i) => (
-          <div key={i} className="flex items-start gap-2">
-            <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-              ins.type === 'a' ? 'bg-purple-400' : ins.type === 'b' ? 'bg-zinc-400' : 'bg-zinc-600'
-            }`} />
-            <p className="text-sm text-zinc-400 leading-relaxed">{ins.text}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex items-center gap-4 pt-1 text-xs text-zinc-600">
-        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" /> {labelA} advantage</span>
-        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-zinc-400 inline-block" /> {labelB} advantage</span>
+      {/* Written paragraph */}
+      <div className="border-t border-zinc-800 pt-4">
+        <p className="text-sm text-zinc-400 leading-relaxed">
+          {insights.map(i => i.text).join(' ')}
+        </p>
       </div>
     </div>
   );
