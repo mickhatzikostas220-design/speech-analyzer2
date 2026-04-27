@@ -42,7 +42,16 @@ def predict(body: dict):
     import numpy as np
     from tribev2 import TribeModel
 
-    os.environ["HF_TOKEN"] = os.environ.get("HF_TOKEN", "")
+    token = os.environ.get("HF_TOKEN", "")
+    os.environ["HF_TOKEN"] = token
+
+    # Log which HF account the token belongs to so we can diagnose access issues
+    try:
+        import huggingface_hub
+        info = huggingface_hub.whoami(token=token)
+        print(f"[INFO] HF account: {info['name']} | token starts: {token[:8]}...")
+    except Exception as hf_err:
+        print(f"[ERROR] HF token invalid or missing: {hf_err}")
 
     file_url         = body.get("file_url", "")
     duration_seconds = float(body.get("duration_seconds", 60))
