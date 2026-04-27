@@ -13,10 +13,13 @@ interface Props {
 const HEIGHT = 80;
 
 const LINES = [
-  { key: 'auditory'  as const, label: 'Auditory',  color: '#06b6d4' },
-  { key: 'language'  as const, label: 'Language',  color: '#a855f7' },
-  { key: 'attention' as const, label: 'Attention', color: '#22c55e' },
-  { key: 'dmn'       as const, label: 'DMN',       color: '#f59e0b' },
+  { key: 'auditory'  as const, label: 'Auditory',   color: '#06b6d4' },
+  { key: 'language'  as const, label: 'Language',   color: '#a855f7' },
+  { key: 'attention' as const, label: 'Attention',  color: '#22c55e' },
+  { key: 'dmn'       as const, label: 'DMN',        color: '#f59e0b' },
+  { key: 'prosody'   as const, label: 'Prosody',    color: '#f472b6' },
+  { key: 'emotional' as const, label: 'Emotional',  color: '#fb923c' },
+  { key: 'memory'    as const, label: 'Memory',     color: '#34d399' },
 ];
 
 export function ROIChart({ timeline, durationMs, onSeek, currentTimeMs }: Props) {

@@ -26,6 +26,9 @@ AUDITORY  = list(range(900,  1100))  + list(range(11142, 11342))
 LANGUAGE  = list(range(1300, 2200))  + list(range(11541, 12442))
 ATTENTION = list(range(4500, 5000))  + list(range(14742, 15242))
 DMN       = list(range(6000, 7500))  + list(range(16000, 17500))
+PROSODY   = list(range(1050, 1300))  + list(range(11200, 11800))  # Right-dominant STG prosody
+EMOTIONAL = list(range(3000, 3600))  + list(range(13000, 13600))  # Insula bilateral
+MEMORY    = list(range(7500, 8100))  + list(range(17400, 18000))  # Parahippocampal/MTL
 AUDIO_EXTENSIONS = {"mp3", "wav", "flac", "ogg", "m4a", "aac"}
 
 
@@ -119,11 +122,17 @@ def process_analysis(body: dict):
         lang_arr = np.array(LANGUAGE)
         att_arr  = np.array(ATTENTION)
         dmn_arr  = np.array(DMN)
+        pros_arr = np.array(PROSODY)
+        emo_arr  = np.array(EMOTIONAL)
+        mem_arr  = np.array(MEMORY)
 
         aud_t  = preds[:, aud_arr].mean(axis=1)
         lang_t = preds[:, lang_arr].mean(axis=1)
         att_t  = preds[:, att_arr].mean(axis=1)
         dmn_t  = preds[:, dmn_arr].mean(axis=1)
+        pros_t = preds[:, pros_arr].mean(axis=1)
+        emo_t  = preds[:, emo_arr].mean(axis=1)
+        mem_t  = preds[:, mem_arr].mean(axis=1)
 
         eng_t    = (aud_t + lang_t + att_t) / 3
         raw      = eng_t * 0.8 - dmn_t * 0.2
@@ -136,18 +145,37 @@ def process_analysis(body: dict):
             lo, hi = float(arr.min()), float(arr.max())
             return ((arr - lo) / (hi - lo) * 100).clip(0, 100) if hi > lo else np.full_like(arr, 50.0)
 
-        aud_n = norm100(aud_t); lang_n = norm100(lang_t)
-        att_n = norm100(att_t); dmn_n  = norm100(dmn_t)
+        aud_n  = norm100(aud_t);  lang_n = norm100(lang_t)
+        att_n  = norm100(att_t);  dmn_n  = norm100(dmn_t)
+        pros_n = norm100(pros_t); emo_n  = norm100(emo_t)
+        mem_n  = norm100(mem_t)
 
         n = len(scores)
         timeline = [{"timecode_ms": i * 1000, "score": int(scores[i])} for i in range(n)]
 
         roi_timeline = [
             {"timecode_ms": i * 1000,
-             "auditory":    int(aud_n[i]),  "language": int(lang_n[i]),
-             "attention":   int(att_n[i]),  "dmn":      int(dmn_n[i])}
+             "auditory":    int(aud_n[i]),  "language":  int(lang_n[i]),
+             "attention":   int(att_n[i]),  "dmn":       int(dmn_n[i]),
+             "prosody":     int(pros_n[i]), "emotional": int(emo_n[i]),
+             "memory":      int(mem_n[i])}
             for i in range(n)
         ]
+
+        # ── Per-word neural responses ─────────────────────────────────────────
+        word_responses = []
+        for w in words_data:
+            t = int(w["start"])
+            if 0 <= t < len(preds):
+                word_responses.append({
+                    "word":      w["word"],
+                    "start":     w["start"],
+                    "end":       w["end"],
+                    "score":     int((aud_n[t] + lang_n[t] + att_n[t]) / 3),
+                    "emotional": int(emo_n[t]),
+                    "memory":    int(mem_n[t]),
+                    "prosody":   int(pros_n[t]),
+                })
 
         overall_score        = int(scores.mean())
         cognitive_load_score = int(att_n.mean())
@@ -283,6 +311,7 @@ def process_analysis(body: dict):
             "peak_moments":              peak_moments,
             "roi_timeline":              roi_timeline,
             "overall_brain_activations": overall_act,
+            "word_responses":            word_responses,
             "is_mock":                   False,
             "status":                    "complete",
         }, f"id=eq.{analysis_id}")

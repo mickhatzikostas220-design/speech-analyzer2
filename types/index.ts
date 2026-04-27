@@ -11,6 +11,19 @@ export interface ROITimepoint {
   language: number;
   attention: number;
   dmn: number;
+  prosody: number;
+  emotional: number;
+  memory: number;
+}
+
+export interface WordResponse {
+  word: string;
+  start: number;
+  end: number;
+  score: number;
+  emotional: number;
+  memory: number;
+  prosody: number;
 }
 
 export interface Analysis {
@@ -29,6 +42,7 @@ export interface Analysis {
   cognitive_load_score: number | null;
   mind_wandering_score: number | null;
   peak_moments: { start_ms: number; end_ms: number; score: number }[] | null;
+  word_responses: WordResponse[] | null;
   is_mock: boolean | null;
 }
 

@@ -7,7 +7,7 @@ import { EngagementChart } from '@/components/EngagementChart';
 import { ROIChart } from '@/components/ROIChart';
 import { ScoreRing } from '@/components/ScoreRing';
 import { BrainMap } from '@/components/BrainMap';
-import type { AnalysisDetail, FeedbackPoint } from '@/types';
+import type { AnalysisDetail, FeedbackPoint, WordResponse } from '@/types';
 
 const POLL_INTERVAL = 2500;
 
@@ -371,6 +371,36 @@ export default function AnalysisPage() {
               <p className="text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap">
                 {analysis.transcript}
               </p>
+            </div>
+          )}
+
+          {/* Word Neural Response */}
+          {analysis.word_responses && analysis.word_responses.length > 0 && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+              <h2 className="text-sm font-medium text-zinc-300 mb-1">Word Neural Response</h2>
+              <p className="text-zinc-600 text-xs mb-4">Each word coloured by predicted neural activation. Green = high engagement, red = low.</p>
+              <div className="flex flex-wrap gap-1.5">
+                {analysis.word_responses.map((w: WordResponse, i: number) => {
+                  const avg = Math.round((w.score + w.emotional + w.memory) / 3);
+                  const r = avg < 50 ? 255 : Math.round(255 * (1 - (avg - 50) / 50));
+                  const g = avg > 50 ? 255 : Math.round(255 * (avg / 50));
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setSeekToMs(Math.round(w.start * 1000))}
+                      title={`Engagement: ${w.score} · Emotional: ${w.emotional} · Memory: ${w.memory} · Prosody: ${w.prosody}`}
+                      className="text-sm px-1 py-0.5 rounded transition-opacity hover:opacity-80"
+                      style={{ color: `rgb(${r},${g},80)`, fontWeight: avg > 70 ? 600 : 400 }}
+                    >
+                      {w.word}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2 mt-3">
+                <div className="h-1.5 flex-1 rounded-full" style={{ background: 'linear-gradient(to right, rgb(255,0,80), rgb(255,255,80), rgb(0,255,80))' }} />
+                <span className="text-[10px] text-zinc-600">low → high activation</span>
+              </div>
             </div>
           )}
 
