@@ -43,6 +43,7 @@ export function Navbar() {
           <nav className="flex items-center gap-4">
             {link('/dashboard', 'Dashboard')}
             {link('/history', 'History')}
+            {link('/compare', 'Compare')}
           </nav>
         </div>
 
