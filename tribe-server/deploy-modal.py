@@ -30,7 +30,7 @@ AUDIO_EXTENSIONS = {"mp3", "wav", "flac", "ogg", "m4a", "aac"}
 
 
 @app.function(
-    gpu="T4",
+    gpu="A10G",
     timeout=900,
     volumes={"/cache": volume},
     secrets=[modal.Secret.from_name("huggingface-secret")],
