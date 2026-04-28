@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Analysis, AnalysisDetail, ROITimepoint } from '@/types';
 
 type MetricKey = 'engagement' | 'auditory' | 'language' | 'attention' | 'dmn' | 'prosody' | 'emotional' | 'memory';
@@ -179,67 +179,58 @@ function avgMetric(data: ChartData, key: MetricKey): number {
   return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
 }
 
-function buildParagraph(avgs: { key: MetricKey; a: number; b: number; diff: number }[], labelA: string, labelB: string): string {
+function buildSummary(avgs: { key: MetricKey; a: number; b: number; diff: number }[], labelA: string, labelB: string): string {
   const get = (key: MetricKey) => avgs.find(m => m.key === key)!;
-  const W = (diff: number, key: MetricKey) => (key === 'dmn' ? diff < 0 : diff > 0) ? labelA : labelB;
-  const sentences: string[] = [];
+  const win = (diff: number, key: MetricKey) => (key === 'dmn' ? diff < 0 : diff > 0) ? labelA : labelB;
+  const parts: string[] = [];
 
   const eng = get('engagement');
-  if (eng.diff === 0) {
-    sentences.push(`Overall, both speeches held the audience's attention equally well.`);
-  } else {
-    const engWinner = eng.diff > 0 ? labelA : labelB;
-    const engLoser  = eng.diff > 0 ? labelB : labelA;
-    sentences.push(`Overall, ${engWinner} did a better job keeping the audience's brain engaged — the neural activity was consistently higher throughout, while ${engLoser} had more moments where attention started to slip.`);
+  parts.push(eng.diff === 0
+    ? `Both speeches scored equally on overall engagement.`
+    : `${eng.diff > 0 ? labelA : labelB} was more engaging overall.`);
+
+  const checks: { key: MetricKey; aHead: string; bHead: string }[] = [
+    { key: 'auditory',   aHead: 'stronger vocal delivery',        bHead: 'flatter vocal delivery' },
+    { key: 'language',   aHead: 'clearer ideas',                  bHead: 'harder to follow language' },
+    { key: 'attention',  aHead: 'better sustained focus',         bHead: 'more attention drift' },
+    { key: 'dmn',        aHead: 'more mind-wandering risk',       bHead: 'less mind-wandering risk' },
+    { key: 'prosody',    aHead: 'better rhythm and flow',         bHead: 'flatter pacing' },
+    { key: 'emotional',  aHead: 'stronger emotional connection',  bHead: 'less emotional impact' },
+    { key: 'memory',     aHead: 'more memorable content',         bHead: 'less memorable content' },
+  ];
+
+  for (const { key, aHead, bHead } of checks) {
+    const m = get(key);
+    if (Math.abs(m.diff) < 3) continue;
+    const w = win(m.diff, key);
+    const desc = (key === 'dmn' ? m.diff > 0 : m.diff > 0) ? aHead : bHead;
+    parts.push(`${w} had ${desc}.`);
   }
 
-  const aud = get('auditory');
-  if (Math.abs(aud.diff) >= 3) {
-    const w = W(aud.diff, 'auditory'), l = aud.diff > 0 ? labelB : labelA;
-    sentences.push(`When it comes to vocal delivery, ${w} was stronger — the brain responded more to the sound of the voice, which typically means better use of tone, volume, and variation. ${l} sounded more flat by comparison, which makes it easier for listeners to tune out.`);
-  }
+  return parts.join(' ');
+}
 
-  const lang = get('language');
-  if (Math.abs(lang.diff) >= 3) {
-    const w = W(lang.diff, 'language'), l = lang.diff > 0 ? labelB : labelA;
-    sentences.push(`For clarity of ideas, ${w} communicated more effectively — the language network in the brain was more active, meaning the words and sentences were easier to follow and understand. ${l} was harder for the brain to decode, which could mean the language was too complex, too abstract, or just not direct enough.`);
-  }
+function buildClaudePrompt(avgs: { key: MetricKey; a: number; b: number; diff: number }[], labelA: string, labelB: string): string {
+  const rows = avgs.map(m => `  ${m.key}: ${labelA}=${m.a}, ${labelB}=${m.b}, difference=${m.diff > 0 ? '+' : ''}${m.diff}`).join('\n');
+  return `I have neural engagement data from two speeches analysed using the Tribe v2 fMRI brain encoding model. Please write a professional speech coaching report comparing them.
 
-  const att = get('attention');
-  if (Math.abs(att.diff) >= 3) {
-    const w = W(att.diff, 'attention'), l = att.diff > 0 ? labelB : labelA;
-    sentences.push(`${w} was better at holding focus — the attention networks stayed more active throughout, which means the audience was genuinely paying attention rather than just hearing noise. ${l} had lower attention activation, suggesting it was harder to stay mentally present for.`);
-  }
+Speech A: "${labelA}"
+Speech B: "${labelB}"
 
-  const dmn = get('dmn');
-  if (Math.abs(dmn.diff) >= 3) {
-    const higher = dmn.diff > 0 ? labelA : labelB;
-    const lower  = dmn.diff > 0 ? labelB : labelA;
-    sentences.push(`${higher} triggered more mind-wandering — the default mode network, which activates when people drift off, was more active. This usually happens during slow or repetitive sections. ${lower} kept the default mode network quieter, meaning the audience stayed mentally present.`);
-  }
+Neural scores (0–100, higher = more brain activation):
+${rows}
 
-  const pros = get('prosody');
-  if (Math.abs(pros.diff) >= 3) {
-    const w = W(pros.diff, 'prosody'), l = pros.diff > 0 ? labelB : labelA;
-    sentences.push(`In terms of rhythm and pacing, ${w} had the edge — the brain responded more to the natural flow and intonation of the speech. ${l} sounded more robotic or monotone in comparison, which makes it harder to stay engaged over time.`);
-  }
+Note: DMN (Default Mode Network) is the opposite of the others — a high DMN score means the audience was mind-wandering, so lower is better for DMN.
 
-  const emo = get('emotional');
-  if (Math.abs(emo.diff) >= 3) {
-    const w = W(emo.diff, 'emotional'), l = emo.diff > 0 ? labelB : labelA;
-    sentences.push(`Emotionally, ${w} connected better — the insula, which processes emotional and personal reactions, was more active. This means the content felt more real, relatable, or impactful. ${l} was more neutral, which isn't always bad, but it means less of an emotional impression was left.`);
-  }
-
-  const mem = get('memory');
-  if (Math.abs(mem.diff) >= 3) {
-    const w = W(mem.diff, 'memory'), l = mem.diff > 0 ? labelB : labelA;
-    sentences.push(`Finally, ${w} is more likely to be remembered — the memory encoding regions were more active, meaning the content was being stored more deeply. ${l} may fade faster from memory, which is worth fixing if the goal is to leave a lasting impression.`);
-  }
-
-  return sentences.join(' ');
+Please write a clear, professional coaching report that:
+1. States which speech performed better overall and why
+2. Breaks down each metric in plain English — what it measures and what the difference means for the speaker
+3. Gives 3 specific, actionable recommendations for improving the weaker speech
+4. Ends with a one-paragraph executive summary a speaker could share with a client`;
 }
 
 function CompareSummary({ dataA, dataB, labelA, labelB }: { dataA: ChartData; dataB: ChartData; labelA: string; labelB: string }) {
+  const [copied, setCopied] = useState(false);
   const avgs = METRICS.map(m => ({
     key: m.key,
     a: avgMetric(dataA, m.key),
@@ -247,12 +238,36 @@ function CompareSummary({ dataA, dataB, labelA, labelB }: { dataA: ChartData; da
     diff: avgMetric(dataA, m.key) - avgMetric(dataB, m.key),
   }));
 
-  const paragraph = buildParagraph(avgs, labelA, labelB);
+  const summary = buildSummary(avgs, labelA, labelB);
+  const prompt  = buildClaudePrompt(avgs, labelA, labelB);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(prompt);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-3">
-      <h2 className="text-sm font-medium text-zinc-300">Summary</h2>
-      <p className="text-sm text-zinc-400 leading-relaxed">{paragraph}</p>
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
+      <div>
+        <h2 className="text-sm font-medium text-zinc-300 mb-2">Summary</h2>
+        <p className="text-sm text-zinc-400 leading-relaxed">{summary}</p>
+      </div>
+
+      <div className="border-t border-zinc-800 pt-4 space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-zinc-500">Claude prompt — paste this to generate a full coaching report</p>
+          <button
+            onClick={handleCopy}
+            className="text-xs px-3 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors border border-zinc-700"
+          >
+            {copied ? 'Copied!' : 'Copy prompt'}
+          </button>
+        </div>
+        <pre className="text-xs text-zinc-600 bg-zinc-950 border border-zinc-800 rounded-lg p-3 whitespace-pre-wrap leading-relaxed select-all">
+          {prompt}
+        </pre>
+      </div>
     </div>
   );
 }
