@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
+import { sendAccessRequestNotification } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -11,7 +12,6 @@ export async function POST(request: NextRequest) {
 
   const adminSupabase = createAdminClient();
 
-  // Check for duplicate pending/approved request
   const { data: existing } = await adminSupabase
     .from('access_requests')
     .select('status')
@@ -26,14 +26,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'A request from this email is already pending review.' }, { status: 409 });
   }
 
-  const { error } = await adminSupabase.from('access_requests').insert({
-    name: name.trim(),
-    email: email.toLowerCase().trim(),
-    reason: reason.trim(),
-  });
+  const { data: inserted, error } = await adminSupabase
+    .from('access_requests')
+    .insert({ name: name.trim(), email: email.toLowerCase().trim(), reason: reason.trim() })
+    .select('id')
+    .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error || !inserted) {
+    return NextResponse.json({ error: error?.message ?? 'Insert failed' }, { status: 500 });
+  }
+
+  if (process.env.RESEND_API_KEY) {
+    try {
+      await sendAccessRequestNotification(inserted.id, name.trim(), email.toLowerCase().trim(), reason.trim());
+    } catch (emailErr) {
+      console.error('Admin notification email failed:', emailErr);
+    }
   }
 
   return NextResponse.json({ success: true }, { status: 201 });
