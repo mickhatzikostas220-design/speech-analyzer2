@@ -58,6 +58,8 @@ export default function AnalysisPage() {
   const [deleting, setDeleting] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchDetail = useCallback(async () => {
@@ -81,6 +83,17 @@ export default function AnalysisPage() {
     const res = await fetch(`/api/analyses/${id}`, { method: 'DELETE' });
     if (res.ok) { router.push('/dashboard'); }
     else { setDeleting(false); setShowDeleteConfirm(false); }
+  }
+
+  async function handleRename() {
+    if (!titleInput.trim() || !detail) return;
+    await fetch(`/api/analyses/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: titleInput.trim() }),
+    });
+    setDetail(d => d ? { ...d, analysis: { ...d.analysis, title: titleInput.trim() } } : d);
+    setEditingTitle(false);
   }
 
   async function handleRetry() {
@@ -150,8 +163,32 @@ export default function AnalysisPage() {
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-white">{analysis.title}</h1>
+        <div className="flex-1 min-w-0">
+          {editingTitle ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                value={titleInput}
+                onChange={e => setTitleInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setEditingTitle(false); }}
+                className="text-xl font-semibold bg-zinc-800 border border-zinc-600 text-white rounded-lg px-2 py-0.5 focus:outline-none focus:border-purple-500 w-full"
+              />
+              <button onClick={handleRename} className="text-xs px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors flex-shrink-0">Save</button>
+              <button onClick={() => setEditingTitle(false)} className="text-xs px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg transition-colors flex-shrink-0">Cancel</button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 group">
+              <h1 className="text-xl font-semibold text-white truncate">{analysis.title}</h1>
+              <button
+                onClick={() => { setTitleInput(analysis.title); setEditingTitle(true); }}
+                className="opacity-0 group-hover:opacity-100 p-1 text-zinc-600 hover:text-zinc-300 transition-all"
+                title="Rename">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            </div>
+          )}
           <p className="text-zinc-500 text-xs mt-1">{formatDate(analysis.created_at)}</p>
         </div>
         <div className="flex items-center gap-3">

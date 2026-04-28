@@ -30,6 +30,27 @@ export async function DELETE(
   return NextResponse.json({ success: true });
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const { title } = await request.json();
+  if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 });
+
+  const { error } = await supabase
+    .from('analyses')
+    .update({ title: title.trim() })
+    .eq('id', params.id)
+    .eq('user_id', user.id);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true });
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
