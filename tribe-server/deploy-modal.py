@@ -9,7 +9,7 @@ image = (
         "fastapi",
         "uvicorn",
         "httpx",
-        "anthropic",
+        "openai",
         extra_index_url="https://download.pytorch.org/whl/cu121",
     )
     .run_commands(
@@ -40,22 +40,22 @@ AUDIO_EXTENSIONS = {"mp3", "wav", "flac", "ogg", "m4a", "aac"}
         modal.Secret.from_name("huggingface-secret"),   # HF_TOKEN
         modal.Secret.from_name("custom-secret"),        # SUPABASE_SERVICE_ROLE_KEY
         modal.Secret.from_name("custom-secret-2"),      # SUPABASE_URL
-        modal.Secret.from_name("anthropic-secret"),      # ANTHROPIC_API_KEY
+        modal.Secret.from_name("openai-secret"),          # OPENAI_API_KEY
     ],
 )
 def process_analysis(body: dict):
     import os, json, tempfile, urllib.request
     import numpy as np
     import httpx
-    import anthropic
     from tribev2 import TribeModel
+    from openai import OpenAI
 
     hf_token = os.environ.get("HF_TOKEN", "")
     os.environ["HF_TOKEN"] = hf_token
 
-    supabase_url    = os.environ["SUPABASE_URL"].rstrip("/").removesuffix("/rest/v1")
-    supabase_key    = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-    anthropic_key   = os.environ["ANTHROPIC_API_KEY"]
+    supabase_url  = os.environ["SUPABASE_URL"].rstrip("/").removesuffix("/rest/v1")
+    supabase_key  = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+    openai_key    = os.environ["OPENAI_API_KEY"]
 
     analysis_id      = body["analysis_id"]
     file_url         = body.get("file_url", "")
@@ -246,8 +246,8 @@ def process_analysis(body: dict):
                   [{"analysis_id": analysis_id, "timecode_ms": t["timecode_ms"], "score": t["score"]}
                    for t in timeline])
 
-        # ── Claude feedback for each low moment ──────────────────────────────
-        claude = anthropic.Anthropic(api_key=anthropic_key)
+        # ── GPT-4o feedback for each low moment ───────────────────────────────
+        oai = OpenAI(api_key=openai_key)
         feedback_rows = []
         for idx, moment in enumerate(low_moments[:8]):
             start_sec = moment["start_ms"] / 1000
@@ -265,24 +265,26 @@ def process_analysis(body: dict):
 
             if transcript:
                 try:
-                    resp = claude.messages.create(
-                        model="claude-haiku-4-5-20251001",
+                    resp = oai.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[
+                            {"role": "system", "content":
+                             "You are a professional speech coach. Neural engagement scores (0–100) represent "
+                             "audience brain activation measured via fMRI. Below 55 means the audience's "
+                             "attention is dropping.\n\nGive exactly two lines:\n"
+                             "Line 1: What specifically caused the engagement drop at this moment (reference the actual words).\n"
+                             "Line 2: One concrete fix for this exact moment — not generic advice.\n\n"
+                             "Each line must be one sentence, under 20 words."},
+                            {"role": "user", "content":
+                             f"At {minutes}:{seconds:02d}, neural engagement dropped to {moment['score']}/100.\n\n"
+                             f"Speaker said: \"{segment or '[audio section]'}\"\n\n"
+                             f"Full speech (first 400 chars): \"{transcript[:400]}\""},
+                        ],
                         max_tokens=120,
-                        system=(
-                            "You are a professional speech coach. Neural engagement scores (0–100) represent "
-                            "audience brain activation measured via fMRI. Below 55 means the audience's "
-                            "attention is dropping.\n\nGive exactly two lines:\n"
-                            "Line 1: What specifically caused the engagement drop at this moment (reference the actual words).\n"
-                            "Line 2: One concrete fix for this exact moment — not generic advice.\n\n"
-                            "Each line must be one sentence, under 20 words."
-                        ),
-                        messages=[{"role": "user", "content":
-                            f"At {minutes}:{seconds:02d}, neural engagement dropped to {moment['score']}/100.\n\n"
-                            f"Speaker said: \"{segment or '[audio section]'}\"\n\n"
-                            f"Full speech (first 400 chars): \"{transcript[:400]}\""}],
+                        temperature=0.6,
                     )
-                    lines = [l for l in (resp.content[0].text or "").strip().split("\n") if l]
-                    if lines:          fb_text = lines[0]
+                    lines = [l for l in (resp.choices[0].message.content or "").strip().split("\n") if l]
+                    if lines:     fb_text = lines[0]
                     if len(lines) > 1: fb_sugg = lines[1]
                 except Exception as e:
                     print(f"[WARN] feedback generation failed for moment {idx}: {e}")

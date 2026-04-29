@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest } from 'next/server';
 
@@ -14,13 +14,13 @@ function buildSystemPrompt(analysis: Record<string, unknown>, feedbackPoints: Re
   const wordResponses = (analysis.word_responses as { word: string; score: number; emotional: number; memory: number; prosody: number }[] | null) ?? [];
   const brainAct = analysis.overall_brain_activations as Record<string, number> | null;
 
-  const topWords = wordResponses
+  const topWords = [...wordResponses]
     .sort((a, b) => b.score - a.score)
     .slice(0, 10)
     .map(w => `"${w.word}" (engagement:${w.score} emotional:${w.emotional} memory:${w.memory} prosody:${w.prosody})`)
     .join(', ');
 
-  const bottomWords = wordResponses
+  const bottomWords = [...wordResponses]
     .sort((a, b) => a.score - b.score)
     .slice(0, 5)
     .map(w => `"${w.word}" (${w.score})`)
@@ -93,13 +93,15 @@ export async function POST(
     return new Response('Analysis not complete yet', { status: 422 });
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  const stream = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
+  const stream = await openai.chat.completions.create({
+    model: 'gpt-4o',
     max_tokens: 1024,
-    system: buildSystemPrompt(analysis, feedbackPoints ?? []),
-    messages,
+    messages: [
+      { role: 'system', content: buildSystemPrompt(analysis, feedbackPoints ?? []) },
+      ...messages,
+    ],
     stream: true,
   });
 
@@ -107,9 +109,8 @@ export async function POST(
   const readable = new ReadableStream({
     async start(controller) {
       for await (const chunk of stream) {
-        if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-          controller.enqueue(encoder.encode(chunk.delta.text));
-        }
+        const text = chunk.choices[0]?.delta?.content ?? '';
+        if (text) controller.enqueue(encoder.encode(text));
       }
       controller.close();
     },
