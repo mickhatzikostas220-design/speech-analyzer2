@@ -550,62 +550,65 @@ export default function AnalysisPage() {
             </div>
           )}
 
-          {/* Chat panel */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-5 h-5 rounded-md bg-gradient-to-br from-purple-500 to-indigo-500 flex-shrink-0" />
-              <h2 className="text-sm font-medium text-zinc-300">Ask about your speech</h2>
-            </div>
-
-            <div className="space-y-3 max-h-96 overflow-y-auto mb-3 pr-1">
-              {chatMessages.length === 0 && (
-                <div className="py-6 text-center space-y-2">
-                  <p className="text-zinc-500 text-sm">Chat with Claude about your neural data.</p>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    {['Why did my engagement drop?', 'What were my strongest moments?', 'How can I improve my prosody?'].map(q => (
-                      <button
-                        key={q}
-                        onClick={() => { setChatInput(q); }}
-                        className="text-xs px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-full border border-zinc-700 transition-colors"
-                      >
-                        {q}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {chatMessages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
-                    msg.role === 'user'
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-zinc-800 text-zinc-200'
-                  }`}>
-                    {msg.content || <span className="opacity-40 animate-pulse">Thinking…</span>}
-                  </div>
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
-
-            <form onSubmit={sendChat} className="flex gap-2">
-              <input
-                value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                placeholder="Ask anything about your data…"
-                disabled={chatLoading}
-                className="flex-1 bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-purple-500 placeholder-zinc-600 disabled:opacity-50"
-              />
-              <button
-                type="submit"
-                disabled={chatLoading || !chatInput.trim()}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors flex-shrink-0"
-              >
-                {chatLoading ? '…' : 'Send'}
-              </button>
-            </form>
-          </div>
         </>
+      )}
+
+      {/* Chat panel — shown for all completed analyses */}
+      {analysis.status === 'complete' && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-purple-500 to-indigo-500 flex-shrink-0" />
+            <h2 className="text-sm font-medium text-zinc-300">Ask about your speech</h2>
+          </div>
+
+          <div className="space-y-3 max-h-96 overflow-y-auto mb-3 pr-1">
+            {chatMessages.length === 0 && (
+              <div className="py-6 text-center space-y-2">
+                <p className="text-zinc-500 text-sm">Ask anything about your neural data.</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {['Why did my engagement drop?', 'What were my strongest moments?', 'How can I improve my prosody?'].map(q => (
+                    <button
+                      key={q}
+                      onClick={() => setChatInput(q)}
+                      className="text-xs px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-full border border-zinc-700 transition-colors"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {chatMessages.map((msg, i) => (
+              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                  msg.role === 'user'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-zinc-800 text-zinc-200'
+                }`}>
+                  {msg.content || <span className="opacity-40 animate-pulse">Thinking…</span>}
+                </div>
+              </div>
+            ))}
+            <div ref={chatEndRef} />
+          </div>
+
+          <form onSubmit={sendChat} className="flex gap-2">
+            <input
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              placeholder="Ask anything about your data…"
+              disabled={chatLoading}
+              className="flex-1 bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-purple-500 placeholder-zinc-600 disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={chatLoading || !chatInput.trim()}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors flex-shrink-0"
+            >
+              {chatLoading ? '…' : 'Send'}
+            </button>
+          </form>
+        </div>
       )}
     </div>
   );
