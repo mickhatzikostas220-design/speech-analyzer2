@@ -60,7 +60,11 @@ export default function AnalysisPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const fetchDetail = useCallback(async () => {
     const res = await fetch(`/api/analyses/${id}`);
@@ -109,6 +113,45 @@ export default function AnalysisPage() {
 
   function downloadExport(format: 'transcript' | 'feedback' | 'json') {
     window.open(`/api/analyses/${id}/export?format=${format}`, '_blank');
+  }
+
+  async function sendChat(e: React.FormEvent) {
+    e.preventDefault();
+    if (!chatInput.trim() || chatLoading) return;
+
+    const userMsg = { role: 'user' as const, content: chatInput.trim() };
+    const newMessages = [...chatMessages, userMsg];
+    setChatMessages(newMessages);
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const res = await fetch(`/api/analyses/${id}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: newMessages }),
+      });
+
+      if (!res.ok || !res.body) throw new Error('Failed');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let assistantText = '';
+
+      setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        assistantText += decoder.decode(value, { stream: true });
+        setChatMessages(prev => [...prev.slice(0, -1), { role: 'assistant', content: assistantText }]);
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    } catch {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. Try again.' }]);
+    } finally {
+      setChatLoading(false);
+    }
   }
 
   if (error) {
@@ -506,6 +549,62 @@ export default function AnalysisPage() {
               </p>
             </div>
           )}
+
+          {/* Chat panel */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-5 h-5 rounded-md bg-gradient-to-br from-purple-500 to-indigo-500 flex-shrink-0" />
+              <h2 className="text-sm font-medium text-zinc-300">Ask about your speech</h2>
+            </div>
+
+            <div className="space-y-3 max-h-96 overflow-y-auto mb-3 pr-1">
+              {chatMessages.length === 0 && (
+                <div className="py-6 text-center space-y-2">
+                  <p className="text-zinc-500 text-sm">Chat with Claude about your neural data.</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {['Why did my engagement drop?', 'What were my strongest moments?', 'How can I improve my prosody?'].map(q => (
+                      <button
+                        key={q}
+                        onClick={() => { setChatInput(q); }}
+                        className="text-xs px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-full border border-zinc-700 transition-colors"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                    msg.role === 'user'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-zinc-800 text-zinc-200'
+                  }`}>
+                    {msg.content || <span className="opacity-40 animate-pulse">Thinking…</span>}
+                  </div>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+
+            <form onSubmit={sendChat} className="flex gap-2">
+              <input
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                placeholder="Ask anything about your data…"
+                disabled={chatLoading}
+                className="flex-1 bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-purple-500 placeholder-zinc-600 disabled:opacity-50"
+              />
+              <button
+                type="submit"
+                disabled={chatLoading || !chatInput.trim()}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors flex-shrink-0"
+              >
+                {chatLoading ? '…' : 'Send'}
+              </button>
+            </form>
+          </div>
         </>
       )}
     </div>
