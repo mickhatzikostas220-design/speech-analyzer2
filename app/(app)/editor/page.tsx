@@ -12,6 +12,16 @@ interface EditorProject {
   created_at: string;
 }
 
+async function safeJson(res: Response): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+  try {
+    const text = (await res.text()).trim();
+    const data = text ? JSON.parse(text) : {};
+    return { ok: res.ok, data };
+  } catch {
+    return { ok: false, data: { error: `Server error ${res.status}` } };
+  }
+}
+
 function fmtDuration(s: number | null) {
   if (!s) return '—';
   const m = Math.floor(s / 60);
@@ -46,8 +56,8 @@ export default function EditorPage() {
 
   useEffect(() => {
     fetch('/api/editor')
-      .then((r) => r.json())
-      .then((d) => { setProjects(Array.isArray(d) ? d : []); setLoading(false); })
+      .then(safeJson)
+      .then(({ data }) => { setProjects(Array.isArray(data) ? data as unknown as EditorProject[] : []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
@@ -62,12 +72,11 @@ export default function EditorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newTitle.trim() }),
       });
-      const text = await res.text();
-      const data = text ? JSON.parse(text) : {};
-      if (res.ok) {
-        router.push(`/editor/${data.id}`);
+      const { ok, data } = await safeJson(res);
+      if (ok) {
+        router.push(`/editor/${(data as { id: string }).id}`);
       } else {
-        setCreateError(data.error || `Server error ${res.status}`);
+        setCreateError((data.error as string) || `Server error ${res.status}`);
       }
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Network error');

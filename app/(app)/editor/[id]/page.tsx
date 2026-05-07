@@ -22,6 +22,15 @@ interface EditorProject {
   video_url?: string | null;
 }
 
+async function safeJson(res: Response) {
+  try {
+    const text = (await res.text()).trim();
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return { error: `Server error ${res.status}` };
+  }
+}
+
 function fmt(s: number) {
   const m = Math.floor(s / 60);
   const sec = (s % 60).toFixed(1);
@@ -146,12 +155,12 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
   // Load project
   useEffect(() => {
     fetch(`/api/editor/${params.id}`)
-      .then((r) => r.json())
+      .then(safeJson)
       .then((d) => {
         if (d.error) { router.push('/editor'); return; }
-        setProject(d);
-        setClips(d.clips ?? []);
-        if (d.video_url) setVideoUrl(d.video_url);
+        setProject(d as EditorProject);
+        setClips((d as EditorProject).clips ?? []);
+        if ((d as EditorProject).video_url) setVideoUrl((d as EditorProject).video_url!);
         setLoading(false);
       })
       .catch(() => router.push('/editor'));
@@ -166,8 +175,8 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ video_duration: dur }),
       })
-        .then((r) => r.json())
-        .then((d) => setProject((p) => p ? { ...p, video_duration: d.video_duration } : p));
+        .then(safeJson)
+        .then((d) => setProject((p) => p ? { ...p, video_duration: (d as EditorProject).video_duration } : p));
     }
   }
 
@@ -190,8 +199,8 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
   // Get fresh signed URL before any ffmpeg operation
   async function getFreshVideoUrl(): Promise<string | null> {
     const res = await fetch(`/api/editor/${params.id}`);
-    const d = await res.json();
-    const url = d.video_url ?? null;
+    const d = await safeJson(res);
+    const url = (d as EditorProject).video_url ?? null;
     if (url) setVideoUrl(url);
     return url;
   }
@@ -226,8 +235,8 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ video_path: path, video_name: file.name, status: 'empty', clips: [] }),
       });
-      const updated = await res.json();
-      setProject(updated);
+      const updated = await safeJson(res);
+      setProject(updated as EditorProject);
       setClips([]);
       if (signed?.signedUrl) setVideoUrl(signed.signedUrl);
     } catch (e) {
