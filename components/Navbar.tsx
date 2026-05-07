@@ -44,6 +44,7 @@ export function Navbar() {
             {link('/dashboard', 'Dashboard')}
             {link('/history', 'History')}
             {link('/compare', 'Compare')}
+            {link('/editor', 'Editor')}
           </nav>
         </div>
 

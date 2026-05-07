@@ -1,5 +1,6 @@
 .next/
 node_modules/
+data/editor/
 .env.local
 .env
 *.log
