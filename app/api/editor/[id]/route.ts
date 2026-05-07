@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   try {
     const supabase = createClient();
@@ -39,7 +41,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const body = await request.json();
+    const rawText = (await request.text()).trim();
+    const body = rawText ? JSON.parse(rawText) : {};
     const allowed = ['video_path', 'video_name', 'video_duration', 'clips', 'status'];
     const updates = Object.fromEntries(
       Object.entries(body).filter(([k]) => allowed.includes(k))
