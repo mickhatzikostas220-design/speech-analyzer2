@@ -44,6 +44,7 @@ export default function EditorPage() {
   const [showModal, setShowModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/editor')
@@ -56,6 +57,7 @@ export default function EditorPage() {
     e.preventDefault();
     if (!newTitle.trim()) return;
     setCreating(true);
+    setCreateError(null);
     try {
       const res = await fetch('/api/editor', {
         method: 'POST',
@@ -63,7 +65,13 @@ export default function EditorPage() {
         body: JSON.stringify({ title: newTitle.trim() }),
       });
       const data = await res.json();
-      if (res.ok) router.push(`/editor/${data.id}`);
+      if (res.ok) {
+        router.push(`/editor/${data.id}`);
+      } else {
+        setCreateError(data.error || `Server error ${res.status}`);
+      }
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'Network error');
     } finally {
       setCreating(false);
     }
@@ -84,7 +92,7 @@ export default function EditorPage() {
           </p>
         </div>
         <button
-          onClick={() => { setNewTitle(''); setShowModal(true); }}
+          onClick={() => { setNewTitle(''); setCreateError(null); setShowModal(true); }}
           className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -159,6 +167,11 @@ export default function EditorPage() {
           >
             <h2 className="text-white font-semibold mb-4">New Project</h2>
             <form onSubmit={createProject} className="space-y-4">
+              {createError && (
+                <p className="text-xs text-red-400 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
+                  {createError}
+                </p>
+              )}
               <input
                 autoFocus
                 type="text"
