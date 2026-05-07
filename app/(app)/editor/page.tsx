@@ -6,11 +6,10 @@ import { useRouter } from 'next/navigation';
 interface EditorProject {
   id: string;
   title: string;
-  status: 'empty' | 'processing' | 'ready' | 'error';
-  videoDuration: number | null;
+  status: 'empty' | 'ready' | 'error';
+  video_duration: number | null;
   clips: { id: string; selected: boolean }[];
-  exportReady: boolean;
-  createdAt: string;
+  created_at: string;
 }
 
 function fmtDuration(s: number | null) {
@@ -32,7 +31,6 @@ function timeAgo(iso: string) {
 
 const STATUS_COLOR: Record<string, string> = {
   empty: 'text-zinc-500',
-  processing: 'text-amber-400',
   ready: 'text-green-400',
   error: 'text-red-400',
 };
@@ -126,19 +124,18 @@ export default function EditorPage() {
               <button className="flex-1 text-left" onClick={() => router.push(`/editor/${p.id}`)}>
                 <div className="flex items-center gap-3">
                   <span className="text-white font-medium text-sm">{p.title}</span>
-                  <span className={`text-xs capitalize ${STATUS_COLOR[p.status]}`}>{p.status}</span>
-                  {p.exportReady && (
-                    <span className="text-xs text-purple-400">· export ready</span>
-                  )}
+                  <span className={`text-xs capitalize ${STATUS_COLOR[p.status] ?? 'text-zinc-500'}`}>
+                    {p.status}
+                  </span>
                 </div>
                 <div className="flex items-center gap-4 mt-1">
-                  <span className="text-xs text-zinc-600">{timeAgo(p.createdAt)}</span>
-                  {p.videoDuration && (
-                    <span className="text-xs text-zinc-600">{fmtDuration(p.videoDuration)}</span>
+                  <span className="text-xs text-zinc-600">{timeAgo(p.created_at)}</span>
+                  {p.video_duration && (
+                    <span className="text-xs text-zinc-600">{fmtDuration(p.video_duration)}</span>
                   )}
-                  {p.clips.length > 0 && (
+                  {p.clips?.length > 0 && (
                     <span className="text-xs text-zinc-600">
-                      {p.clips.filter((c) => c.selected).length}/{p.clips.length} clips selected
+                      {p.clips.filter((c) => c.selected).length}/{p.clips.length} clips
                     </span>
                   )}
                 </div>
@@ -146,7 +143,6 @@ export default function EditorPage() {
               <button
                 onClick={() => deleteProject(p.id)}
                 className="ml-4 p-1 text-zinc-700 hover:text-red-400 transition-colors"
-                title="Delete project"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

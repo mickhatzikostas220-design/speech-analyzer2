@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { listUserProjects, saveProject, EDITOR_DIR } from '@/lib/editor/projects';
-import { mkdir } from 'fs/promises';
 
 export async function GET() {
   try {
@@ -9,12 +7,16 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    await mkdir(EDITOR_DIR, { recursive: true });
-    const projects = await listUserProjects(user.id);
-    return NextResponse.json(projects);
+    const { data, error } = await supabase
+      .from('editor_projects')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(data);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[editor GET]', msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
@@ -25,29 +27,20 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { title } = await request.json();
+    const text = await request.text();
+    const { title } = JSON.parse(text || '{}');
     if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 });
 
-    await mkdir(EDITOR_DIR, { recursive: true });
+    const { data, error } = await supabase
+      .from('editor_projects')
+      .insert({ user_id: user.id, title })
+      .select()
+      .single();
 
-    const project = {
-      id: crypto.randomUUID(),
-      userId: user.id,
-      title,
-      videoName: null,
-      videoExt: null,
-      videoDuration: null,
-      status: 'empty' as const,
-      clips: [],
-      exportReady: false,
-      createdAt: new Date().toISOString(),
-    };
-
-    await saveProject(project);
-    return NextResponse.json(project, { status: 201 });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(data, { status: 201 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[editor POST]', msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
