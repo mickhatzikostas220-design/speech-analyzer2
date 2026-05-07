@@ -64,7 +64,8 @@ export default function EditorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newTitle.trim() }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : {};
       if (res.ok) {
         router.push(`/editor/${data.id}`);
       } else {
