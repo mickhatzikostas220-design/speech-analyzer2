@@ -48,16 +48,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       Object.entries(body).filter(([k]) => allowed.includes(k))
     );
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('editor_projects')
       .update(updates)
       .eq('id', params.id)
-      .eq('user_id', user.id)
-      .select()
-      .single();
+      .eq('user_id', user.id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data);
+    return NextResponse.json({ success: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 500 });

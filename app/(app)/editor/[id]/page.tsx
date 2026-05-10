@@ -212,36 +212,26 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
     videoInFFmpeg.current = false;
 
     try {
-      // Get signed upload URL from server (bypasses storage RLS)
-      const signRes = await fetch(`/api/editor/${params.id}/signed-upload`, {
+      // Upload through server route (uses admin key, bypasses storage RLS)
+      const form = new FormData();
+      form.append('file', file);
+      const uploadRes = await fetch(`/api/editor/${params.id}/upload`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: file.name }),
+        body: form,
       });
-      const signData = await safeJson(signRes);
-      if (signData.error) throw new Error(`Could not get upload URL: ${signData.error}`);
+      const uploadData = await safeJson(uploadRes);
+      if (uploadData.error) throw new Error(String(uploadData.error));
 
-      const { token, path } = signData as { token: string; path: string };
+      const { path, videoUrl: signedUrl } = uploadData as { path: string; videoUrl: string | null };
+      const signed = signedUrl ? { signedUrl } : null;
 
-      const { error: uploadErr } = await supabase.storage
-        .from('speeches')
-        .uploadToSignedUrl(path, token, file, { upsert: true });
-
-      if (uploadErr) throw new Error(uploadErr.message);
-
-      // Get signed URL for immediate playback
-      const { data: signed } = await supabase.storage
-        .from('speeches')
-        .createSignedUrl(path, 3600);
-
-      // Save metadata
-      const res = await fetch(`/api/editor/${params.id}`, {
+      // Save metadata to DB
+      await fetch(`/api/editor/${params.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ video_path: path, video_name: file.name, status: 'empty', clips: [] }),
       });
-      const updated = await safeJson(res);
-      setProject(updated as EditorProject);
+      setProject((p) => p ? { ...p, video_path: path, video_name: file.name, status: 'empty' } : p);
       setClips([]);
       if (signed?.signedUrl) setVideoUrl(signed.signedUrl);
     } catch (e) {
