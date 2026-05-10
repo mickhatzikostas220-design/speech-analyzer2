@@ -26,13 +26,18 @@ interface ScriptClip {
   videoUrl?: string | null;
 }
 
+// One clip slice assigned to a script line
+interface SegmentClip {
+  clipId: string;
+  clipName: string;
+  start: number;
+  end: number;
+}
+
 interface ScriptSegment {
   id: string;
   scriptLine: string;
-  clipId: string | null;
-  clipName: string | null;
-  start: number;
-  end: number;
+  clips: SegmentClip[];   // ordered list — can be multiple per line
   confidence: number;
 }
 
@@ -61,12 +66,21 @@ function fmtTime(s: number): string {
   return `${m}:${sec.padStart(4, '0')}`;
 }
 
+// Migrate segments stored in the old single-clip format
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function migrateSegment(raw: any): ScriptSegment {
+  if (Array.isArray(raw.clips)) return raw as ScriptSegment;
+  const sc: SegmentClip[] = raw.clipId
+    ? [{ clipId: raw.clipId, clipName: raw.clipName ?? '', start: raw.start ?? 0, end: raw.end ?? 0 }]
+    : [];
+  return { id: raw.id, scriptLine: raw.scriptLine, clips: sc, confidence: raw.confidence ?? 0 };
+}
+
 // ── Script matching algorithm ────────────────────────────────
 function normalizeWord(w: string) {
   return w.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-// Character-level edit distance
 function levenshtein(a: string, b: string): number {
   if (a === b) return 0;
   if (!a.length) return b.length;
@@ -85,40 +99,30 @@ function levenshtein(a: string, b: string): number {
   return curr[b.length];
 }
 
-// 0–1 similarity between two words (1 = identical)
 function wordSim(a: string, b: string): number {
   if (!a && !b) return 1;
   if (!a || !b) return 0;
   if (a === b) return 1;
-  const dist = levenshtein(a, b);
-  return 1 - dist / Math.max(a.length, b.length);
+  return 1 - levenshtein(a, b) / Math.max(a.length, b.length);
 }
 
-// Score a window of transcript words against script words using fuzzy matching.
-// Uses a greedy subsequence approach: for each script word, find the best
-// fuzzy match in the remaining window words (in order).
 function fuzzySeqScore(scriptWords: string[], windowWords: string[]): number {
   if (!scriptWords.length) return 0;
   let si = 0;
   let totalSim = 0;
   for (let wi = 0; wi < windowWords.length && si < scriptWords.length; wi++) {
     const sim = wordSim(scriptWords[si], windowWords[wi]);
-    if (sim >= 0.65) {
-      totalSim += sim;
-      si++;
-    }
+    if (sim >= 0.65) { totalSim += sim; si++; }
   }
   return totalSim / scriptWords.length;
 }
 
-// Strip screenplay-style formatting before matching:
-// [Character name], <stage directions>, leading colons, quotes
 function cleanScriptLine(line: string): string {
   return line
-    .replace(/\[.*?\]/g, '')   // [Business], [Erin], etc.
-    .replace(/<.*?>/g, '')     // <disgruntled face>, etc.
-    .replace(/^[\s:]+/, '')    // leading colon/space after label
-    .replace(/["""]/g, '')     // curly and straight quotes
+    .replace(/\[.*?\]/g, '')
+    .replace(/<.*?>/g, '')
+    .replace(/^[\s:]+/, '')
+    .replace(/["""]/g, '')
     .trim();
 }
 
@@ -127,27 +131,14 @@ function matchScriptToClips(script: string, clips: ScriptClip[]): ScriptSegment[
   return lines.map((line) => {
     const cleaned = cleanScriptLine(line);
     const scriptWords = cleaned.split(/\s+/).map(normalizeWord).filter(Boolean);
-    if (!scriptWords.length) return {
-      id: crypto.randomUUID(), scriptLine: line,
-      clipId: null, clipName: null, start: 0, end: 0, confidence: 0,
-    };
+    if (!scriptWords.length) return { id: crypto.randomUUID(), scriptLine: line, clips: [], confidence: 0 };
 
     let bestScore = 0;
-    let bestClipId: string | null = null;
-    let bestClipName: string | null = null;
-    let bestStart = 0;
-    let bestEnd = 0;
+    let bestClip: SegmentClip | null = null;
 
     for (const clip of clips) {
       if (!clip.transcribed || !clip.transcription.length) continue;
-      const trans = clip.transcription.map((w) => ({
-        norm: normalizeWord(w.word),
-        start: w.start,
-        end: w.end,
-      }));
-
-      // Allow window to be 50%–200% of script word count to handle
-      // filler words, repetitions, and transcription insertions
+      const trans = clip.transcription.map((w) => ({ norm: normalizeWord(w.word), start: w.start, end: w.end }));
       const minW = Math.max(1, Math.floor(scriptWords.length * 0.5));
       const maxW = Math.ceil(scriptWords.length * 2.0);
 
@@ -157,10 +148,12 @@ function matchScriptToClips(script: string, clips: ScriptClip[]): ScriptSegment[
           const score = fuzzySeqScore(scriptWords, win.map((w) => w.norm));
           if (score > bestScore) {
             bestScore = score;
-            bestClipId = clip.id;
-            bestClipName = clip.name;
-            bestStart = Math.max(0, win[0].start - 0.2);
-            bestEnd = win[win.length - 1].end + 0.2;
+            bestClip = {
+              clipId: clip.id,
+              clipName: clip.name,
+              start: Math.max(0, win[0].start - 0.2),
+              end: win[win.length - 1].end + 0.2,
+            };
           }
         }
       }
@@ -169,10 +162,7 @@ function matchScriptToClips(script: string, clips: ScriptClip[]): ScriptSegment[
     return {
       id: crypto.randomUUID(),
       scriptLine: line,
-      clipId: bestScore > 0.25 ? bestClipId : null,
-      clipName: bestScore > 0.25 ? bestClipName : null,
-      start: bestStart,
-      end: bestEnd,
+      clips: bestScore > 0.25 && bestClip ? [bestClip] : [],
       confidence: bestScore,
     };
   });
@@ -186,7 +176,6 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
   const ffmpegRef = useRef<any>(null);
   const scriptSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
-
   const previewRef = useRef<HTMLVideoElement>(null);
   const previewEndRef = useRef<number>(0);
 
@@ -214,7 +203,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
         setProject(p);
         setClips(p.clips ?? []);
         setScript(p.script ?? '');
-        setSegments(p.segments ?? []);
+        setSegments((p.segments ?? []).map(migrateSegment));
         setLoading(false);
       })
       .catch(() => router.push('/editor'));
@@ -251,12 +240,20 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
 
   // ── Save clips to server ───────────────────────────────────
   async function saveClips(updated: ScriptClip[]) {
-    // Strip videoUrl before saving (it's ephemeral)
     const toSave = updated.map(({ videoUrl: _v, ...rest }) => rest);
     await fetch(`/api/editor/script/${params.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clips: toSave }),
+    });
+  }
+
+  // ── Save segments to server ────────────────────────────────
+  async function saveSegments(updated: ScriptSegment[]) {
+    await fetch(`/api/editor/script/${params.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ segments: updated }),
     });
   }
 
@@ -271,7 +268,6 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
         const file = files[i];
         setUploadMsg(`Uploading ${i + 1} of ${files.length}: ${file.name}`);
 
-        // Step 1: get a signed upload URL from server (admin key, no RLS)
         const signRes = await fetch(`/api/editor/script/${params.id}/signed-upload`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -282,7 +278,6 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
 
         const { signedUrl, path, clipId } = signData as { signedUrl: string; path: string; clipId: string };
 
-        // Step 2: PUT file directly to Supabase (browser → Supabase, no Vercel limit)
         const uploadRes = await fetch(signedUrl, {
           method: 'PUT',
           body: file,
@@ -293,21 +288,15 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
           throw new Error(`Upload failed: ${msg}`);
         }
 
-        // Step 3: get a signed download URL for playback
         const { data: signed } = await supabase.storage.from('speeches').createSignedUrl(path, 3600);
         const videoUrl = signed?.signedUrl ?? null;
 
         const newClip: ScriptClip = {
-          id: clipId,
-          name: file.name,
-          path,
-          duration: null,
-          transcribed: false,
-          transcription: [],
-          speechSegments: [],
+          id: clipId, name: file.name, path,
+          duration: null, transcribed: false,
+          transcription: [], speechSegments: [],
           videoUrl: videoUrl ?? null,
         };
-
         newClips.push(newClip);
         setClips([...newClips]);
         await saveClips(newClips);
@@ -341,14 +330,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
       const audioName = `clip_audio_${clip.id}.mp3`;
 
       await ffmpeg.writeFile(inputName, await fetchFile(freshUrl));
-      await ffmpeg.exec([
-        '-i', inputName,
-        '-vn',
-        '-ar', '16000',
-        '-ac', '1',
-        '-b:a', '32k',
-        audioName,
-      ]);
+      await ffmpeg.exec(['-i', inputName, '-vn', '-ar', '16000', '-ac', '1', '-b:a', '32k', audioName]);
 
       const audioData = await ffmpeg.readFile(audioName);
       const audioBlob = new Blob([new Uint8Array(audioData as ArrayBuffer)], { type: 'audio/mpeg' });
@@ -359,10 +341,9 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
       const res = await fetch('/api/transcribe', { method: 'POST', body: form });
       const data = await safeJson(res);
       if (data.error) throw new Error(data.error as string);
-
       const words: WordTimestamp[] = (data.words as WordTimestamp[]) ?? [];
 
-      // Detect silence to build speech segments for manual picking
+      // Silence detect for manual picker
       const silLogs: string[] = [];
       const silHandler = ({ message }: { message: string }) => silLogs.push(message);
       ffmpeg.on('log', silHandler);
@@ -390,7 +371,6 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
       setClips(updatedClips);
       await saveClips(updatedClips);
 
-      // Cleanup ffmpeg FS
       try { await ffmpeg.deleteFile(inputName); } catch { /* ignore */ }
       try { await ffmpeg.deleteFile(audioName); } catch { /* ignore */ }
     } catch (e) {
@@ -402,8 +382,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
 
   // ── Transcribe all ─────────────────────────────────────────
   async function handleTranscribeAll() {
-    const untranscribed = clips.filter((c) => !c.transcribed);
-    for (const clip of untranscribed) {
+    for (const clip of clips.filter((c) => !c.transcribed)) {
       await handleTranscribeClip(clip);
     }
   }
@@ -428,18 +407,26 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
     }
   }
 
-  // ── Manual segment pick ────────────────────────────────────
-  async function handleManualPick(segId: string, clip: ScriptClip, start: number, end: number) {
+  // ── Add a clip segment to a script line ────────────────────
+  async function handleAddSegmentClip(segId: string, clip: ScriptClip, start: number, end: number) {
+    const newEntry: SegmentClip = { clipId: clip.id, clipName: clip.name, start, end };
     const updated = segments.map((s) =>
-      s.id === segId ? { ...s, clipId: clip.id, clipName: clip.name, start, end, confidence: 1 } : s
+      s.id === segId ? { ...s, clips: [...s.clips, newEntry], confidence: 1 } : s
     );
     setSegments(updated);
-    setPickingForSegId(null);
-    await fetch(`/api/editor/script/${params.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ segments: updated }),
+    await saveSegments(updated);
+    // Keep picker open so user can add more
+  }
+
+  // ── Remove one clip from a script line ─────────────────────
+  async function handleRemoveSegmentClip(segId: string, clipIndex: number) {
+    const updated = segments.map((s) => {
+      if (s.id !== segId) return s;
+      const remaining = s.clips.filter((_, i) => i !== clipIndex);
+      return { ...s, clips: remaining, confidence: remaining.length ? s.confidence : 0 };
     });
+    setSegments(updated);
+    await saveSegments(updated);
   }
 
   // ── Preview a speech segment ───────────────────────────────
@@ -479,7 +466,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
 
   // ── Export assembled video ─────────────────────────────────
   async function handleExport() {
-    const validSegments = segments.filter((s) => s.clipId && s.confidence > 0.1);
+    const validSegments = segments.filter((s) => s.clips.length > 0);
     if (!validSegments.length) return;
 
     setExporting(true);
@@ -494,46 +481,35 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
         setExportProgress(Math.round(Math.min(progress, 1) * 100));
       ffmpeg.on('progress', progressHandler);
 
-      // Download each unique clip
-      const uniqueClipIds = Array.from(new Set(validSegments.map((s) => s.clipId as string)));
+      // Download each unique source clip
+      const uniqueClipIds = Array.from(new Set(validSegments.flatMap((s) => s.clips.map((c) => c.clipId))));
       for (const clipId of uniqueClipIds) {
         const url = await getFreshClipUrl(clipId);
         if (!url) throw new Error(`Could not get URL for clip ${clipId}`);
         await ffmpeg.writeFile(`clip_${clipId}.mp4`, await fetchFile(url));
       }
 
-      // Trim each segment
-      for (let i = 0; i < validSegments.length; i++) {
-        const seg = validSegments[i];
-        await ffmpeg.exec([
-          '-i', `clip_${seg.clipId}.mp4`,
-          '-ss', String(seg.start),
-          '-to', String(seg.end),
-          '-c:v', 'libx264',
-          '-preset', 'fast',
-          '-crf', '23',
-          '-c:a', 'aac',
-          '-b:a', '128k',
-          `seg_${i}.mp4`,
-        ]);
+      // Trim every sub-clip in order
+      let segIdx = 0;
+      for (const seg of validSegments) {
+        for (const sc of seg.clips) {
+          await ffmpeg.exec([
+            '-i', `clip_${sc.clipId}.mp4`,
+            '-ss', String(sc.start),
+            '-to', String(sc.end),
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+            '-c:a', 'aac', '-b:a', '128k',
+            `seg_${segIdx}.mp4`,
+          ]);
+          segIdx++;
+        }
       }
 
-      // Build concat list
-      const concatContent = validSegments
-        .map((_, i) => `file 'seg_${i}.mp4'`)
-        .join('\n');
-      const encoder = new TextEncoder();
-      await ffmpeg.writeFile('concat.txt', encoder.encode(concatContent));
+      const totalPieces = segIdx;
+      const concatContent = Array.from({ length: totalPieces }, (_, i) => `file 'seg_${i}.mp4'`).join('\n');
+      await ffmpeg.writeFile('concat.txt', new TextEncoder().encode(concatContent));
 
-      // Concatenate
-      await ffmpeg.exec([
-        '-f', 'concat',
-        '-safe', '0',
-        '-i', 'concat.txt',
-        '-c', 'copy',
-        'output.mp4',
-      ]);
-
+      await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', 'output.mp4']);
       ffmpeg.off('progress', progressHandler);
 
       const raw = await ffmpeg.readFile('output.mp4');
@@ -546,10 +522,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
       a.click();
       setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
 
-      // Cleanup
-      for (let i = 0; i < validSegments.length; i++) {
-        try { await ffmpeg.deleteFile(`seg_${i}.mp4`); } catch { /* ignore */ }
-      }
+      for (let i = 0; i < totalPieces; i++) { try { await ffmpeg.deleteFile(`seg_${i}.mp4`); } catch { /* ignore */ } }
       try { await ffmpeg.deleteFile('output.mp4'); } catch { /* ignore */ }
       try { await ffmpeg.deleteFile('concat.txt'); } catch { /* ignore */ }
     } catch (e) {
@@ -580,30 +553,25 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
   const isTranscribing = transcribingId !== null;
   const scriptLines = script.split('\n').filter((l) => l.trim()).length;
   const canMatch = script.trim().length > 0 && hasTranscribed && !matching && !exporting;
-  const validSegmentCount = segments.filter((s) => s.clipId && s.confidence > 0.1).length;
+  const validSegmentCount = segments.filter((s) => s.clips.length > 0).length;
   const totalAssembledDuration = segments
-    .filter((s) => s.clipId && s.confidence > 0.1)
-    .reduce((sum, s) => sum + (s.end - s.start), 0);
+    .filter((s) => s.clips.length > 0)
+    .reduce((sum, s) => sum + s.clips.reduce((cs, c) => cs + (c.end - c.start), 0), 0);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={() => router.push('/editor')}
-          className="text-zinc-500 hover:text-white transition-colors"
-        >
+        <button onClick={() => router.push('/editor')} className="text-zinc-500 hover:text-white transition-colors">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
         <h1 className="text-lg font-semibold text-white">{project.title}</h1>
         <span className={`text-xs px-2 py-0.5 rounded-full ${
-          project.status === 'ready'
-            ? 'bg-green-900/40 text-green-400'
-            : project.status === 'error'
-            ? 'bg-red-900/40 text-red-400'
-            : 'bg-zinc-800 text-zinc-500'
+          project.status === 'ready' ? 'bg-green-900/40 text-green-400'
+          : project.status === 'error' ? 'bg-red-900/40 text-red-400'
+          : 'bg-zinc-800 text-zinc-500'
         }`}>
           {project.status}
         </span>
@@ -621,7 +589,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
 
       {/* 2-column grid */}
       <div className="grid grid-cols-5 gap-6">
-        {/* LEFT — Clips panel (2/5) */}
+        {/* LEFT — Clips panel */}
         <div className="col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-white">Video Clips</p>
@@ -669,9 +637,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-sm text-white truncate" title={clip.name}>{clip.name}</p>
-                      {clip.duration !== null && (
-                        <p className="text-xs text-zinc-500 mt-0.5">{fmtTime(clip.duration)}</p>
-                      )}
+                      {clip.duration !== null && <p className="text-xs text-zinc-500 mt-0.5">{fmtTime(clip.duration)}</p>}
                     </div>
                     <button
                       onClick={() => handleDeleteClip(clip.id)}
@@ -703,7 +669,6 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                     ) : (
                       <span className="text-xs text-zinc-500">Not transcribed</span>
                     )}
-
                     {!clip.transcribed && transcribingId !== clip.id && (
                       <button
                         onClick={() => handleTranscribeClip(clip)}
@@ -733,18 +698,16 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                   </svg>
                   Transcribing...
                 </>
-              ) : (
-                'Transcribe All'
-              )}
+              ) : 'Transcribe All'}
             </button>
           )}
         </div>
 
-        {/* RIGHT — Script panel (3/5) */}
+        {/* RIGHT — Script panel */}
         <div className="col-span-3 bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col gap-4">
           <div>
             <p className="text-sm font-medium text-white">Script</p>
-            <p className="text-xs text-zinc-500 mt-0.5">Each line of text will be matched to a clip</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Each line will be matched to clip(s)</p>
           </div>
 
           <textarea
@@ -754,9 +717,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
             className="flex-1 min-h-64 w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500 resize-none transition-colors"
           />
 
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-zinc-500">{scriptLines} {scriptLines === 1 ? 'line' : 'lines'}</p>
-          </div>
+          <p className="text-xs text-zinc-500">{scriptLines} {scriptLines === 1 ? 'line' : 'lines'}</p>
 
           <button
             onClick={handleMatch}
@@ -786,18 +747,16 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
       {/* Segments section */}
       {segments.length > 0 && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-white">Script Assembly</h2>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                {validSegmentCount}/{segments.length} lines matched &middot; Total: {fmtTime(totalAssembledDuration)}
-              </p>
-            </div>
+          <div>
+            <h2 className="text-base font-semibold text-white">Script Assembly</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              {validSegmentCount}/{segments.length} lines matched &middot; Total: {fmtTime(totalAssembledDuration)}
+            </p>
           </div>
 
           <div className="space-y-2">
             {segments.map((seg, i) => {
-              const hasMatch = seg.clipId && seg.confidence > 0.1;
+              const hasMatch = seg.clips.length > 0;
               const isPicking = pickingForSegId === seg.id;
               const dots = 5;
               const filledDots = seg.confidence === 1 ? dots : Math.round(seg.confidence * dots);
@@ -805,32 +764,49 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
               return (
                 <div key={seg.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                   {/* Main row */}
-                  <div className="px-4 py-3 flex items-center gap-4">
-                    <span className="text-xs text-zinc-600 w-5 text-right flex-shrink-0">{i + 1}</span>
+                  <div className="px-4 py-3 flex items-start gap-4">
+                    <span className="text-xs text-zinc-600 w-5 text-right flex-shrink-0 mt-0.5">{i + 1}</span>
 
-                    <p className="text-sm text-white truncate flex-1 min-w-0" title={seg.scriptLine}>
+                    <p className="text-sm text-white flex-1 min-w-0 truncate mt-0.5" title={seg.scriptLine}>
                       {seg.scriptLine}
                     </p>
 
-                    <svg className="w-4 h-4 text-zinc-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-zinc-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                     </svg>
 
-                    {hasMatch ? (
-                      <span className="text-xs text-zinc-300 flex-shrink-0 whitespace-nowrap">
-                        {seg.clipName}&nbsp;
-                        <span className="text-zinc-500">{fmtTime(seg.start)}–{fmtTime(seg.end)}</span>
-                      </span>
-                    ) : (
-                      <span className="text-xs text-amber-400 flex-shrink-0 flex items-center gap-1">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                        </svg>
-                        No match
-                      </span>
-                    )}
+                    {/* Assigned clip chips */}
+                    <div className="flex flex-wrap gap-1.5 flex-shrink-0 max-w-xs">
+                      {hasMatch ? (
+                        seg.clips.map((sc, ci) => (
+                          <span
+                            key={ci}
+                            className="flex items-center gap-1 text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2 py-0.5 rounded-md"
+                          >
+                            <span className="text-zinc-500 truncate max-w-[5rem]" title={sc.clipName}>
+                              {sc.clipName.split('.')[0]}
+                            </span>
+                            <span className="text-zinc-600">{fmtTime(sc.start)}–{fmtTime(sc.end)}</span>
+                            <button
+                              onClick={() => handleRemoveSegmentClip(seg.id, ci)}
+                              className="text-zinc-600 hover:text-red-400 transition-colors ml-0.5 leading-none"
+                              title="Remove"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-amber-400 flex items-center gap-1">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                          </svg>
+                          No match
+                        </span>
+                      )}
+                    </div>
 
-                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                    <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
                       {Array.from({ length: dots }).map((_, d) => (
                         <div key={d} className={`w-1.5 h-1.5 rounded-full ${d < filledDots ? 'bg-purple-500' : 'bg-zinc-700'}`} />
                       ))}
@@ -844,14 +820,16 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                           : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white'
                       }`}
                     >
-                      {isPicking ? 'Cancel' : 'Pick'}
+                      {isPicking ? 'Done' : hasMatch ? '+ Add' : 'Pick'}
                     </button>
                   </div>
 
-                  {/* Manual picker — shown when this row is active */}
+                  {/* Manual picker */}
                   {isPicking && (
                     <div className="border-t border-zinc-800 px-4 py-3 space-y-2">
-                      <p className="text-xs text-zinc-500 mb-2">Select a speech segment from any clip:</p>
+                      <p className="text-xs text-zinc-500 mb-2">
+                        Add a speech segment — picked clips play in order for this line:
+                      </p>
                       {clips.filter((c) => c.transcribed && c.speechSegments?.length > 0).length === 0 ? (
                         <p className="text-xs text-zinc-600">No speech segments detected yet — transcribe a clip first.</p>
                       ) : (
@@ -877,7 +855,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                                     {isPlaying ? '⏸' : '▶'}
                                   </button>
                                   <button
-                                    onClick={() => handleManualPick(seg.id, clip, sp.start, sp.end)}
+                                    onClick={() => handleAddSegmentClip(seg.id, clip, sp.start, sp.end)}
                                     className="text-xs bg-zinc-800 hover:bg-purple-700 text-zinc-300 hover:text-white px-3 py-1.5 transition-colors whitespace-nowrap border-l border-zinc-700"
                                   >
                                     <span className="text-zinc-500 mr-1">{clip.name.split('.')[0]}</span>
@@ -896,20 +874,16 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
             })}
           </div>
 
-          {/* Export section */}
+          {/* Export */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
             {exporting && (
               <div className="space-y-1">
                 <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-purple-600 transition-all duration-300"
-                    style={{ width: `${exportProgress}%` }}
-                  />
+                  <div className="h-full bg-purple-600 transition-all duration-300" style={{ width: `${exportProgress}%` }} />
                 </div>
                 <p className="text-xs text-zinc-500 text-center">{exportProgress}%</p>
               </div>
             )}
-
             <button
               onClick={handleExport}
               disabled={exporting || validSegmentCount === 0}
@@ -936,16 +910,13 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
         </div>
       )}
 
-      {/* Hidden video element used only for segment previews */}
+      {/* Hidden video element for segment previews */}
       <video
         ref={previewRef}
         style={{ display: 'none' }}
         onTimeUpdate={() => {
           const v = previewRef.current;
-          if (v && v.currentTime >= previewEndRef.current) {
-            v.pause();
-            setPreviewKey(null);
-          }
+          if (v && v.currentTime >= previewEndRef.current) { v.pause(); setPreviewKey(null); }
         }}
         onEnded={() => setPreviewKey(null)}
       />
