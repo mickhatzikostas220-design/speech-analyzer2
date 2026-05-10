@@ -188,23 +188,31 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
     setUploadMsg('Uploading...');
     setError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
       const newClips: ScriptClip[] = [...clips];
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const clipId = crypto.randomUUID();
-        const ext = file.name.split('.').pop() || 'mp4';
-        const path = `${user.id}/script/${params.id}/${clipId}.${ext}`;
+        setUploadMsg(`Uploading ${i + 1} of ${files.length}: ${file.name}`);
 
+        // Get signed upload URL from server (bypasses storage RLS)
+        const signRes = await fetch(`/api/editor/script/${params.id}/signed-upload`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: file.name }),
+        });
+        const signData = await safeJson(signRes);
+        if (signData.error) throw new Error(`Could not get upload URL: ${signData.error}`);
+
+        const { token, path, clipId } = signData as { token: string; path: string; clipId: string };
+
+        // Upload directly to Supabase using signed URL
         const { error: uploadErr } = await supabase.storage
           .from('speeches')
-          .upload(path, file, { upsert: true, contentType: file.type });
+          .uploadToSignedUrl(path, token, file, { upsert: true });
 
         if (uploadErr) throw new Error(`Upload failed for ${file.name}: ${uploadErr.message}`);
 
+        // Get a signed download URL for playback
         const { data: signed } = await supabase.storage
           .from('speeches')
           .createSignedUrl(path, 3600);
@@ -222,7 +230,6 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
         newClips.push(newClip);
         setClips([...newClips]);
         await saveClips(newClips);
-        setUploadMsg(`Uploaded ${i + 1} of ${files.length}`);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed');

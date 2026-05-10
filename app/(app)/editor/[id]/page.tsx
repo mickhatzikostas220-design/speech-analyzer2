@@ -212,15 +212,20 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
     videoInFFmpeg.current = false;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      // Get signed upload URL from server (bypasses storage RLS)
+      const signRes = await fetch(`/api/editor/${params.id}/signed-upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name }),
+      });
+      const signData = await safeJson(signRes);
+      if (signData.error) throw new Error(`Could not get upload URL: ${signData.error}`);
 
-      const ext = file.name.split('.').pop() || 'mp4';
-      const path = `${user.id}/editor/${params.id}/original.${ext}`;
+      const { token, path } = signData as { token: string; path: string };
 
       const { error: uploadErr } = await supabase.storage
         .from('speeches')
-        .upload(path, file, { upsert: true, contentType: file.type });
+        .uploadToSignedUrl(path, token, file, { upsert: true });
 
       if (uploadErr) throw new Error(uploadErr.message);
 
