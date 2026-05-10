@@ -60,18 +60,60 @@ function normalizeWord(w: string) {
   return w.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function seqScore(scriptWords: string[], windowWords: string[]): number {
-  let si = 0;
-  for (let wi = 0; wi < windowWords.length && si < scriptWords.length; wi++) {
-    if (scriptWords[si] === windowWords[wi]) si++;
+// Character-level edit distance
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  const curr = new Array(b.length + 1).fill(0);
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      curr[j] = a[i - 1] === b[j - 1]
+        ? prev[j - 1]
+        : 1 + Math.min(prev[j - 1], prev[j], curr[j - 1]);
+    }
+    prev.splice(0, prev.length, ...curr);
   }
-  return si / scriptWords.length;
+  return curr[b.length];
+}
+
+// 0–1 similarity between two words (1 = identical)
+function wordSim(a: string, b: string): number {
+  if (!a && !b) return 1;
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const dist = levenshtein(a, b);
+  return 1 - dist / Math.max(a.length, b.length);
+}
+
+// Score a window of transcript words against script words using fuzzy matching.
+// Uses a greedy subsequence approach: for each script word, find the best
+// fuzzy match in the remaining window words (in order).
+function fuzzySeqScore(scriptWords: string[], windowWords: string[]): number {
+  if (!scriptWords.length) return 0;
+  let si = 0;
+  let totalSim = 0;
+  for (let wi = 0; wi < windowWords.length && si < scriptWords.length; wi++) {
+    const sim = wordSim(scriptWords[si], windowWords[wi]);
+    if (sim >= 0.65) {
+      totalSim += sim;
+      si++;
+    }
+  }
+  return totalSim / scriptWords.length;
 }
 
 function matchScriptToClips(script: string, clips: ScriptClip[]): ScriptSegment[] {
   const lines = script.split('\n').map((l) => l.trim()).filter(Boolean);
   return lines.map((line) => {
     const scriptWords = line.split(/\s+/).map(normalizeWord).filter(Boolean);
+    if (!scriptWords.length) return {
+      id: crypto.randomUUID(), scriptLine: line,
+      clipId: null, clipName: null, start: 0, end: 0, confidence: 0,
+    };
+
     let bestScore = 0;
     let bestClipId: string | null = null;
     let bestClipName: string | null = null;
@@ -85,18 +127,22 @@ function matchScriptToClips(script: string, clips: ScriptClip[]): ScriptSegment[
         start: w.start,
         end: w.end,
       }));
-      const minW = Math.max(1, Math.floor(scriptWords.length * 0.6));
-      const maxW = Math.ceil(scriptWords.length * 1.6);
+
+      // Allow window to be 50%–200% of script word count to handle
+      // filler words, repetitions, and transcription insertions
+      const minW = Math.max(1, Math.floor(scriptWords.length * 0.5));
+      const maxW = Math.ceil(scriptWords.length * 2.0);
+
       for (let i = 0; i < trans.length; i++) {
         for (let sz = minW; sz <= maxW && i + sz <= trans.length; sz++) {
           const win = trans.slice(i, i + sz);
-          const score = seqScore(scriptWords, win.map((w) => w.norm));
+          const score = fuzzySeqScore(scriptWords, win.map((w) => w.norm));
           if (score > bestScore) {
             bestScore = score;
             bestClipId = clip.id;
             bestClipName = clip.name;
-            bestStart = Math.max(0, win[0].start - 0.15);
-            bestEnd = win[win.length - 1].end + 0.15;
+            bestStart = Math.max(0, win[0].start - 0.2);
+            bestEnd = win[win.length - 1].end + 0.2;
           }
         }
       }
@@ -105,8 +151,8 @@ function matchScriptToClips(script: string, clips: ScriptClip[]): ScriptSegment[
     return {
       id: crypto.randomUUID(),
       scriptLine: line,
-      clipId: bestClipId,
-      clipName: bestClipName,
+      clipId: bestScore > 0.25 ? bestClipId : null,
+      clipName: bestScore > 0.25 ? bestClipName : null,
       start: bestStart,
       end: bestEnd,
       confidence: bestScore,
