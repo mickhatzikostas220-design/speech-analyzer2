@@ -80,9 +80,11 @@ function generateCaptionsFromSegments(segments: TLSegment[]): TLCaption[] {
   const caps: TLCaption[] = [];
   let abs = 0;
   for (const seg of segments) {
-    for (const clip of seg.clips) {
-      const effStart = clip.start + seg.trimStart;
-      const effEnd = clip.end - seg.trimEnd;
+    const lastIdx = seg.clips.length - 1;
+    for (let ci = 0; ci < seg.clips.length; ci++) {
+      const clip = seg.clips[ci];
+      const effStart = clip.start + (ci === 0 ? seg.trimStart : 0);
+      const effEnd = clip.end - (ci === lastIdx ? seg.trimEnd : 0);
       if (effEnd <= effStart) continue;
       const words = (clip.transcription ?? []).filter(w => w.start >= effStart - 0.1 && w.end <= effEnd + 0.1);
       let chunk: WordTimestamp[] = [];
@@ -101,7 +103,12 @@ function generateCaptionsFromSegments(segments: TLSegment[]): TLCaption[] {
 }
 
 function segEffectiveDuration(seg: TLSegment) {
-  return seg.clips.reduce((s, c) => s + Math.max(0, (c.end - seg.trimEnd) - (c.start + seg.trimStart)), 0);
+  const lastIdx = seg.clips.length - 1;
+  return seg.clips.reduce((s, c, ci) => {
+    const effStart = c.start + (ci === 0 ? seg.trimStart : 0);
+    const effEnd = c.end - (ci === lastIdx ? seg.trimEnd : 0);
+    return s + Math.max(0, effEnd - effStart);
+  }, 0);
 }
 
 // Compute auto-trim using word timestamps: trim silence before first word and after last word
@@ -144,10 +151,11 @@ function buildCompositionProps(segments: TLSegment[], captions: TLCaption[]): {
   const compSegments: CompositionSegment[] = [];
 
   for (const seg of segments) {
+    const lastIdx = seg.clips.length - 1;
     const clips = seg.clips
-      .map(clip => {
-        const effStart = clip.start + seg.trimStart;
-        const effEnd = clip.end - seg.trimEnd;
+      .map((clip, ci) => {
+        const effStart = clip.start + (ci === 0 ? seg.trimStart : 0);
+        const effEnd = clip.end - (ci === lastIdx ? seg.trimEnd : 0);
         if (effEnd <= effStart || !clip.videoUrl) return null;
         const startFrame = Math.round(effStart * FPS);
         const durationFrames = Math.round(effEnd * FPS) - startFrame;
@@ -409,9 +417,11 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
 
       let pieceIdx = 0;
       for (const seg of validSegs) {
-        for (const clip of seg.clips) {
-          const effStart = clip.start + seg.trimStart;
-          const effEnd   = clip.end   - seg.trimEnd;
+        const lastClipIdx = seg.clips.length - 1;
+        for (let ci = 0; ci < seg.clips.length; ci++) {
+          const clip = seg.clips[ci];
+          const effStart = clip.start + (ci === 0 ? seg.trimStart : 0);
+          const effEnd   = clip.end   - (ci === lastClipIdx ? seg.trimEnd : 0);
           if (effEnd <= effStart) continue;
           const srcName = `src_${btoa(clip.clipPath).replace(/[+/=]/g, '_')}.mp4`;
           await ff.exec([
@@ -601,7 +611,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                         <div className="flex flex-wrap gap-1">
                           {seg.clips.map((clip, ci) => (
                             <span key={ci} className="text-xs bg-zinc-800 border border-zinc-700 text-zinc-400 px-2 py-0.5 rounded-md whitespace-nowrap">
-                              {clip.clipName.split('.')[0]} · {fmtTime(clip.start + seg.trimStart)}–{fmtTime(clip.end - seg.trimEnd)}
+                              {clip.clipName.split('.')[0]} · {fmtTime(clip.start + (ci === 0 ? seg.trimStart : 0))}–{fmtTime(clip.end - (ci === seg.clips.length - 1 ? seg.trimEnd : 0))}
                             </span>
                           ))}
                         </div>
