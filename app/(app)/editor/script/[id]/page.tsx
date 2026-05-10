@@ -105,10 +105,22 @@ function fuzzySeqScore(scriptWords: string[], windowWords: string[]): number {
   return totalSim / scriptWords.length;
 }
 
+// Strip screenplay-style formatting before matching:
+// [Character name], <stage directions>, leading colons, quotes
+function cleanScriptLine(line: string): string {
+  return line
+    .replace(/\[.*?\]/g, '')   // [Business], [Erin], etc.
+    .replace(/<.*?>/g, '')     // <disgruntled face>, etc.
+    .replace(/^[\s:]+/, '')    // leading colon/space after label
+    .replace(/["""]/g, '')     // curly and straight quotes
+    .trim();
+}
+
 function matchScriptToClips(script: string, clips: ScriptClip[]): ScriptSegment[] {
   const lines = script.split('\n').map((l) => l.trim()).filter(Boolean);
   return lines.map((line) => {
-    const scriptWords = line.split(/\s+/).map(normalizeWord).filter(Boolean);
+    const cleaned = cleanScriptLine(line);
+    const scriptWords = cleaned.split(/\s+/).map(normalizeWord).filter(Boolean);
     if (!scriptWords.length) return {
       id: crypto.randomUUID(), scriptLine: line,
       clipId: null, clipName: null, start: 0, end: 0, confidence: 0,
