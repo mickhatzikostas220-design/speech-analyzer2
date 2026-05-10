@@ -12,6 +12,14 @@ interface EditorProject {
   created_at: string;
 }
 
+interface ScriptProject {
+  id: string;
+  title: string;
+  status: string;
+  clips: unknown[];
+  created_at: string;
+}
+
 async function safeJson(res: Response): Promise<{ ok: boolean; data: Record<string, unknown> }> {
   try {
     const text = (await res.text()).trim();
@@ -47,6 +55,8 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function EditorPage() {
   const router = useRouter();
+
+  // ── Silence-removal projects ───────────────────────────────
   const [projects, setProjects] = useState<EditorProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -54,11 +64,30 @@ export default function EditorPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  // ── Script projects ────────────────────────────────────────
+  const [scriptProjects, setScriptProjects] = useState<ScriptProject[]>([]);
+  const [scriptLoading, setScriptLoading] = useState(true);
+  const [showScriptModal, setShowScriptModal] = useState(false);
+  const [newScriptTitle, setNewScriptTitle] = useState('');
+  const [creatingScript, setCreatingScript] = useState(false);
+  const [scriptCreateError, setScriptCreateError] = useState<string | null>(null);
+
   useEffect(() => {
     fetch('/api/editor')
       .then(safeJson)
-      .then(({ data }) => { setProjects(Array.isArray(data) ? data as unknown as EditorProject[] : []); setLoading(false); })
+      .then(({ data }) => {
+        setProjects(Array.isArray(data) ? (data as unknown as EditorProject[]) : []);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
+
+    fetch('/api/editor/script')
+      .then(safeJson)
+      .then(({ data }) => {
+        setScriptProjects(Array.isArray(data) ? (data as unknown as ScriptProject[]) : []);
+        setScriptLoading(false);
+      })
+      .catch(() => setScriptLoading(false));
   }, []);
 
   async function createProject(e: React.FormEvent) {
@@ -90,78 +119,181 @@ export default function EditorPage() {
     setProjects((p) => p.filter((proj) => proj.id !== id));
   }
 
+  async function createScriptProject(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newScriptTitle.trim()) return;
+    setCreatingScript(true);
+    setScriptCreateError(null);
+    try {
+      const res = await fetch('/api/editor/script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newScriptTitle.trim() }),
+      });
+      const { ok, data } = await safeJson(res);
+      if (ok) {
+        router.push(`/editor/script/${(data as { id: string }).id}`);
+      } else {
+        setScriptCreateError((data.error as string) || `Server error ${res.status}`);
+      }
+    } catch (err) {
+      setScriptCreateError(err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setCreatingScript(false);
+    }
+  }
+
+  async function deleteScriptProject(id: string) {
+    await fetch(`/api/editor/script/${id}`, { method: 'DELETE' });
+    setScriptProjects((p) => p.filter((proj) => proj.id !== id));
+  }
+
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-white">Video Editor</h1>
-          <p className="text-zinc-500 text-sm mt-1">
-            Upload a video, detect speech segments, remove silences, and export.
-          </p>
+    <div className="max-w-3xl mx-auto px-4 py-10 space-y-12">
+      {/* ── Silence Removal Section ─────────────────────────── */}
+      <section className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">Video Editor</h1>
+            <p className="text-zinc-500 text-sm mt-1">
+              Upload a video, detect speech segments, remove silences, and export.
+            </p>
+          </div>
+          <button
+            onClick={() => { setNewTitle(''); setCreateError(null); setShowModal(true); }}
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Project
+          </button>
         </div>
-        <button
-          onClick={() => { setNewTitle(''); setCreateError(null); setShowModal(true); }}
-          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Project
-        </button>
-      </div>
 
-      {loading ? (
-        <div className="space-y-3">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl h-20 animate-pulse" />
-          ))}
-        </div>
-      ) : projects.length === 0 ? (
-        <div className="text-center py-16">
-          <svg className="w-10 h-10 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-          <p className="text-sm text-zinc-600">No projects yet — create one above.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {projects.map((p) => (
-            <div
-              key={p.id}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center justify-between hover:border-zinc-700 transition-colors"
-            >
-              <button className="flex-1 text-left" onClick={() => router.push(`/editor/${p.id}`)}>
-                <div className="flex items-center gap-3">
-                  <span className="text-white font-medium text-sm">{p.title}</span>
-                  <span className={`text-xs capitalize ${STATUS_COLOR[p.status] ?? 'text-zinc-500'}`}>
-                    {p.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4 mt-1">
-                  <span className="text-xs text-zinc-600">{timeAgo(p.created_at)}</span>
-                  {p.video_duration && (
-                    <span className="text-xs text-zinc-600">{fmtDuration(p.video_duration)}</span>
-                  )}
-                  {p.clips?.length > 0 && (
-                    <span className="text-xs text-zinc-600">
-                      {p.clips.filter((c) => c.selected).length}/{p.clips.length} clips
-                    </span>
-                  )}
-                </div>
-              </button>
-              <button
-                onClick={() => deleteProject(p.id)}
-                className="ml-4 p-1 text-zinc-700 hover:text-red-400 transition-colors"
+        {loading ? (
+          <div className="space-y-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl h-20 animate-pulse" />
+            ))}
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="text-center py-16">
+            <svg className="w-10 h-10 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <p className="text-sm text-zinc-600">No projects yet — create one above.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {projects.map((p) => (
+              <div
+                key={p.id}
+                className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center justify-between hover:border-zinc-700 transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+                <button className="flex-1 text-left" onClick={() => router.push(`/editor/${p.id}`)}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-white font-medium text-sm">{p.title}</span>
+                    <span className={`text-xs capitalize ${STATUS_COLOR[p.status] ?? 'text-zinc-500'}`}>
+                      {p.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 mt-1">
+                    <span className="text-xs text-zinc-600">{timeAgo(p.created_at)}</span>
+                    {p.video_duration && (
+                      <span className="text-xs text-zinc-600">{fmtDuration(p.video_duration)}</span>
+                    )}
+                    {p.clips?.length > 0 && (
+                      <span className="text-xs text-zinc-600">
+                        {p.clips.filter((c) => c.selected).length}/{p.clips.length} clips
+                      </span>
+                    )}
+                  </div>
+                </button>
+                <button
+                  onClick={() => deleteProject(p.id)}
+                  className="ml-4 p-1 text-zinc-700 hover:text-red-400 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
+      {/* ── Script Editor Section ───────────────────────────── */}
+      <section className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-white">Script Editor</h2>
+            <p className="text-zinc-500 text-sm mt-1">
+              Upload clips, paste a script, and auto-assemble in script order.
+            </p>
+          </div>
+          <button
+            onClick={() => { setNewScriptTitle(''); setScriptCreateError(null); setShowScriptModal(true); }}
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Script Project
+          </button>
+        </div>
+
+        {scriptLoading ? (
+          <div className="space-y-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl h-20 animate-pulse" />
+            ))}
+          </div>
+        ) : scriptProjects.length === 0 ? (
+          <div className="text-center py-16">
+            <svg className="w-10 h-10 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p className="text-sm text-zinc-600">No script projects yet — create one above.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {scriptProjects.map((p) => (
+              <div
+                key={p.id}
+                className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center justify-between hover:border-zinc-700 transition-colors"
+              >
+                <button className="flex-1 text-left" onClick={() => router.push(`/editor/script/${p.id}`)}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-white font-medium text-sm">{p.title}</span>
+                    <span className={`text-xs capitalize ${STATUS_COLOR[p.status] ?? 'text-zinc-500'}`}>
+                      {p.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 mt-1">
+                    <span className="text-xs text-zinc-600">{timeAgo(p.created_at)}</span>
+                    {p.clips?.length > 0 && (
+                      <span className="text-xs text-zinc-600">
+                        {p.clips.length} {p.clips.length === 1 ? 'clip' : 'clips'}
+                      </span>
+                    )}
+                  </div>
+                </button>
+                <button
+                  onClick={() => deleteScriptProject(p.id)}
+                  className="ml-4 p-1 text-zinc-700 hover:text-red-400 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── New Silence Project Modal ───────────────────────── */}
       {showModal && (
         <div
           className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
@@ -199,7 +331,53 @@ export default function EditorPage() {
                   disabled={creating || !newTitle.trim()}
                   className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
                 >
-                  {creating ? 'Creating…' : 'Create'}
+                  {creating ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── New Script Project Modal ────────────────────────── */}
+      {showScriptModal && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+          onClick={() => setShowScriptModal(false)}
+        >
+          <div
+            className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-white font-semibold mb-4">New Script Project</h2>
+            <form onSubmit={createScriptProject} className="space-y-4">
+              {scriptCreateError && (
+                <p className="text-xs text-red-400 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
+                  {scriptCreateError}
+                </p>
+              )}
+              <input
+                autoFocus
+                type="text"
+                placeholder="Project title"
+                value={newScriptTitle}
+                onChange={(e) => setNewScriptTitle(e.target.value)}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowScriptModal(false)}
+                  className="text-sm text-zinc-400 hover:text-white px-3 py-2 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingScript || !newScriptTitle.trim()}
+                  className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                >
+                  {creatingScript ? 'Creating...' : 'Create'}
                 </button>
               </div>
             </form>
