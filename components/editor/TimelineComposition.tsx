@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AbsoluteFill, Series, Video, Sequence } from 'remotion';
+import { AbsoluteFill, Series, OffthreadVideo, Sequence } from 'remotion';
 
 export interface CompositionClip {
   videoUrl: string;
@@ -50,7 +50,7 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({ segmen
         {pieces.map((piece, i) => (
           <Series.Sequence key={i} durationInFrames={piece.durationFrames}>
             <AbsoluteFill>
-              <Video
+              <OffthreadVideo
                 src={piece.url}
                 startFrom={piece.startFrame}
                 volume={piece.volume}

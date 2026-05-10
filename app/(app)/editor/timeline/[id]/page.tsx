@@ -4,12 +4,8 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { TimelineComposition } from '@/components/editor/TimelineComposition';
-import type {
-  CompositionSegment,
-  CompositionCaption,
-} from '@/components/editor/TimelineComposition';
+import type { CompositionSegment, CompositionCaption } from '@/components/editor/TimelineComposition';
 
-// Remotion Player — client-only (uses browser APIs at load time)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const RemotionPlayer = dynamic<any>(
   () => import('@remotion/player').then((m) => m.Player),
@@ -55,6 +51,11 @@ interface TLProject {
   segments: TLSegment[];
   captions: TLCaption[];
   created_at: string;
+}
+
+interface TrimPreview {
+  start: string | null;
+  end: string | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -103,7 +104,37 @@ function segEffectiveDuration(seg: TLSegment) {
   return seg.clips.reduce((s, c) => s + Math.max(0, (c.end - seg.trimEnd) - (c.start + seg.trimStart)), 0);
 }
 
-// Convert editor state → Remotion composition props
+// Compute auto-trim using word timestamps: trim silence before first word and after last word
+function computeAutoTrim(seg: TLSegment): { trimStart: number; trimEnd: number } {
+  const BUFFER = 0.15;
+  if (!seg.clips.length) return { trimStart: seg.trimStart, trimEnd: seg.trimEnd };
+
+  const firstClip = seg.clips[0];
+  const lastClip = seg.clips[seg.clips.length - 1];
+
+  const firstWords = (firstClip.transcription ?? [])
+    .filter(w => w.start >= firstClip.start - 0.05 && w.end <= firstClip.end + 0.05)
+    .sort((a, b) => a.start - b.start);
+
+  const lastWords = (lastClip.transcription ?? [])
+    .filter(w => w.start >= lastClip.start - 0.05 && w.end <= lastClip.end + 0.05)
+    .sort((a, b) => a.start - b.start);
+
+  const trimStart = firstWords.length > 0
+    ? Math.max(0, firstWords[0].start - firstClip.start - BUFFER)
+    : seg.trimStart;
+
+  const trimEnd = lastWords.length > 0
+    ? Math.max(0, lastClip.end - lastWords[lastWords.length - 1].end - BUFFER)
+    : seg.trimEnd;
+
+  return {
+    trimStart: Math.round(trimStart * 100) / 100,
+    trimEnd: Math.round(trimEnd * 100) / 100,
+  };
+}
+
+// Build Remotion composition props from editor state
 function buildCompositionProps(segments: TLSegment[], captions: TLCaption[]): {
   compSegments: CompositionSegment[];
   compCaptions: CompositionCaption[];
@@ -114,7 +145,7 @@ function buildCompositionProps(segments: TLSegment[], captions: TLCaption[]): {
 
   for (const seg of segments) {
     const clips = seg.clips
-      .map((clip) => {
+      .map(clip => {
         const effStart = clip.start + seg.trimStart;
         const effEnd = clip.end - seg.trimEnd;
         if (effEnd <= effStart || !clip.videoUrl) return null;
@@ -132,13 +163,15 @@ function buildCompositionProps(segments: TLSegment[], captions: TLCaption[]): {
     }
   }
 
-  const compCaptions: CompositionCaption[] = captions.map((cap) => ({
-    text: cap.text,
-    startFrame: Math.round(cap.start * FPS),
-    endFrame: Math.round(cap.end * FPS),
-  }));
-
-  return { compSegments, compCaptions, totalFrames: absFrame };
+  return {
+    compSegments,
+    compCaptions: captions.map(cap => ({
+      text: cap.text,
+      startFrame: Math.round(cap.start * FPS),
+      endFrame: Math.round(cap.end * FPS),
+    })),
+    totalFrames: absFrame,
+  };
 }
 
 // ── Page ─────────────────────────────────────────────────────
@@ -146,11 +179,14 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
   const router = useRouter();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ffmpegRef = useRef<any>(null);
+  const frameCacheRef = useRef<Map<string, string | null>>(new Map());
+  const trimDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const [project, setProject] = useState<TLProject | null>(null);
   const [segments, setSegments] = useState<TLSegment[]>([]);
   const [captions, setCaptions] = useState<TLCaption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [trimPreviews, setTrimPreviews] = useState<Record<string, TrimPreview>>({});
   const [generatingCaps, setGeneratingCaps] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -166,9 +202,9 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         const segs = (p.segments ?? []).map(s => ({
           ...s,
           trimStart: s.trimStart ?? 0,
-          trimEnd: s.trimEnd ?? 0,
-          title: s.title ?? '',
-          volume: s.volume ?? 1,
+          trimEnd:   s.trimEnd   ?? 0,
+          title:     s.title     ?? '',
+          volume:    s.volume    ?? 1,
         }));
         setProject(p);
         setSegments(segs);
@@ -178,11 +214,68 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
       .catch(() => router.push('/editor'));
   }, [params.id, router]);
 
-  // ── Composition props (reactive to segment/caption edits) ─
+  // Load trim frame previews once segments are ready
+  useEffect(() => {
+    if (!loading && segments.length > 0) {
+      segments.forEach(seg => loadTrimPreviews(seg));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  // ── Composition props ─────────────────────────────────────
   const { compSegments, compCaptions, totalFrames } = useMemo(
     () => buildCompositionProps(segments, captions),
     [segments, captions]
   );
+
+  // ── Frame capture ─────────────────────────────────────────
+  async function captureFrame(url: string, timeSeconds: number): Promise<string | null> {
+    const key = `${url.slice(-50)}-${timeSeconds.toFixed(2)}`;
+    if (frameCacheRef.current.has(key)) return frameCacheRef.current.get(key) ?? null;
+
+    return new Promise(resolve => {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.muted = true;
+      video.preload = 'auto';
+
+      let done = false;
+      const finish = (result: string | null) => {
+        if (done) return;
+        done = true;
+        frameCacheRef.current.set(key, result);
+        resolve(result);
+      };
+
+      video.addEventListener('seeked', () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 320; canvas.height = 180;
+          canvas.getContext('2d')!.drawImage(video, 0, 0, 320, 180);
+          finish(canvas.toDataURL('image/jpeg', 0.75));
+        } catch { finish(null); }
+      }, { once: true });
+
+      video.addEventListener('error', () => finish(null), { once: true });
+      video.src = url;
+      video.currentTime = Math.max(0, timeSeconds);
+    });
+  }
+
+  async function loadTrimPreviews(seg: TLSegment) {
+    if (!seg.clips.length) return;
+    const firstClip = seg.clips[0];
+    const lastClip  = seg.clips[seg.clips.length - 1];
+    const startUrl  = firstClip.videoUrl;
+    const endUrl    = lastClip.videoUrl;
+    if (!startUrl || !endUrl) return;
+
+    const [startFrame, endFrame] = await Promise.all([
+      captureFrame(startUrl, Math.max(0, firstClip.start + seg.trimStart)),
+      captureFrame(endUrl,   Math.max(0, lastClip.end   - seg.trimEnd)),
+    ]);
+    setTrimPreviews(prev => ({ ...prev, [seg.id]: { start: startFrame, end: endFrame } }));
+  }
 
   // ── Persist ──────────────────────────────────────────────
   async function persist(segs: TLSegment[], caps: TLCaption[]) {
@@ -239,7 +332,34 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
   }
 
   function patchSegment(i: number, patch: Partial<TLSegment>) {
-    setSegments(prev => prev.map((s, idx) => idx === i ? { ...s, ...patch } : s));
+    setSegments(prev => {
+      const next = prev.map((s, idx) => idx === i ? { ...s, ...patch } : s);
+      const seg = next[i];
+      if ('trimStart' in patch || 'trimEnd' in patch) {
+        if (trimDebounceRef.current[seg.id]) clearTimeout(trimDebounceRef.current[seg.id]);
+        trimDebounceRef.current[seg.id] = setTimeout(() => loadTrimPreviews(seg), 300);
+      }
+      return next;
+    });
+  }
+
+  function handleAutoTrimSegment(i: number) {
+    const seg = segments[i];
+    const { trimStart, trimEnd } = computeAutoTrim(seg);
+    const next = segments.map((s, idx) => idx === i ? { ...s, trimStart, trimEnd } : s);
+    setSegments(next);
+    persist(next, captions);
+    loadTrimPreviews({ ...seg, trimStart, trimEnd });
+  }
+
+  function handleAutoTrimAll() {
+    const next = segments.map(seg => {
+      const { trimStart, trimEnd } = computeAutoTrim(seg);
+      return { ...seg, trimStart, trimEnd };
+    });
+    setSegments(next);
+    persist(next, captions);
+    next.forEach(seg => loadTrimPreviews(seg));
   }
 
   // ── Caption ops ──────────────────────────────────────────
@@ -262,7 +382,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
     persist(segments, next);
   }
 
-  // ── Export (ffmpeg.wasm) ─────────────────────────────────
+  // ── Export ───────────────────────────────────────────────
   async function handleExport() {
     const validSegs = segments.filter(s => s.clips.some(c => c.end - s.trimEnd > c.start + s.trimStart));
     if (!validSegs.length) return;
@@ -291,7 +411,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
       for (const seg of validSegs) {
         for (const clip of seg.clips) {
           const effStart = clip.start + seg.trimStart;
-          const effEnd = clip.end - seg.trimEnd;
+          const effEnd   = clip.end   - seg.trimEnd;
           if (effEnd <= effStart) continue;
           const srcName = `src_${btoa(clip.clipPath).replace(/[+/=]/g, '_')}.mp4`;
           await ff.exec([
@@ -362,9 +482,10 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
     return (
       <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
         <div className="h-8 w-64 bg-zinc-800 rounded animate-pulse" />
+        <div className="w-full aspect-video bg-zinc-900 rounded-xl animate-pulse" />
         <div className="grid grid-cols-5 gap-6">
-          <div className="col-span-3 bg-zinc-900 rounded-xl h-96 animate-pulse" />
-          <div className="col-span-2 bg-zinc-900 rounded-xl h-96 animate-pulse" />
+          <div className="col-span-3 bg-zinc-900 rounded-xl h-64 animate-pulse" />
+          <div className="col-span-2 bg-zinc-900 rounded-xl h-64 animate-pulse" />
         </div>
       </div>
     );
@@ -399,7 +520,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         </div>
       )}
 
-      {/* ── Remotion Player (full width) ─────────────────── */}
+      {/* Remotion Player */}
       <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden">
         <RemotionPlayer
           component={TimelineComposition}
@@ -412,10 +533,11 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
           controls
           clickToPlay
           showVolumeControls
+          pauseWhenBuffering
         />
         {totalFrames === 0 && (
           <p className="text-xs text-zinc-600 text-center py-3">
-            Add segments from the Script Editor to see a preview here.
+            No segments with video yet — add segments from the Script Editor.
           </p>
         )}
       </div>
@@ -425,7 +547,12 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         <div className="col-span-3 space-y-2">
           <div className="flex items-center justify-between mb-1">
             <p className="text-sm font-medium text-white">Segments</p>
-            <p className="text-xs text-zinc-500">Reorder · trim · volume · title overlay</p>
+            <button
+              onClick={handleAutoTrimAll}
+              className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white px-2.5 py-1 rounded-md transition-colors"
+            >
+              Auto-trim all silence
+            </button>
           </div>
 
           {segments.length === 0 ? (
@@ -433,85 +560,133 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
               <p className="text-sm text-zinc-600">No segments — bring a project here from the Script Editor.</p>
             </div>
           ) : (
-            segments.map((seg, i) => (
-              <div key={seg.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-                <div className="px-4 py-3 flex items-start gap-3">
-                  {/* Reorder arrows */}
-                  <div className="flex flex-col gap-0.5 flex-shrink-0 mt-0.5">
-                    <button onClick={() => moveSegment(i, -1)} disabled={i === 0}
-                      className="text-zinc-600 hover:text-white disabled:opacity-20 transition-colors">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
-                      </svg>
-                    </button>
-                    <button onClick={() => moveSegment(i, 1)} disabled={i === segments.length - 1}
-                      className="text-zinc-600 hover:text-white disabled:opacity-20 transition-colors">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                  </div>
+            segments.map((seg, i) => {
+              const preview = trimPreviews[seg.id];
+              const firstClip = seg.clips[0];
+              const lastClip  = seg.clips[seg.clips.length - 1];
 
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <p className="text-sm text-white truncate" title={seg.scriptLine}>{seg.scriptLine}</p>
-
-                    {/* Clip source tags */}
-                    <div className="flex flex-wrap gap-1">
-                      {seg.clips.map((clip, ci) => (
-                        <span key={ci} className="text-xs bg-zinc-800 border border-zinc-700 text-zinc-400 px-2 py-0.5 rounded-md whitespace-nowrap">
-                          {clip.clipName.split('.')[0]} · {fmtTime(clip.start + seg.trimStart)}–{fmtTime(clip.end - seg.trimEnd)}
-                        </span>
-                      ))}
+              return (
+                <div key={seg.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 flex items-start gap-3">
+                    {/* Reorder */}
+                    <div className="flex flex-col gap-0.5 flex-shrink-0 mt-0.5">
+                      <button onClick={() => moveSegment(i, -1)} disabled={i === 0}
+                        className="text-zinc-600 hover:text-white disabled:opacity-20 transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+                        </svg>
+                      </button>
+                      <button onClick={() => moveSegment(i, 1)} disabled={i === segments.length - 1}
+                        className="text-zinc-600 hover:text-white disabled:opacity-20 transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
                     </div>
 
-                    {/* Trim + volume */}
-                    <div className="flex flex-wrap gap-3 items-center">
-                      <label className="flex items-center gap-1.5 text-xs text-zinc-500">
-                        Trim start
-                        <input type="number" min={0} step={0.1} value={seg.trimStart}
-                          onChange={e => patchSegment(i, { trimStart: Math.max(0, parseFloat(e.target.value) || 0) })}
-                          onBlur={() => persist(segments, captions)}
-                          className="w-14 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-purple-500"
-                        />s
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs text-zinc-500">
-                        Trim end
-                        <input type="number" min={0} step={0.1} value={seg.trimEnd}
-                          onChange={e => patchSegment(i, { trimEnd: Math.max(0, parseFloat(e.target.value) || 0) })}
-                          onBlur={() => persist(segments, captions)}
-                          className="w-14 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-purple-500"
-                        />s
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs text-zinc-500">
-                        Volume
-                        <input type="range" min={0} max={2} step={0.05} value={seg.volume}
-                          onChange={e => patchSegment(i, { volume: parseFloat(e.target.value) })}
-                          onMouseUp={() => persist(segments, captions)}
-                          onTouchEnd={() => persist(segments, captions)}
-                          className="w-20 accent-purple-500"
-                        />
-                        <span className="w-8 text-zinc-400">{Math.round(seg.volume * 100)}%</span>
-                      </label>
+                    <div className="flex-1 min-w-0 space-y-2.5">
+                      {/* Script line + remove */}
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm text-white truncate" title={seg.scriptLine}>{seg.scriptLine}</p>
+                        <button onClick={() => removeSegment(i)}
+                          className="text-zinc-600 hover:text-red-400 transition-colors flex-shrink-0">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* Clip source tags + auto-trim */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-wrap gap-1">
+                          {seg.clips.map((clip, ci) => (
+                            <span key={ci} className="text-xs bg-zinc-800 border border-zinc-700 text-zinc-400 px-2 py-0.5 rounded-md whitespace-nowrap">
+                              {clip.clipName.split('.')[0]} · {fmtTime(clip.start + seg.trimStart)}–{fmtTime(clip.end - seg.trimEnd)}
+                            </span>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => handleAutoTrimSegment(i)}
+                          title="Auto-trim silence at start and end using word timestamps"
+                          className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-500 hover:text-white px-2 py-0.5 rounded-md transition-colors flex-shrink-0 whitespace-nowrap"
+                        >
+                          Auto-trim
+                        </button>
+                      </div>
+
+                      {/* Trim controls with frame previews */}
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* Cut in */}
+                        <div className="space-y-1.5">
+                          <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+                            Trim start
+                            <input
+                              type="number" min={0} step={0.1} value={seg.trimStart}
+                              onChange={e => patchSegment(i, { trimStart: Math.max(0, parseFloat(e.target.value) || 0) })}
+                              onBlur={() => persist(segments, captions)}
+                              className="w-14 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-purple-500"
+                            />s
+                          </label>
+                          {preview?.start ? (
+                            <div className="relative rounded-lg overflow-hidden border border-zinc-700 aspect-video bg-zinc-800">
+                              <img src={preview.start} alt="cut-in frame" className="w-full h-full object-cover" />
+                              <div className="absolute bottom-0 inset-x-0 bg-black/65 text-xs text-zinc-300 px-1.5 py-0.5 text-center">
+                                Cut in · {fmtTime(firstClip ? firstClip.start + seg.trimStart : 0)}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="rounded-lg bg-zinc-800 border border-zinc-700 aspect-video animate-pulse" />
+                          )}
+                        </div>
+
+                        {/* Cut out */}
+                        <div className="space-y-1.5">
+                          <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+                            Trim end
+                            <input
+                              type="number" min={0} step={0.1} value={seg.trimEnd}
+                              onChange={e => patchSegment(i, { trimEnd: Math.max(0, parseFloat(e.target.value) || 0) })}
+                              onBlur={() => persist(segments, captions)}
+                              className="w-14 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-purple-500"
+                            />s
+                          </label>
+                          {preview?.end ? (
+                            <div className="relative rounded-lg overflow-hidden border border-zinc-700 aspect-video bg-zinc-800">
+                              <img src={preview.end} alt="cut-out frame" className="w-full h-full object-cover" />
+                              <div className="absolute bottom-0 inset-x-0 bg-black/65 text-xs text-zinc-300 px-1.5 py-0.5 text-center">
+                                Cut out · {fmtTime(lastClip ? lastClip.end - seg.trimEnd : 0)}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="rounded-lg bg-zinc-800 border border-zinc-700 aspect-video animate-pulse" />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Volume + title */}
+                      <div className="flex flex-wrap gap-3 items-center">
+                        <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+                          Volume
+                          <input type="range" min={0} max={2} step={0.05} value={seg.volume}
+                            onChange={e => patchSegment(i, { volume: parseFloat(e.target.value) })}
+                            onMouseUp={() => persist(segments, captions)}
+                            onTouchEnd={() => persist(segments, captions)}
+                            className="w-20 accent-purple-500"
+                          />
+                          <span className="w-8 text-zinc-400">{Math.round(seg.volume * 100)}%</span>
+                        </label>
+                      </div>
+
+                      <input type="text" placeholder="Title overlay (optional)…" value={seg.title}
+                        onChange={e => patchSegment(i, { title: e.target.value })}
+                        onBlur={() => persist(segments, captions)}
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500"
+                      />
                     </div>
-
-                    {/* Title overlay */}
-                    <input type="text" placeholder="Title overlay (optional)…" value={seg.title}
-                      onChange={e => patchSegment(i, { title: e.target.value })}
-                      onBlur={() => persist(segments, captions)}
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500"
-                    />
                   </div>
-
-                  {/* Remove */}
-                  <button onClick={() => removeSegment(i)}
-                    className="text-zinc-600 hover:text-red-400 transition-colors p-1 flex-shrink-0 mt-0.5">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -567,7 +742,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         </div>
       </div>
 
-      {/* Export bar */}
+      {/* Export */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
         {exporting && (
           <div className="space-y-1">
