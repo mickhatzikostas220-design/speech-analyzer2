@@ -10,6 +10,11 @@ interface WordTimestamp {
   end: number;
 }
 
+interface SpeechSegment {
+  start: number;
+  end: number;
+}
+
 interface ScriptClip {
   id: string;
   name: string;
@@ -17,6 +22,7 @@ interface ScriptClip {
   duration: number | null;
   transcribed: boolean;
   transcription: WordTimestamp[];
+  speechSegments: SpeechSegment[];
   videoUrl?: string | null;
 }
 
@@ -189,6 +195,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const [transcribingId, setTranscribingId] = useState<string | null>(null);
   const [matching, setMatching] = useState(false);
+  const [pickingForSegId, setPickingForSegId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -285,6 +292,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
           duration: null,
           transcribed: false,
           transcription: [],
+          speechSegments: [],
           videoUrl: videoUrl ?? null,
         };
 
@@ -342,8 +350,30 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
 
       const words: WordTimestamp[] = (data.words as WordTimestamp[]) ?? [];
 
+      // Detect silence to build speech segments for manual picking
+      const silLogs: string[] = [];
+      const silHandler = ({ message }: { message: string }) => silLogs.push(message);
+      ffmpeg.on('log', silHandler);
+      await ffmpeg.exec(['-i', inputName, '-af', 'silencedetect=noise=-30dB:d=0.3', '-f', 'null', '-']);
+      ffmpeg.off('log', silHandler);
+
+      const logText = silLogs.join('\n');
+      const silStarts = Array.from(logText.matchAll(/silence_start: ([\d.]+)/g)).map((m) => parseFloat(m[1]));
+      const silEnds   = Array.from(logText.matchAll(/silence_end: ([\d.]+)/g)).map((m) => parseFloat(m[1]));
+      const clipDur   = words.length ? words[words.length - 1].end + 0.5 : 60;
+      const silences  = silStarts.map((s, i) => ({ start: s, end: silEnds[i] ?? clipDur }));
+
+      const speechSegments: SpeechSegment[] = [];
+      let cur = 0;
+      for (const sil of silences) {
+        if (sil.start > cur + 0.15) speechSegments.push({ start: Math.round(cur * 100) / 100, end: Math.round(sil.start * 100) / 100 });
+        cur = sil.end;
+      }
+      if (cur < clipDur - 0.15) speechSegments.push({ start: Math.round(cur * 100) / 100, end: Math.round(clipDur * 100) / 100 });
+      if (silences.length === 0) speechSegments.push({ start: 0, end: Math.round(clipDur * 100) / 100 });
+
       const updatedClips = clips.map((c) =>
-        c.id === clip.id ? { ...c, transcribed: true, transcription: words } : c
+        c.id === clip.id ? { ...c, transcribed: true, transcription: words, speechSegments } : c
       );
       setClips(updatedClips);
       await saveClips(updatedClips);
@@ -384,6 +414,20 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
     } finally {
       setMatching(false);
     }
+  }
+
+  // ── Manual segment pick ────────────────────────────────────
+  async function handleManualPick(segId: string, clip: ScriptClip, start: number, end: number) {
+    const updated = segments.map((s) =>
+      s.id === segId ? { ...s, clipId: clip.id, clipName: clip.name, start, end, confidence: 1 } : s
+    );
+    setSegments(updated);
+    setPickingForSegId(null);
+    await fetch(`/api/editor/script/${params.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ segments: updated }),
+    });
   }
 
   // ── Script auto-save ───────────────────────────────────────
@@ -720,49 +764,80 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
           <div className="space-y-2">
             {segments.map((seg, i) => {
               const hasMatch = seg.clipId && seg.confidence > 0.1;
+              const isPicking = pickingForSegId === seg.id;
               const dots = 5;
-              const filledDots = Math.round(seg.confidence * dots);
+              const filledDots = seg.confidence === 1 ? dots : Math.round(seg.confidence * dots);
 
               return (
-                <div
-                  key={seg.id}
-                  className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 flex items-center gap-4"
-                >
-                  <span className="text-xs text-zinc-600 w-5 text-right flex-shrink-0">{i + 1}</span>
+                <div key={seg.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                  {/* Main row */}
+                  <div className="px-4 py-3 flex items-center gap-4">
+                    <span className="text-xs text-zinc-600 w-5 text-right flex-shrink-0">{i + 1}</span>
 
-                  <p className="text-sm text-white truncate flex-1 min-w-0" title={seg.scriptLine}>
-                    {seg.scriptLine}
-                  </p>
+                    <p className="text-sm text-white truncate flex-1 min-w-0" title={seg.scriptLine}>
+                      {seg.scriptLine}
+                    </p>
 
-                  <svg className="w-4 h-4 text-zinc-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
+                    <svg className="w-4 h-4 text-zinc-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
 
-                  {hasMatch ? (
-                    <span className="text-xs text-zinc-300 flex-shrink-0 whitespace-nowrap">
-                      {seg.clipName} &nbsp;
-                      <span className="text-zinc-500">{fmtTime(seg.start)}–{fmtTime(seg.end)}</span>
-                    </span>
-                  ) : (
-                    <span className="text-xs text-amber-400 flex-shrink-0 flex items-center gap-1">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                      </svg>
-                      No match found
-                    </span>
-                  )}
+                    {hasMatch ? (
+                      <span className="text-xs text-zinc-300 flex-shrink-0 whitespace-nowrap">
+                        {seg.clipName}&nbsp;
+                        <span className="text-zinc-500">{fmtTime(seg.start)}–{fmtTime(seg.end)}</span>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-amber-400 flex-shrink-0 flex items-center gap-1">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                        </svg>
+                        No match
+                      </span>
+                    )}
 
-                  {/* Confidence dots */}
-                  <div className="flex items-center gap-0.5 flex-shrink-0">
-                    {Array.from({ length: dots }).map((_, d) => (
-                      <div
-                        key={d}
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          d < filledDots ? 'bg-purple-500' : 'bg-zinc-700'
-                        }`}
-                      />
-                    ))}
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      {Array.from({ length: dots }).map((_, d) => (
+                        <div key={d} className={`w-1.5 h-1.5 rounded-full ${d < filledDots ? 'bg-purple-500' : 'bg-zinc-700'}`} />
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => setPickingForSegId(isPicking ? null : seg.id)}
+                      className={`flex-shrink-0 text-xs px-2.5 py-1 rounded-md transition-colors ${
+                        isPicking
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      {isPicking ? 'Cancel' : 'Pick'}
+                    </button>
                   </div>
+
+                  {/* Manual picker — shown when this row is active */}
+                  {isPicking && (
+                    <div className="border-t border-zinc-800 px-4 py-3 space-y-2">
+                      <p className="text-xs text-zinc-500 mb-2">Select a speech segment from any clip:</p>
+                      {clips.filter((c) => c.transcribed && c.speechSegments?.length > 0).length === 0 ? (
+                        <p className="text-xs text-zinc-600">No speech segments detected yet — transcribe a clip first.</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {clips.filter((c) => c.transcribed).map((clip) =>
+                            (clip.speechSegments ?? []).map((sp, si) => (
+                              <button
+                                key={`${clip.id}-${si}`}
+                                onClick={() => handleManualPick(seg.id, clip, sp.start, sp.end)}
+                                className="text-xs bg-zinc-800 hover:bg-purple-700 border border-zinc-700 hover:border-purple-500 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                              >
+                                <span className="text-zinc-500 mr-1">{clip.name.split('.')[0]}</span>
+                                {fmtTime(sp.start)}–{fmtTime(sp.end)}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
