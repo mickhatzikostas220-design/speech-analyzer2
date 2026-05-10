@@ -189,8 +189,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
   const [matching, setMatching] = useState(false);
   const [pickingForSegId, setPickingForSegId] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
+  const [bringing, setBringing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // ── Load project ───────────────────────────────────────────
@@ -464,72 +463,49 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
     }, 800);
   }
 
-  // ── Export assembled video ─────────────────────────────────
-  async function handleExport() {
-    const validSegments = segments.filter((s) => s.clips.length > 0);
-    if (!validSegments.length) return;
-
-    setExporting(true);
-    setExportProgress(0);
+  // ── Bring assembled segments to the timeline editor ───────
+  async function handleBringToEditor() {
+    if (!validSegmentCount) return;
+    setBringing(true);
     setError(null);
-
     try {
-      const ffmpeg = await getFFmpeg();
-      const { fetchFile } = await import('@ffmpeg/util');
+      const tlSegments = segments
+        .filter(s => s.clips.length > 0)
+        .map(s => ({
+          id: s.id,
+          scriptLine: s.scriptLine,
+          trimStart: 0,
+          trimEnd: 0,
+          title: '',
+          volume: 1,
+          clips: s.clips.map(sc => {
+            const src = clips.find(c => c.id === sc.clipId);
+            return {
+              clipId: sc.clipId,
+              clipName: sc.clipName,
+              clipPath: src?.path ?? '',
+              start: sc.start,
+              end: sc.end,
+              transcription: src?.transcription ?? [],
+            };
+          }),
+        }));
 
-      const progressHandler = ({ progress }: { progress: number }) =>
-        setExportProgress(Math.round(Math.min(progress, 1) * 100));
-      ffmpeg.on('progress', progressHandler);
-
-      // Download each unique source clip
-      const uniqueClipIds = Array.from(new Set(validSegments.flatMap((s) => s.clips.map((c) => c.clipId))));
-      for (const clipId of uniqueClipIds) {
-        const url = await getFreshClipUrl(clipId);
-        if (!url) throw new Error(`Could not get URL for clip ${clipId}`);
-        await ffmpeg.writeFile(`clip_${clipId}.mp4`, await fetchFile(url));
-      }
-
-      // Trim every sub-clip in order
-      let segIdx = 0;
-      for (const seg of validSegments) {
-        for (const sc of seg.clips) {
-          await ffmpeg.exec([
-            '-i', `clip_${sc.clipId}.mp4`,
-            '-ss', String(sc.start),
-            '-to', String(sc.end),
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-            '-c:a', 'aac', '-b:a', '128k',
-            `seg_${segIdx}.mp4`,
-          ]);
-          segIdx++;
-        }
-      }
-
-      const totalPieces = segIdx;
-      const concatContent = Array.from({ length: totalPieces }, (_, i) => `file 'seg_${i}.mp4'`).join('\n');
-      await ffmpeg.writeFile('concat.txt', new TextEncoder().encode(concatContent));
-
-      await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', 'output.mp4']);
-      ffmpeg.off('progress', progressHandler);
-
-      const raw = await ffmpeg.readFile('output.mp4');
-      const blob = new Blob([new Uint8Array(raw as ArrayBuffer)], { type: 'video/mp4' });
-      const blobUrl = URL.createObjectURL(blob);
-      const safeName = (project?.title ?? 'export').replace(/[^a-z0-9]/gi, '_');
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `${safeName}_assembled.mp4`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
-
-      for (let i = 0; i < totalPieces; i++) { try { await ffmpeg.deleteFile(`seg_${i}.mp4`); } catch { /* ignore */ } }
-      try { await ffmpeg.deleteFile('output.mp4'); } catch { /* ignore */ }
-      try { await ffmpeg.deleteFile('concat.txt'); } catch { /* ignore */ }
+      const res = await fetch('/api/editor/timeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `${project?.title ?? 'Untitled'} — Edit`,
+          source_project_id: params.id,
+          segments: tlSegments,
+        }),
+      });
+      const data = await safeJson(res);
+      if (data.error) throw new Error(data.error as string);
+      router.push(`/editor/timeline/${data.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Export failed');
-    } finally {
-      setExporting(false);
-      setExportProgress(0);
+      setError(e instanceof Error ? e.message : 'Failed to open editor');
+      setBringing(false);
     }
   }
 
@@ -552,7 +528,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
   const hasUntranscribed = clips.some((c) => !c.transcribed);
   const isTranscribing = transcribingId !== null;
   const scriptLines = script.split('\n').filter((l) => l.trim()).length;
-  const canMatch = script.trim().length > 0 && hasTranscribed && !matching && !exporting;
+  const canMatch = script.trim().length > 0 && hasTranscribed && !matching;
   const validSegmentCount = segments.filter((s) => s.clips.length > 0).length;
   const totalAssembledDuration = segments
     .filter((s) => s.clips.length > 0)
@@ -874,38 +850,33 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
             })}
           </div>
 
-          {/* Export */}
+          {/* Bring to Editor */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
-            {exporting && (
-              <div className="space-y-1">
-                <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-purple-600 transition-all duration-300" style={{ width: `${exportProgress}%` }} />
-                </div>
-                <p className="text-xs text-zinc-500 text-center">{exportProgress}%</p>
-              </div>
-            )}
             <button
-              onClick={handleExport}
-              disabled={exporting || validSegmentCount === 0}
+              onClick={handleBringToEditor}
+              disabled={bringing || validSegmentCount === 0}
               className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
             >
-              {exporting ? (
+              {bringing ? (
                 <>
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
-                  Exporting...
+                  Opening editor…
                 </>
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
-                  Export Assembled Video &darr;
+                  Bring to Editor
                 </>
               )}
             </button>
+            <p className="text-xs text-zinc-600 text-center">
+              Add captions, reorder segments, trim, and adjust volume
+            </p>
           </div>
         </div>
       )}

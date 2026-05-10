@@ -20,6 +20,13 @@ interface ScriptProject {
   created_at: string;
 }
 
+interface TimelineProject {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+}
+
 async function safeJson(res: Response): Promise<{ ok: boolean; data: Record<string, unknown> }> {
   try {
     const text = (await res.text()).trim();
@@ -72,6 +79,10 @@ export default function EditorPage() {
   const [creatingScript, setCreatingScript] = useState(false);
   const [scriptCreateError, setScriptCreateError] = useState<string | null>(null);
 
+  // ── Timeline projects ──────────────────────────────────────
+  const [timelineProjects, setTimelineProjects] = useState<TimelineProject[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(true);
+
   useEffect(() => {
     fetch('/api/editor')
       .then(safeJson)
@@ -88,6 +99,14 @@ export default function EditorPage() {
         setScriptLoading(false);
       })
       .catch(() => setScriptLoading(false));
+
+    fetch('/api/editor/timeline')
+      .then(safeJson)
+      .then(({ data }) => {
+        setTimelineProjects(Array.isArray(data) ? (data as unknown as TimelineProject[]) : []);
+        setTimelineLoading(false);
+      })
+      .catch(() => setTimelineLoading(false));
   }, []);
 
   async function createProject(e: React.FormEvent) {
@@ -146,6 +165,11 @@ export default function EditorPage() {
   async function deleteScriptProject(id: string) {
     await fetch(`/api/editor/script/${id}`, { method: 'DELETE' });
     setScriptProjects((p) => p.filter((proj) => proj.id !== id));
+  }
+
+  async function deleteTimelineProject(id: string) {
+    await fetch(`/api/editor/timeline/${id}`, { method: 'DELETE' });
+    setTimelineProjects((p) => p.filter((proj) => proj.id !== id));
   }
 
   return (
@@ -281,6 +305,58 @@ export default function EditorPage() {
                 </button>
                 <button
                   onClick={() => deleteScriptProject(p.id)}
+                  className="ml-4 p-1 text-zinc-700 hover:text-red-400 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── Timeline Editor Section ────────────────────────── */}
+      <section className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold text-white">Timeline Editor</h2>
+          <p className="text-zinc-500 text-sm mt-1">
+            Projects brought here from the Script Editor — add captions, trim, reorder, and export.
+          </p>
+        </div>
+
+        {timelineLoading ? (
+          <div className="space-y-3">
+            {[0, 1].map((i) => (
+              <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl h-20 animate-pulse" />
+            ))}
+          </div>
+        ) : timelineProjects.length === 0 ? (
+          <div className="text-center py-12 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+            <svg className="w-8 h-8 mx-auto mb-2 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <p className="text-sm text-zinc-600">No timeline projects yet — use "Bring to Editor" in a Script project.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {timelineProjects.map((p) => (
+              <div
+                key={p.id}
+                className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center justify-between hover:border-zinc-700 transition-colors"
+              >
+                <button className="flex-1 text-left" onClick={() => router.push(`/editor/timeline/${p.id}`)}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-white font-medium text-sm">{p.title}</span>
+                    <span className={`text-xs capitalize ${STATUS_COLOR[p.status] ?? 'text-zinc-500'}`}>
+                      {p.status}
+                    </span>
+                  </div>
+                  <span className="text-xs text-zinc-600">{timeAgo(p.created_at)}</span>
+                </button>
+                <button
+                  onClick={() => deleteTimelineProject(p.id)}
                   className="ml-4 p-1 text-zinc-700 hover:text-red-400 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
