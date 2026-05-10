@@ -1,7 +1,22 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+import { TimelineComposition } from '@/components/editor/TimelineComposition';
+import type {
+  CompositionSegment,
+  CompositionCaption,
+} from '@/components/editor/TimelineComposition';
+
+// Remotion Player — client-only (uses browser APIs at load time)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const RemotionPlayer = dynamic<any>(
+  () => import('@remotion/player').then((m) => m.Player),
+  { ssr: false, loading: () => <div className="w-full aspect-video bg-zinc-900 rounded-xl animate-pulse" /> }
+);
+
+const FPS = 30;
 
 // ── Types ────────────────────────────────────────────────────
 interface WordTimestamp { word: string; start: number; end: number; }
@@ -55,12 +70,9 @@ function fmtTime(s: number) {
 
 function escapeDrawtext(t: string) {
   return t
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/:/g, '\\:')
-    .replace(/%/g, '\\%')
-    .replace(/\[/g, '\\[')
-    .replace(/\]/g, '\\]');
+    .replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+    .replace(/:/g, '\\:').replace(/%/g, '\\%')
+    .replace(/\[/g, '\\[').replace(/\]/g, '\\]');
 }
 
 function generateCaptionsFromSegments(segments: TLSegment[]): TLCaption[] {
@@ -69,32 +81,18 @@ function generateCaptionsFromSegments(segments: TLSegment[]): TLCaption[] {
   for (const seg of segments) {
     for (const clip of seg.clips) {
       const effStart = clip.start + seg.trimStart;
-      const effEnd   = clip.end   - seg.trimEnd;
+      const effEnd = clip.end - seg.trimEnd;
       if (effEnd <= effStart) continue;
-      const words = (clip.transcription ?? []).filter(
-        w => w.start >= effStart - 0.1 && w.end <= effEnd + 0.1
-      );
+      const words = (clip.transcription ?? []).filter(w => w.start >= effStart - 0.1 && w.end <= effEnd + 0.1);
       let chunk: WordTimestamp[] = [];
       for (const w of words) {
         chunk.push(w);
         if (chunk.length >= 6 || w.end - chunk[0].start >= 4) {
-          caps.push({
-            id: crypto.randomUUID(),
-            text: chunk.map(x => x.word).join(' ').trim(),
-            start: Math.max(0, abs + chunk[0].start - effStart),
-            end: abs + chunk[chunk.length - 1].end - effStart,
-          });
+          caps.push({ id: crypto.randomUUID(), text: chunk.map(x => x.word).join(' ').trim(), start: Math.max(0, abs + chunk[0].start - effStart), end: abs + chunk[chunk.length - 1].end - effStart });
           chunk = [];
         }
       }
-      if (chunk.length) {
-        caps.push({
-          id: crypto.randomUUID(),
-          text: chunk.map(x => x.word).join(' ').trim(),
-          start: Math.max(0, abs + chunk[0].start - effStart),
-          end: abs + chunk[chunk.length - 1].end - effStart,
-        });
-      }
+      if (chunk.length) caps.push({ id: crypto.randomUUID(), text: chunk.map(x => x.word).join(' ').trim(), start: Math.max(0, abs + chunk[0].start - effStart), end: abs + chunk[chunk.length - 1].end - effStart });
       abs += effEnd - effStart;
     }
   }
@@ -102,7 +100,45 @@ function generateCaptionsFromSegments(segments: TLSegment[]): TLCaption[] {
 }
 
 function segEffectiveDuration(seg: TLSegment) {
-  return seg.clips.reduce((sum, c) => sum + Math.max(0, (c.end - seg.trimEnd) - (c.start + seg.trimStart)), 0);
+  return seg.clips.reduce((s, c) => s + Math.max(0, (c.end - seg.trimEnd) - (c.start + seg.trimStart)), 0);
+}
+
+// Convert editor state → Remotion composition props
+function buildCompositionProps(segments: TLSegment[], captions: TLCaption[]): {
+  compSegments: CompositionSegment[];
+  compCaptions: CompositionCaption[];
+  totalFrames: number;
+} {
+  let absFrame = 0;
+  const compSegments: CompositionSegment[] = [];
+
+  for (const seg of segments) {
+    const clips = seg.clips
+      .map((clip) => {
+        const effStart = clip.start + seg.trimStart;
+        const effEnd = clip.end - seg.trimEnd;
+        if (effEnd <= effStart || !clip.videoUrl) return null;
+        const startFrame = Math.round(effStart * FPS);
+        const durationFrames = Math.round(effEnd * FPS) - startFrame;
+        if (durationFrames <= 0) return null;
+        return { videoUrl: clip.videoUrl, startFrame, durationFrames };
+      })
+      .filter(Boolean) as { videoUrl: string; startFrame: number; durationFrames: number }[];
+
+    const segDur = clips.reduce((s, c) => s + c.durationFrames, 0);
+    if (clips.length > 0) {
+      compSegments.push({ clips, title: seg.title, volume: seg.volume, startFrame: absFrame });
+      absFrame += segDur;
+    }
+  }
+
+  const compCaptions: CompositionCaption[] = captions.map((cap) => ({
+    text: cap.text,
+    startFrame: Math.round(cap.start * FPS),
+    endFrame: Math.round(cap.end * FPS),
+  }));
+
+  return { compSegments, compCaptions, totalFrames: absFrame };
 }
 
 // ── Page ─────────────────────────────────────────────────────
@@ -110,16 +146,11 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
   const router = useRouter();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ffmpegRef = useRef<any>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const previewQueue = useRef<{ url: string; start: number; end: number }[]>([]);
-  const previewIdxRef = useRef(0);
-  const previewEndRef = useRef(Infinity);
 
   const [project, setProject] = useState<TLProject | null>(null);
   const [segments, setSegments] = useState<TLSegment[]>([]);
   const [captions, setCaptions] = useState<TLCaption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [previewing, setPreviewing] = useState<string | null>(null);
   const [generatingCaps, setGeneratingCaps] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -135,9 +166,9 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         const segs = (p.segments ?? []).map(s => ({
           ...s,
           trimStart: s.trimStart ?? 0,
-          trimEnd:   s.trimEnd   ?? 0,
-          title:     s.title     ?? '',
-          volume:    s.volume    ?? 1,
+          trimEnd: s.trimEnd ?? 0,
+          title: s.title ?? '',
+          volume: s.volume ?? 1,
         }));
         setProject(p);
         setSegments(segs);
@@ -146,6 +177,12 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
       })
       .catch(() => router.push('/editor'));
   }, [params.id, router]);
+
+  // ── Composition props (reactive to segment/caption edits) ─
+  const { compSegments, compCaptions, totalFrames } = useMemo(
+    () => buildCompositionProps(segments, captions),
+    [segments, captions]
+  );
 
   // ── Persist ──────────────────────────────────────────────
   async function persist(segs: TLSegment[], caps: TLCaption[]) {
@@ -201,10 +238,8 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
     persist(next, captions);
   }
 
-  function patchSegment(i: number, patch: Partial<TLSegment>, save = false) {
-    const next = segments.map((s, idx) => idx === i ? { ...s, ...patch } : s);
-    setSegments(next);
-    if (save) persist(next, captions);
+  function patchSegment(i: number, patch: Partial<TLSegment>) {
+    setSegments(prev => prev.map((s, idx) => idx === i ? { ...s, ...patch } : s));
   }
 
   // ── Caption ops ──────────────────────────────────────────
@@ -219,9 +254,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
     setCaptions(prev => prev.map(c => c.id === id ? { ...c, text } : c));
   }
 
-  function saveCaption() {
-    persist(segments, captions);
-  }
+  function saveCaption() { persist(segments, captions); }
 
   function removeCaption(id: string) {
     const next = captions.filter(c => c.id !== id);
@@ -229,48 +262,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
     persist(segments, next);
   }
 
-  // ── Preview ──────────────────────────────────────────────
-  function playQueueFrom(idx: number) {
-    const video = videoRef.current;
-    if (!video) return;
-    const queue = previewQueue.current;
-    if (idx >= queue.length) { setPreviewing(null); return; }
-    const { url, start, end } = queue[idx];
-    previewIdxRef.current = idx + 1;
-    previewEndRef.current = end;
-    if (video.src !== url) video.src = url;
-    video.currentTime = start;
-    video.play().catch(() => setPreviewing(null));
-  }
-
-  async function handlePreviewSegment(seg: TLSegment) {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (previewing === seg.id) {
-      video.pause();
-      setPreviewing(null);
-      return;
-    }
-
-    let urlMap: Map<string, string>;
-    try { urlMap = await getFreshUrlMap(); } catch { return; }
-
-    const queue = seg.clips
-      .map(clip => ({
-        url: urlMap.get(clip.clipPath) ?? clip.videoUrl ?? '',
-        start: clip.start + seg.trimStart,
-        end: clip.end - seg.trimEnd,
-      }))
-      .filter(q => q.url && q.end > q.start);
-
-    if (!queue.length) return;
-    previewQueue.current = queue;
-    setPreviewing(seg.id);
-    playQueueFrom(0);
-  }
-
-  // ── Export ───────────────────────────────────────────────
+  // ── Export (ffmpeg.wasm) ─────────────────────────────────
   async function handleExport() {
     const validSegs = segments.filter(s => s.clips.some(c => c.end - s.trimEnd > c.start + s.trimStart));
     if (!validSegs.length) return;
@@ -288,7 +280,6 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         setExportProgress(Math.round(Math.min(progress, 1) * 100));
       ff.on('progress', progressHandler);
 
-      // Download unique source clips
       const uniquePaths = Array.from(new Set(validSegs.flatMap(s => s.clips.map(c => c.clipPath))));
       for (const path of uniquePaths) {
         const url = urlMap.get(path);
@@ -296,17 +287,15 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         await ff.writeFile(`src_${btoa(path).replace(/[+/=]/g, '_')}.mp4`, await fetchFile(url));
       }
 
-      // Trim + volume-encode each piece
       let pieceIdx = 0;
       for (const seg of validSegs) {
         for (const clip of seg.clips) {
           const effStart = clip.start + seg.trimStart;
-          const effEnd   = clip.end   - seg.trimEnd;
+          const effEnd = clip.end - seg.trimEnd;
           if (effEnd <= effStart) continue;
           const srcName = `src_${btoa(clip.clipPath).replace(/[+/=]/g, '_')}.mp4`;
           await ff.exec([
-            '-i', srcName,
-            '-ss', String(effStart), '-to', String(effEnd),
+            '-i', srcName, '-ss', String(effStart), '-to', String(effEnd),
             '-af', `volume=${seg.volume}`,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
             '-c:a', 'aac', '-b:a', '128k',
@@ -318,12 +307,10 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
 
       if (pieceIdx === 0) throw new Error('No valid segments to export');
 
-      // Concat
       const concatList = Array.from({ length: pieceIdx }, (_, i) => `file 'piece_${i}.mp4'`).join('\n');
       await ff.writeFile('concat.txt', new TextEncoder().encode(concatList));
       await ff.exec(['-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', 'assembled.mp4']);
 
-      // Build drawtext filter chain (captions bottom + title overlays top)
       let absTime = 0;
       const titleFilters: string[] = [];
       for (const seg of validSegs) {
@@ -341,15 +328,8 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
       );
 
       const allFilters = [...captionFilters, ...titleFilters].filter(Boolean);
-
       if (allFilters.length > 0) {
-        await ff.exec([
-          '-i', 'assembled.mp4',
-          '-vf', allFilters.join(','),
-          '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-          '-c:a', 'copy',
-          'output.mp4',
-        ]);
+        await ff.exec(['-i', 'assembled.mp4', '-vf', allFilters.join(','), '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-c:a', 'copy', 'output.mp4']);
       } else {
         await ff.exec(['-i', 'assembled.mp4', '-c', 'copy', 'output.mp4']);
       }
@@ -392,7 +372,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
 
   if (!project) return null;
 
-  const totalDuration = segments.reduce((s, seg) => s + segEffectiveDuration(seg), 0);
+  const totalSeconds = totalFrames / FPS;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
@@ -405,7 +385,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         </button>
         <h1 className="text-lg font-semibold text-white">{project.title}</h1>
         <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full">
-          {segments.length} segments · {fmtTime(totalDuration)}
+          {segments.length} segments · {fmtTime(totalSeconds)}
         </span>
       </div>
 
@@ -419,51 +399,63 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         </div>
       )}
 
+      {/* ── Remotion Player (full width) ─────────────────── */}
+      <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden">
+        <RemotionPlayer
+          component={TimelineComposition}
+          inputProps={{ segments: compSegments, captions: compCaptions }}
+          durationInFrames={Math.max(1, totalFrames)}
+          compositionWidth={1920}
+          compositionHeight={1080}
+          fps={FPS}
+          style={{ width: '100%', aspectRatio: '16/9' }}
+          controls
+          clickToPlay
+          showVolumeControls
+        />
+        {totalFrames === 0 && (
+          <p className="text-xs text-zinc-600 text-center py-3">
+            Add segments from the Script Editor to see a preview here.
+          </p>
+        )}
+      </div>
+
       <div className="grid grid-cols-5 gap-6 items-start">
         {/* ── LEFT: Segments ─────────────────────────────── */}
         <div className="col-span-3 space-y-2">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-1">
             <p className="text-sm font-medium text-white">Segments</p>
-            <p className="text-xs text-zinc-500">Reorder, trim, add title overlays</p>
+            <p className="text-xs text-zinc-500">Reorder · trim · volume · title overlay</p>
           </div>
 
           {segments.length === 0 ? (
             <div className="text-center py-12 bg-zinc-900 border border-zinc-800 rounded-xl">
-              <p className="text-sm text-zinc-600">No segments — go back to the script editor.</p>
+              <p className="text-sm text-zinc-600">No segments — bring a project here from the Script Editor.</p>
             </div>
           ) : (
             segments.map((seg, i) => (
               <div key={seg.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-                {/* Segment header row */}
                 <div className="px-4 py-3 flex items-start gap-3">
-                  {/* Up/down */}
+                  {/* Reorder arrows */}
                   <div className="flex flex-col gap-0.5 flex-shrink-0 mt-0.5">
-                    <button
-                      onClick={() => moveSegment(i, -1)}
-                      disabled={i === 0}
-                      className="text-zinc-600 hover:text-white disabled:opacity-20 transition-colors leading-none"
-                    >
+                    <button onClick={() => moveSegment(i, -1)} disabled={i === 0}
+                      className="text-zinc-600 hover:text-white disabled:opacity-20 transition-colors">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
                       </svg>
                     </button>
-                    <button
-                      onClick={() => moveSegment(i, 1)}
-                      disabled={i === segments.length - 1}
-                      className="text-zinc-600 hover:text-white disabled:opacity-20 transition-colors leading-none"
-                    >
+                    <button onClick={() => moveSegment(i, 1)} disabled={i === segments.length - 1}
+                      className="text-zinc-600 hover:text-white disabled:opacity-20 transition-colors">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
                   </div>
 
-                  {/* Main content */}
                   <div className="flex-1 min-w-0 space-y-2">
-                    {/* Script line */}
                     <p className="text-sm text-white truncate" title={seg.scriptLine}>{seg.scriptLine}</p>
 
-                    {/* Clip tags */}
+                    {/* Clip source tags */}
                     <div className="flex flex-wrap gap-1">
                       {seg.clips.map((clip, ci) => (
                         <span key={ci} className="text-xs bg-zinc-800 border border-zinc-700 text-zinc-400 px-2 py-0.5 rounded-md whitespace-nowrap">
@@ -472,42 +464,27 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       ))}
                     </div>
 
-                    {/* Trim + volume controls */}
+                    {/* Trim + volume */}
                     <div className="flex flex-wrap gap-3 items-center">
                       <label className="flex items-center gap-1.5 text-xs text-zinc-500">
                         Trim start
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.1}
-                          value={seg.trimStart}
+                        <input type="number" min={0} step={0.1} value={seg.trimStart}
                           onChange={e => patchSegment(i, { trimStart: Math.max(0, parseFloat(e.target.value) || 0) })}
                           onBlur={() => persist(segments, captions)}
                           className="w-14 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-purple-500"
-                        />
-                        s
+                        />s
                       </label>
                       <label className="flex items-center gap-1.5 text-xs text-zinc-500">
                         Trim end
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.1}
-                          value={seg.trimEnd}
+                        <input type="number" min={0} step={0.1} value={seg.trimEnd}
                           onChange={e => patchSegment(i, { trimEnd: Math.max(0, parseFloat(e.target.value) || 0) })}
                           onBlur={() => persist(segments, captions)}
                           className="w-14 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-purple-500"
-                        />
-                        s
+                        />s
                       </label>
                       <label className="flex items-center gap-1.5 text-xs text-zinc-500">
                         Volume
-                        <input
-                          type="range"
-                          min={0}
-                          max={2}
-                          step={0.05}
-                          value={seg.volume}
+                        <input type="range" min={0} max={2} step={0.05} value={seg.volume}
                           onChange={e => patchSegment(i, { volume: parseFloat(e.target.value) })}
                           onMouseUp={() => persist(segments, captions)}
                           onTouchEnd={() => persist(segments, captions)}
@@ -517,120 +494,76 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       </label>
                     </div>
 
-                    {/* Title overlay input */}
-                    <input
-                      type="text"
-                      placeholder="Title overlay (optional)…"
-                      value={seg.title}
+                    {/* Title overlay */}
+                    <input type="text" placeholder="Title overlay (optional)…" value={seg.title}
                       onChange={e => patchSegment(i, { title: e.target.value })}
                       onBlur={() => persist(segments, captions)}
                       className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500"
                     />
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button
-                      onClick={() => handlePreviewSegment(seg)}
-                      title={previewing === seg.id ? 'Stop preview' : 'Preview segment'}
-                      className={`text-xs px-2 py-1 rounded-md transition-colors ${
-                        previewing === seg.id
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      {previewing === seg.id ? '⏸' : '▶'}
-                    </button>
-                    <button
-                      onClick={() => removeSegment(i)}
-                      className="text-zinc-600 hover:text-red-400 transition-colors p-1"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
+                  {/* Remove */}
+                  <button onClick={() => removeSegment(i)}
+                    className="text-zinc-600 hover:text-red-400 transition-colors p-1 flex-shrink-0 mt-0.5">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             ))
           )}
         </div>
 
-        {/* ── RIGHT: Player + Captions ───────────────────── */}
-        <div className="col-span-2 space-y-4 sticky top-6">
-          {/* Video preview */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-            <video
-              ref={videoRef}
-              controls
-              className="w-full aspect-video bg-black"
-              onTimeUpdate={() => {
-                const v = videoRef.current;
-                if (!v) return;
-                if (v.currentTime >= previewEndRef.current) {
-                  playQueueFrom(previewIdxRef.current);
-                }
-              }}
-              onEnded={() => playQueueFrom(previewIdxRef.current)}
-              onPause={() => { if (previewing) setPreviewing(null); }}
-            />
-            <p className="text-xs text-zinc-600 text-center py-1.5">
-              {previewing ? 'Previewing segment…' : 'Click ▶ on a segment to preview'}
+        {/* ── RIGHT: Captions ────────────────────────────── */}
+        <div className="col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3 sticky top-6">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-white">Captions</p>
+            <button
+              onClick={handleGenerateCaptions}
+              disabled={generatingCaps}
+              className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 px-2.5 py-1.5 rounded-lg transition-colors"
+            >
+              {generatingCaps ? (
+                <>
+                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  Generating…
+                </>
+              ) : captions.length > 0 ? 'Regenerate' : 'Generate Captions'}
+            </button>
+          </div>
+
+          {captions.length === 0 ? (
+            <p className="text-xs text-zinc-600 py-4 text-center">
+              Click Generate Captions to auto-create from transcriptions.
             </p>
-          </div>
-
-          {/* Captions panel */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-white">Captions</p>
-              <button
-                onClick={handleGenerateCaptions}
-                disabled={generatingCaps}
-                className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 px-2.5 py-1.5 rounded-lg transition-colors"
-              >
-                {generatingCaps ? (
-                  <>
-                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          ) : (
+            <div className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
+              {captions.map(cap => (
+                <div key={cap.id} className="flex items-start gap-2">
+                  <span className="text-xs text-zinc-600 flex-shrink-0 mt-1.5 w-20 leading-tight">
+                    {fmtTime(cap.start)}<br />{fmtTime(cap.end)}
+                  </span>
+                  <textarea
+                    value={cap.text}
+                    onChange={e => patchCaption(cap.id, e.target.value)}
+                    onBlur={saveCaption}
+                    rows={2}
+                    className="flex-1 text-xs bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-white resize-none focus:outline-none focus:border-purple-500"
+                  />
+                  <button onClick={() => removeCaption(cap.id)}
+                    className="text-zinc-600 hover:text-red-400 transition-colors flex-shrink-0 mt-1">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                    Generating…
-                  </>
-                ) : captions.length > 0 ? 'Regenerate' : 'Generate Captions'}
-              </button>
+                  </button>
+                </div>
+              ))}
             </div>
-
-            {captions.length === 0 ? (
-              <p className="text-xs text-zinc-600 py-4 text-center">
-                Click Generate Captions to auto-create from transcriptions.
-              </p>
-            ) : (
-              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                {captions.map(cap => (
-                  <div key={cap.id} className="flex items-start gap-2">
-                    <span className="text-xs text-zinc-600 flex-shrink-0 mt-1.5 w-20 leading-none">
-                      {fmtTime(cap.start)}<br />{fmtTime(cap.end)}
-                    </span>
-                    <textarea
-                      value={cap.text}
-                      onChange={e => patchCaption(cap.id, e.target.value)}
-                      onBlur={saveCaption}
-                      rows={2}
-                      className="flex-1 text-xs bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-white resize-none focus:outline-none focus:border-purple-500"
-                    />
-                    <button
-                      onClick={() => removeCaption(cap.id)}
-                      className="text-zinc-600 hover:text-red-400 transition-colors flex-shrink-0 mt-1"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
@@ -667,12 +600,9 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
           )}
         </button>
         <p className="text-xs text-zinc-600 text-center">
-          Captions are baked in · Title overlays show at top · Volume applied per segment
+          Captions baked in · Title overlays at top · Volume per segment
         </p>
       </div>
-
-      {/* Hidden video for queue-based preview */}
-      {/* (videoRef is the visible player — no second element needed) */}
     </div>
   );
 }

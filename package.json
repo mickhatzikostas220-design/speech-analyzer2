@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.91.1",
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.2",
+    "@remotion/player": "^4.0.459",
     "@supabase/ssr": "^0.5.1",
     "@supabase/supabase-js": "^2.45.0",
     "@types/fluent-ffmpeg": "^2.1.28",
@@ -23,6 +24,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-dropzone": "^14.2.3",
+    "remotion": "^4.0.459",
     "resend": "^6.12.2",
     "uuid": "^14.0.0"
   },
