@@ -187,6 +187,9 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
   const scriptSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
+  const previewRef = useRef<HTMLVideoElement>(null);
+  const previewEndRef = useRef<number>(0);
+
   const [project, setProject] = useState<ScriptProject | null>(null);
   const [clips, setClips] = useState<ScriptClip[]>([]);
   const [script, setScript] = useState('');
@@ -196,6 +199,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
   const [transcribingId, setTranscribingId] = useState<string | null>(null);
   const [matching, setMatching] = useState(false);
   const [pickingForSegId, setPickingForSegId] = useState<string | null>(null);
+  const [previewKey, setPreviewKey] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -215,6 +219,14 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
       })
       .catch(() => router.push('/editor'));
   }, [params.id, router]);
+
+  // Pause preview when picker closes
+  useEffect(() => {
+    if (!pickingForSegId) {
+      previewRef.current?.pause();
+      setPreviewKey(null);
+    }
+  }, [pickingForSegId]);
 
   // ── Lazy-load ffmpeg.wasm ──────────────────────────────────
   async function getFFmpeg() {
@@ -428,6 +440,28 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ segments: updated }),
     });
+  }
+
+  // ── Preview a speech segment ───────────────────────────────
+  async function handlePreview(clip: ScriptClip, sp: SpeechSegment, key: string) {
+    const video = previewRef.current;
+    if (!video) return;
+
+    if (previewKey === key) {
+      video.pause();
+      setPreviewKey(null);
+      return;
+    }
+
+    let url = clip.videoUrl ?? null;
+    if (!url) url = await getFreshClipUrl(clip.id);
+    if (!url) return;
+
+    previewEndRef.current = sp.end;
+    if (video.src !== url) video.src = url;
+    video.currentTime = sp.start;
+    setPreviewKey(key);
+    try { await video.play(); } catch { /* autoplay blocked */ }
   }
 
   // ── Script auto-save ───────────────────────────────────────
@@ -823,16 +857,35 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {clips.filter((c) => c.transcribed).map((clip) =>
-                            (clip.speechSegments ?? []).map((sp, si) => (
-                              <button
-                                key={`${clip.id}-${si}`}
-                                onClick={() => handleManualPick(seg.id, clip, sp.start, sp.end)}
-                                className="text-xs bg-zinc-800 hover:bg-purple-700 border border-zinc-700 hover:border-purple-500 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
-                              >
-                                <span className="text-zinc-500 mr-1">{clip.name.split('.')[0]}</span>
-                                {fmtTime(sp.start)}–{fmtTime(sp.end)}
-                              </button>
-                            ))
+                            (clip.speechSegments ?? []).map((sp, si) => {
+                              const pk = `${clip.id}-${si}`;
+                              const isPlaying = previewKey === pk;
+                              return (
+                                <div
+                                  key={pk}
+                                  className="flex items-center rounded-lg overflow-hidden border border-zinc-700 hover:border-zinc-600 transition-colors"
+                                >
+                                  <button
+                                    onClick={() => handlePreview(clip, sp, pk)}
+                                    title={isPlaying ? 'Pause' : 'Preview'}
+                                    className={`text-xs px-2.5 py-1.5 transition-colors ${
+                                      isPlaying
+                                        ? 'bg-purple-600 text-white'
+                                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white'
+                                    }`}
+                                  >
+                                    {isPlaying ? '⏸' : '▶'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleManualPick(seg.id, clip, sp.start, sp.end)}
+                                    className="text-xs bg-zinc-800 hover:bg-purple-700 text-zinc-300 hover:text-white px-3 py-1.5 transition-colors whitespace-nowrap border-l border-zinc-700"
+                                  >
+                                    <span className="text-zinc-500 mr-1">{clip.name.split('.')[0]}</span>
+                                    {fmtTime(sp.start)}–{fmtTime(sp.end)}
+                                  </button>
+                                </div>
+                              );
+                            })
                           )}
                         </div>
                       )}
@@ -882,6 +935,20 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
           </div>
         </div>
       )}
+
+      {/* Hidden video element used only for segment previews */}
+      <video
+        ref={previewRef}
+        style={{ display: 'none' }}
+        onTimeUpdate={() => {
+          const v = previewRef.current;
+          if (v && v.currentTime >= previewEndRef.current) {
+            v.pause();
+            setPreviewKey(null);
+          }
+        }}
+        onEnded={() => setPreviewKey(null)}
+      />
     </div>
   );
 }
