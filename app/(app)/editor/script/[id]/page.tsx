@@ -168,6 +168,45 @@ function matchScriptToClips(script: string, clips: ScriptClip[]): ScriptSegment[
   });
 }
 
+// Narrow a speech segment to just the words matching the script line
+function narrowToScriptLine(
+  scriptLine: string,
+  clip: ScriptClip,
+  spStart: number,
+  spEnd: number,
+): { start: number; end: number } {
+  const cleaned = cleanScriptLine(scriptLine);
+  const scriptWords = cleaned.split(/\s+/).map(normalizeWord).filter(Boolean);
+  if (!scriptWords.length) return { start: spStart, end: spEnd };
+
+  const trans = (clip.transcription ?? [])
+    .filter(w => w.start >= spStart - 0.1 && w.end <= spEnd + 0.1)
+    .map(w => ({ norm: normalizeWord(w.word), start: w.start, end: w.end }));
+
+  if (!trans.length) return { start: spStart, end: spEnd };
+
+  const minW = Math.max(1, Math.floor(scriptWords.length * 0.5));
+  const maxW = Math.ceil(scriptWords.length * 2.0);
+
+  let bestScore = 0;
+  let bestStart = spStart;
+  let bestEnd = spEnd;
+
+  for (let i = 0; i < trans.length; i++) {
+    for (let sz = minW; sz <= maxW && i + sz <= trans.length; sz++) {
+      const win = trans.slice(i, i + sz);
+      const score = fuzzySeqScore(scriptWords, win.map(w => w.norm));
+      if (score > bestScore) {
+        bestScore = score;
+        bestStart = Math.max(spStart, win[0].start - 0.2);
+        bestEnd = Math.min(spEnd, win[win.length - 1].end + 0.2);
+      }
+    }
+  }
+
+  return bestScore > 0.25 ? { start: bestStart, end: bestEnd } : { start: spStart, end: spEnd };
+}
+
 // ── Main page ────────────────────────────────────────────────
 export default function ScriptEditorPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -407,7 +446,11 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
   }
 
   // ── Add a clip segment to a script line ────────────────────
-  async function handleAddSegmentClip(segId: string, clip: ScriptClip, start: number, end: number) {
+  async function handleAddSegmentClip(segId: string, clip: ScriptClip, spStart: number, spEnd: number) {
+    const seg = segments.find(s => s.id === segId);
+    const { start, end } = seg
+      ? narrowToScriptLine(seg.scriptLine, clip, spStart, spEnd)
+      : { start: spStart, end: spEnd };
     const newEntry: SegmentClip = { clipId: clip.id, clipName: clip.name, start, end };
     const updated = segments.map((s) =>
       s.id === segId ? { ...s, clips: [...s.clips, newEntry], confidence: 1 } : s
