@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       .createSignedUploadUrl(path);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ token: data.token, path, clipId });
+    return NextResponse.json({ signedUrl: data.signedUrl, path, clipId });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 500 });

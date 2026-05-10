@@ -194,17 +194,31 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
         const file = files[i];
         setUploadMsg(`Uploading ${i + 1} of ${files.length}: ${file.name}`);
 
-        // Upload through server route (uses admin key, bypasses storage RLS)
-        const form = new FormData();
-        form.append('file', file);
-        const res = await fetch(`/api/editor/script/${params.id}/upload`, {
+        // Step 1: get a signed upload URL from server (admin key, no RLS)
+        const signRes = await fetch(`/api/editor/script/${params.id}/signed-upload`, {
           method: 'POST',
-          body: form,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: file.name }),
         });
-        const data = await safeJson(res);
-        if (data.error) throw new Error(String(data.error));
+        const signData = await safeJson(signRes);
+        if (signData.error) throw new Error(`Could not get upload URL: ${signData.error}`);
 
-        const { clipId, path, videoUrl } = data as { clipId: string; path: string; videoUrl: string | null };
+        const { signedUrl, path, clipId } = signData as { signedUrl: string; path: string; clipId: string };
+
+        // Step 2: PUT file directly to Supabase (browser → Supabase, no Vercel limit)
+        const uploadRes = await fetch(signedUrl, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type || 'video/mp4', 'x-upsert': 'true' },
+        });
+        if (!uploadRes.ok) {
+          const msg = await uploadRes.text().catch(() => uploadRes.status.toString());
+          throw new Error(`Upload failed: ${msg}`);
+        }
+
+        // Step 3: get a signed download URL for playback
+        const { data: signed } = await supabase.storage.from('speeches').createSignedUrl(path, 3600);
+        const videoUrl = signed?.signedUrl ?? null;
 
         const newClip: ScriptClip = {
           id: clipId,
