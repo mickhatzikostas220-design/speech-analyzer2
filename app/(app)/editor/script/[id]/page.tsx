@@ -115,23 +115,21 @@ function cleanScriptLine(line: string): string {
     .trim();
 }
 
-// Greedy forward scan: tries every starting position in `trans`, matches
-// scriptWords in order, records the last matched word index.
-// Clip boundaries are set to first-match-start and last-match-end (not window end),
-// so extra filler words between script words don't bleed into the clip.
+// Greedy forward scan starting at `startFrom`.
+// Returns the best match together with lastMatchedIdx so the caller can
+// advance the search cursor and prevent the next line from overlapping.
 function findBestMatch(
   scriptWords: string[],
   trans: { norm: string; start: number; end: number }[],
-): { score: number; start: number; end: number } | null {
+  startFrom = 0,
+): { score: number; start: number; end: number; lastMatchedIdx: number } | null {
   const BUFFER = 0.3;
-  // Allow up to 4× the script length of transcription words per attempt,
-  // so filler-heavy speech still gets fully matched.
   const searchRange = scriptWords.length * 4;
 
   let bestScore = 0;
-  let best: { score: number; start: number; end: number } | null = null;
+  let best: { score: number; start: number; end: number; lastMatchedIdx: number } | null = null;
 
-  for (let i = 0; i < trans.length; i++) {
+  for (let i = startFrom; i < trans.length; i++) {
     let si = 0;
     let totalSim = 0;
     let lastMatchedIdx = i;
@@ -153,6 +151,7 @@ function findBestMatch(
         score,
         start: Math.max(0, trans[i].start - BUFFER),
         end: trans[lastMatchedIdx].end + BUFFER,
+        lastMatchedIdx,
       };
     }
   }
@@ -162,23 +161,43 @@ function findBestMatch(
 
 function matchScriptToClips(script: string, clips: ScriptClip[]): ScriptSegment[] {
   const lines = script.split('\n').map((l) => l.trim()).filter(Boolean);
-  return lines.map((line) => {
+
+  // Pre-normalise each clip's transcription once
+  const transCache = new Map<string, { norm: string; start: number; end: number }[]>();
+  for (const clip of clips) {
+    if (clip.transcribed && clip.transcription.length) {
+      transCache.set(clip.id, clip.transcription.map(w => ({ norm: normalizeWord(w.word), start: w.start, end: w.end })));
+    }
+  }
+
+  // Per-clip cursor: next line must start at or after this word index
+  const clipNextStart = new Map<string, number>();
+
+  const segments = lines.map((line) => {
     const cleaned = cleanScriptLine(line);
     const scriptWords = cleaned.split(/\s+/).map(normalizeWord).filter(Boolean);
     if (!scriptWords.length) return { id: crypto.randomUUID(), scriptLine: line, clips: [], confidence: 0 };
 
     let bestScore = 0;
     let bestClip: SegmentClip | null = null;
+    let bestClipId: string | null = null;
+    let bestLastIdx = 0;
 
     for (const clip of clips) {
-      if (!clip.transcribed || !clip.transcription.length) continue;
-      const trans = clip.transcription.map((w) => ({ norm: normalizeWord(w.word), start: w.start, end: w.end }));
-      const result = findBestMatch(scriptWords, trans);
+      const trans = transCache.get(clip.id);
+      if (!trans) continue;
+      const startFrom = clipNextStart.get(clip.id) ?? 0;
+      const result = findBestMatch(scriptWords, trans, startFrom);
       if (result && result.score > bestScore) {
         bestScore = result.score;
         bestClip = { clipId: clip.id, clipName: clip.name, start: result.start, end: result.end };
+        bestClipId = clip.id;
+        bestLastIdx = result.lastMatchedIdx;
       }
     }
+
+    // Advance this clip's cursor so the next line can't reuse the same words
+    if (bestClipId !== null) clipNextStart.set(bestClipId, bestLastIdx + 1);
 
     return {
       id: crypto.randomUUID(),
@@ -187,6 +206,24 @@ function matchScriptToClips(script: string, clips: ScriptClip[]): ScriptSegment[
       confidence: bestScore,
     };
   });
+
+  // Fix buffer overlap at seams between consecutive lines from the same clip:
+  // if line N ends at T1 and line N+1 starts at T0 < T1 (same clip), cut at midpoint.
+  for (let i = 0; i < segments.length - 1; i++) {
+    const curr = segments[i];
+    const next = segments[i + 1];
+    if (!curr.clips.length || !next.clips.length) continue;
+    const currLast = curr.clips[curr.clips.length - 1];
+    const nextFirst = next.clips[0];
+    if (currLast.clipId !== nextFirst.clipId) continue;
+    if (currLast.end > nextFirst.start) {
+      const mid = (currLast.end + nextFirst.start) / 2;
+      currLast.end = mid;
+      nextFirst.start = mid;
+    }
+  }
+
+  return segments;
 }
 
 // Narrow a speech segment to just the words matching the script line
