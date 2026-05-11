@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { preloadVideo } from '@remotion/preload';
 import { TimelineComposition } from '@/components/editor/TimelineComposition';
 import type { CompositionSegment, CompositionCaption } from '@/components/editor/TimelineComposition';
 
@@ -219,6 +220,14 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
+
+  // Preload every clip video URL so OffthreadVideo can seek instantly (no black frames)
+  useEffect(() => {
+    const urls = new Set<string>();
+    segments.forEach(seg => seg.clips.forEach(clip => { if (clip.videoUrl) urls.add(clip.videoUrl); }));
+    const freeList = Array.from(urls).map(url => preloadVideo(url));
+    return () => freeList.forEach(free => free());
+  }, [segments]);
 
   // ── Composition props ────────────────────────────────────────
   const { compSegments, compCaptions, totalFrames } = useMemo(
