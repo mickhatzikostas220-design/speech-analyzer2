@@ -281,6 +281,15 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
   const [previewKey, setPreviewKey] = useState<string | null>(null);
   const [bringing, setBringing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingEntry, setEditingEntry] = useState<{
+    segId: string;
+    clipIdx: number;
+    start: number;
+    end: number;
+    sliderMin: number;
+    sliderMax: number;
+    clipId: string;
+  } | null>(null);
 
   // ── Load project ───────────────────────────────────────────
   useEffect(() => {
@@ -520,6 +529,43 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
     });
     setSegments(updated);
     await saveSegments(updated);
+  }
+
+  // ── Open clip trim editor ──────────────────────────────────
+  function openClipEdit(segId: string, clipIdx: number) {
+    const seg = segments.find(s => s.id === segId);
+    if (!seg) return;
+    const sc = seg.clips[clipIdx];
+    if (!sc) return;
+    const clip = clips.find(c => c.id === sc.clipId);
+    if (!clip) return;
+
+    const trans = clip.transcription ?? [];
+    const rawMin = trans.length > 0 ? trans[0].start : 0;
+    const rawMax = trans.length > 0 ? trans[trans.length - 1].end : (clip.duration ?? 60);
+
+    setEditingEntry({
+      segId, clipIdx,
+      start: sc.start, end: sc.end,
+      sliderMin: Math.max(0, rawMin - 0.5),
+      sliderMax: rawMax + 0.5,
+      clipId: sc.clipId,
+    });
+  }
+
+  // ── Preview a specific clip range ──────────────────────────
+  async function previewClipRange(clipId: string, start: number, end: number) {
+    const video = previewRef.current;
+    if (!video) return;
+    const clip = clips.find(c => c.id === clipId);
+    let url = clip?.videoUrl ?? null;
+    if (!url) url = await getFreshClipUrl(clipId);
+    if (!url) return;
+    previewEndRef.current = end;
+    if (video.src !== url) video.src = url;
+    video.currentTime = start;
+    setPreviewKey(null);
+    try { await video.play(); } catch { /* autoplay blocked */ }
   }
 
   // ── Preview a speech segment ───────────────────────────────
@@ -849,22 +895,29 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                     <div className="flex flex-wrap gap-1.5 flex-shrink-0 max-w-xs">
                       {hasMatch ? (
                         seg.clips.map((sc, ci) => (
-                          <span
-                            key={ci}
-                            className="flex items-center gap-1 text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2 py-0.5 rounded-md"
-                          >
-                            <span className="text-zinc-500 truncate max-w-[5rem]" title={sc.clipName}>
-                              {sc.clipName.split('.')[0]}
-                            </span>
-                            <span className="text-zinc-600">{fmtTime(sc.start)}–{fmtTime(sc.end)}</span>
+                          <div key={ci} className="flex items-center">
+                            <button
+                              onClick={() => openClipEdit(seg.id, ci)}
+                              className={`flex items-center gap-1 text-xs border text-zinc-300 px-2 py-0.5 rounded-l-md transition-colors ${
+                                editingEntry?.segId === seg.id && editingEntry?.clipIdx === ci
+                                  ? 'bg-purple-800/40 border-purple-600'
+                                  : 'bg-zinc-800 border-zinc-700 hover:border-zinc-500'
+                              }`}
+                              title="Click to adjust timing"
+                            >
+                              <span className="text-zinc-500 truncate max-w-[5rem]" title={sc.clipName}>
+                                {sc.clipName.split('.')[0]}
+                              </span>
+                              <span className="text-zinc-600">{fmtTime(sc.start)}–{fmtTime(sc.end)}</span>
+                            </button>
                             <button
                               onClick={() => handleRemoveSegmentClip(seg.id, ci)}
-                              className="text-zinc-600 hover:text-red-400 transition-colors ml-0.5 leading-none"
+                              className="text-zinc-600 hover:text-red-400 transition-colors text-xs bg-zinc-800 border border-l-0 border-zinc-700 rounded-r-md px-1.5 py-0.5 leading-none"
                               title="Remove"
                             >
                               ×
                             </button>
-                          </span>
+                          </div>
                         ))
                       ) : (
                         <span className="text-xs text-amber-400 flex items-center gap-1">
@@ -939,6 +992,90 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                       )}
                     </div>
                   )}
+
+                  {/* Clip timing editor */}
+                  {editingEntry && editingEntry.segId === seg.id && (() => {
+                    const sc = seg.clips[editingEntry.clipIdx];
+                    if (!sc) return null;
+                    const saveStart = async () => {
+                      if (!editingEntry) return;
+                      const { segId, clipIdx, start, end, clipId } = editingEntry;
+                      const updated = segments.map(s =>
+                        s.id !== segId ? s : { ...s, clips: s.clips.map((c, i) => i !== clipIdx ? c : { ...c, start }) }
+                      );
+                      setSegments(updated);
+                      await saveSegments(updated);
+                      await previewClipRange(clipId, start, end);
+                    };
+                    const saveEnd = async () => {
+                      if (!editingEntry) return;
+                      const { segId, clipIdx, start, end, clipId } = editingEntry;
+                      const updated = segments.map(s =>
+                        s.id !== segId ? s : { ...s, clips: s.clips.map((c, i) => i !== clipIdx ? c : { ...c, end }) }
+                      );
+                      setSegments(updated);
+                      await saveSegments(updated);
+                      await previewClipRange(clipId, start, end);
+                    };
+                    return (
+                      <div className="border-t border-zinc-800 px-4 py-3 space-y-3 bg-zinc-950/40">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-zinc-300">
+                            Trim: <span className="text-zinc-500">{sc.clipName.split('.')[0]}</span>
+                          </p>
+                          <button
+                            onClick={() => setEditingEntry(null)}
+                            className="text-xs text-zinc-500 hover:text-white transition-colors"
+                          >
+                            Done
+                          </button>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-zinc-500">Start</span>
+                            <span className="text-xs text-purple-400 tabular-nums">{fmtTime(editingEntry.start)}</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={editingEntry.sliderMin}
+                            max={Math.max(editingEntry.sliderMin, editingEntry.end - 0.1)}
+                            step={0.05}
+                            value={editingEntry.start}
+                            onChange={e => setEditingEntry(prev => prev ? { ...prev, start: parseFloat(e.target.value) } : null)}
+                            onMouseUp={saveStart}
+                            onTouchEnd={saveStart}
+                            className="w-full accent-purple-500"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-zinc-500">End</span>
+                            <span className="text-xs text-purple-400 tabular-nums">{fmtTime(editingEntry.end)}</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={Math.min(editingEntry.sliderMax, editingEntry.start + 0.1)}
+                            max={editingEntry.sliderMax}
+                            step={0.05}
+                            value={editingEntry.end}
+                            onChange={e => setEditingEntry(prev => prev ? { ...prev, end: parseFloat(e.target.value) } : null)}
+                            onMouseUp={saveEnd}
+                            onTouchEnd={saveEnd}
+                            className="w-full accent-purple-500"
+                          />
+                        </div>
+
+                        <button
+                          onClick={() => previewClipRange(editingEntry.clipId, editingEntry.start, editingEntry.end)}
+                          className="text-xs text-zinc-500 hover:text-white transition-colors flex items-center gap-1.5"
+                        >
+                          ▶ Preview range
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

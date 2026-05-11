@@ -503,6 +503,9 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
   const selPreview = sel ? trimPreviews[sel.id] : undefined;
   const selFirst = sel?.clips[0];
   const selLast = sel ? sel.clips[sel.clips.length - 1] : undefined;
+  const rawDur = sel ? sel.clips.reduce((s, c) => s + (c.end - c.start), 0) : 0;
+  const maxTrimStart = Math.max(0, rawDur - (sel?.trimEnd ?? 0) - 0.1);
+  const maxTrimEnd = Math.max(0, rawDur - (sel?.trimStart ?? 0) - 0.1);
 
   return (
     <div className="flex flex-col bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden" style={{ minHeight: '82vh' }}>
@@ -710,6 +713,13 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                           <span className="text-[10px] text-zinc-600">s</span>
                         </div>
                       </div>
+                      <input
+                        type="range" min={0} max={maxTrimStart} step={0.05} value={sel.trimStart}
+                        onChange={e => patchSegment(selectedIdx, { trimStart: Math.max(0, parseFloat(e.target.value)) })}
+                        onMouseUp={() => persist(segments, captions)}
+                        onTouchEnd={() => persist(segments, captions)}
+                        className="w-full accent-purple-500"
+                      />
                       {selPreview?.start ? (
                         <div className="relative rounded overflow-hidden border border-zinc-700 aspect-video bg-zinc-900">
                           <img src={selPreview.start} alt="" className="w-full h-full object-cover" />
@@ -736,6 +746,13 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                           <span className="text-[10px] text-zinc-600">s</span>
                         </div>
                       </div>
+                      <input
+                        type="range" min={0} max={maxTrimEnd} step={0.05} value={sel.trimEnd}
+                        onChange={e => patchSegment(selectedIdx, { trimEnd: Math.max(0, parseFloat(e.target.value)) })}
+                        onMouseUp={() => persist(segments, captions)}
+                        onTouchEnd={() => persist(segments, captions)}
+                        className="w-full accent-purple-500"
+                      />
                       {selPreview?.end ? (
                         <div className="relative rounded overflow-hidden border border-zinc-700 aspect-video bg-zinc-900">
                           <img src={selPreview.end} alt="" className="w-full h-full object-cover" />
