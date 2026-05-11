@@ -132,6 +132,7 @@ function findBestMatch(
   for (let i = startFrom; i < trans.length; i++) {
     let si = 0;
     let totalSim = 0;
+    let firstMatchedIdx = -1;
     let lastMatchedIdx = i;
     const limit = Math.min(trans.length, i + searchRange);
 
@@ -139,17 +140,22 @@ function findBestMatch(
       const sim = wordSim(scriptWords[si], trans[wi].norm);
       if (sim >= 0.65) {
         totalSim += sim;
+        if (firstMatchedIdx === -1) firstMatchedIdx = wi;
         lastMatchedIdx = wi;
         si++;
       }
     }
+
+    // Skip positions where nothing matched at all
+    if (firstMatchedIdx === -1) continue;
 
     const score = totalSim / scriptWords.length;
     if (score > bestScore) {
       bestScore = score;
       best = {
         score,
-        start: Math.max(0, trans[i].start - BUFFER),
+        // Clip starts at the FIRST matched word, not the scan start position
+        start: Math.max(0, trans[firstMatchedIdx].start - BUFFER),
         end: trans[lastMatchedIdx].end + BUFFER,
         lastMatchedIdx,
       };
