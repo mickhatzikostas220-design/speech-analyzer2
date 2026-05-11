@@ -106,17 +106,6 @@ function wordSim(a: string, b: string): number {
   return 1 - levenshtein(a, b) / Math.max(a.length, b.length);
 }
 
-function fuzzySeqScore(scriptWords: string[], windowWords: string[]): number {
-  if (!scriptWords.length) return 0;
-  let si = 0;
-  let totalSim = 0;
-  for (let wi = 0; wi < windowWords.length && si < scriptWords.length; wi++) {
-    const sim = wordSim(scriptWords[si], windowWords[wi]);
-    if (sim >= 0.65) { totalSim += sim; si++; }
-  }
-  return totalSim / scriptWords.length;
-}
-
 function cleanScriptLine(line: string): string {
   return line
     .replace(/\[.*?\]/g, '')
@@ -124,6 +113,51 @@ function cleanScriptLine(line: string): string {
     .replace(/^[\s:]+/, '')
     .replace(/["""]/g, '')
     .trim();
+}
+
+// Greedy forward scan: tries every starting position in `trans`, matches
+// scriptWords in order, records the last matched word index.
+// Clip boundaries are set to first-match-start and last-match-end (not window end),
+// so extra filler words between script words don't bleed into the clip.
+function findBestMatch(
+  scriptWords: string[],
+  trans: { norm: string; start: number; end: number }[],
+): { score: number; start: number; end: number } | null {
+  const BUFFER = 0.3;
+  // Allow up to 4× the script length of transcription words per attempt,
+  // so filler-heavy speech still gets fully matched.
+  const searchRange = scriptWords.length * 4;
+
+  let bestScore = 0;
+  let best: { score: number; start: number; end: number } | null = null;
+
+  for (let i = 0; i < trans.length; i++) {
+    let si = 0;
+    let totalSim = 0;
+    let lastMatchedIdx = i;
+    const limit = Math.min(trans.length, i + searchRange);
+
+    for (let wi = i; wi < limit && si < scriptWords.length; wi++) {
+      const sim = wordSim(scriptWords[si], trans[wi].norm);
+      if (sim >= 0.65) {
+        totalSim += sim;
+        lastMatchedIdx = wi;
+        si++;
+      }
+    }
+
+    const score = totalSim / scriptWords.length;
+    if (score > bestScore) {
+      bestScore = score;
+      best = {
+        score,
+        start: Math.max(0, trans[i].start - BUFFER),
+        end: trans[lastMatchedIdx].end + BUFFER,
+      };
+    }
+  }
+
+  return bestScore > 0 ? best : null;
 }
 
 function matchScriptToClips(script: string, clips: ScriptClip[]): ScriptSegment[] {
@@ -139,23 +173,10 @@ function matchScriptToClips(script: string, clips: ScriptClip[]): ScriptSegment[
     for (const clip of clips) {
       if (!clip.transcribed || !clip.transcription.length) continue;
       const trans = clip.transcription.map((w) => ({ norm: normalizeWord(w.word), start: w.start, end: w.end }));
-      const minW = Math.max(1, Math.floor(scriptWords.length * 0.5));
-      const maxW = Math.ceil(scriptWords.length * 2.0);
-
-      for (let i = 0; i < trans.length; i++) {
-        for (let sz = minW; sz <= maxW && i + sz <= trans.length; sz++) {
-          const win = trans.slice(i, i + sz);
-          const score = fuzzySeqScore(scriptWords, win.map((w) => w.norm));
-          if (score > bestScore) {
-            bestScore = score;
-            bestClip = {
-              clipId: clip.id,
-              clipName: clip.name,
-              start: Math.max(0, win[0].start - 0.2),
-              end: win[win.length - 1].end + 0.2,
-            };
-          }
-        }
+      const result = findBestMatch(scriptWords, trans);
+      if (result && result.score > bestScore) {
+        bestScore = result.score;
+        bestClip = { clipId: clip.id, clipName: clip.name, start: result.start, end: result.end };
       }
     }
 
@@ -185,26 +206,13 @@ function narrowToScriptLine(
 
   if (!trans.length) return { start: spStart, end: spEnd };
 
-  const minW = Math.max(1, Math.floor(scriptWords.length * 0.5));
-  const maxW = Math.ceil(scriptWords.length * 2.0);
+  const result = findBestMatch(scriptWords, trans);
+  if (!result || result.score <= 0.25) return { start: spStart, end: spEnd };
 
-  let bestScore = 0;
-  let bestStart = spStart;
-  let bestEnd = spEnd;
-
-  for (let i = 0; i < trans.length; i++) {
-    for (let sz = minW; sz <= maxW && i + sz <= trans.length; sz++) {
-      const win = trans.slice(i, i + sz);
-      const score = fuzzySeqScore(scriptWords, win.map(w => w.norm));
-      if (score > bestScore) {
-        bestScore = score;
-        bestStart = Math.max(spStart, win[0].start - 0.2);
-        bestEnd = Math.min(spEnd, win[win.length - 1].end + 0.2);
-      }
-    }
-  }
-
-  return bestScore > 0.25 ? { start: bestStart, end: bestEnd } : { start: spStart, end: spEnd };
+  return {
+    start: Math.max(spStart, result.start),
+    end: Math.min(spEnd, result.end),
+  };
 }
 
 // ── Main page ────────────────────────────────────────────────
