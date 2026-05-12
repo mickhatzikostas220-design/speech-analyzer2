@@ -19,19 +19,19 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 
     if (error || !project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    // Generate signed download URLs for every unique clip path
+    // Generate signed download URLs for every unique clip path (parallel)
     const admin = createAdminClient();
     const segments = (project.segments ?? []) as Array<{ clips: Array<{ clipPath: string }> }>;
-    const pathToUrl = new Map<string, string>();
-
-    for (const seg of segments) {
-      for (const clip of seg.clips ?? []) {
-        if (clip.clipPath && !pathToUrl.has(clip.clipPath)) {
-          const { data } = await admin.storage.from('speeches').createSignedUrl(clip.clipPath, 3600);
-          if (data?.signedUrl) pathToUrl.set(clip.clipPath, data.signedUrl);
-        }
-      }
-    }
+    const uniquePaths = Array.from(
+      new Set(segments.flatMap(seg => (seg.clips ?? []).map(c => c.clipPath).filter(Boolean)))
+    );
+    const signedEntries = await Promise.all(
+      uniquePaths.map(async path => {
+        const { data } = await admin.storage.from('speeches').createSignedUrl(path, 3600);
+        return [path, data?.signedUrl ?? null] as [string, string | null];
+      })
+    );
+    const pathToUrl = new Map(signedEntries.filter(([, url]) => url !== null) as [string, string][]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const enrichedSegments = segments.map((seg: any) => ({
