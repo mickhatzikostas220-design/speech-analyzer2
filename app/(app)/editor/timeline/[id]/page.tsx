@@ -4,7 +4,10 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { TimelineComposition } from '@/components/editor/TimelineComposition';
-import type { CompositionSegment, CompositionCaption } from '@/components/editor/TimelineComposition';
+import type {
+  CompositionSegment, CompositionCaption,
+  CompositionTextStyle, CompositionIntroTitle, CompositionTextOverlay,
+} from '@/components/editor/TimelineComposition';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const RemotionPlayer = dynamic<any>(
@@ -44,12 +47,39 @@ interface TLCaption {
   end: number;
 }
 
+interface TextStyle {
+  fontFamily: string;
+  fontSize: number;
+  color: string;
+  bgColor: string;
+  bgOpacity: number;
+  bold: boolean;
+  italic: boolean;
+  shadow: boolean;
+  captionPosition: 'top' | 'center' | 'bottom';
+}
+
+interface TLIntroTitle {
+  text: string;
+  durationSec: number;
+}
+
+interface TLTextOverlay {
+  id: string;
+  text: string;
+  startSec: number;
+  endSec: number;
+}
+
 interface TLProject {
   id: string;
   title: string;
   status: string;
   segments: TLSegment[];
   captions: TLCaption[];
+  text_style: TextStyle | null;
+  intro_title: TLIntroTitle | null;
+  text_overlays: TLTextOverlay[] | null;
   created_at: string;
 }
 
@@ -57,6 +87,27 @@ interface TrimPreview {
   start: string | null;
   end: string | null;
 }
+
+const GOOGLE_FONTS = [
+  'Abril Fatface', 'Anton', 'Bebas Neue', 'Cabin', 'Dancing Script',
+  'DM Sans', 'Inter', 'Josefin Sans', 'Karla', 'Lato',
+  'Merriweather', 'Montserrat', 'Mulish', 'Nunito', 'Open Sans',
+  'Oswald', 'Pacifico', 'Permanent Marker', 'Playfair Display', 'Plus Jakarta Sans',
+  'Poppins', 'PT Sans', 'Raleway', 'Righteous', 'Roboto',
+  'Source Sans 3', 'Space Grotesk', 'Ubuntu', 'Work Sans', 'Figtree',
+];
+
+const DEFAULT_TEXT_STYLE: TextStyle = {
+  fontFamily: 'Inter',
+  fontSize: 36,
+  color: '#ffffff',
+  bgColor: '#000000',
+  bgOpacity: 0.78,
+  bold: false,
+  italic: false,
+  shadow: false,
+  captionPosition: 'bottom',
+};
 
 // ── Helpers ──────────────────────────────────────────────────
 async function safeJson(res: Response) {
@@ -182,6 +233,9 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
   const [project, setProject] = useState<TLProject | null>(null);
   const [segments, setSegments] = useState<TLSegment[]>([]);
   const [captions, setCaptions] = useState<TLCaption[]>([]);
+  const [textStyle, setTextStyle] = useState<TextStyle>(DEFAULT_TEXT_STYLE);
+  const [introTitle, setIntroTitle] = useState<TLIntroTitle>({ text: '', durationSec: 3 });
+  const [textOverlays, setTextOverlays] = useState<TLTextOverlay[]>([]);
   const [loading, setLoading] = useState(true);
   const [trimPreviews, setTrimPreviews] = useState<Record<string, TrimPreview>>({});
   const [generatingCaps, setGeneratingCaps] = useState(false);
@@ -189,7 +243,20 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
   const [exportProgress, setExportProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
-  const [rightTab, setRightTab] = useState<'segment' | 'captions'>('segment');
+  const [rightTab, setRightTab] = useState<'segment' | 'captions' | 'style'>('segment');
+  const [fontPickerOpen, setFontPickerOpen] = useState(false);
+  const [fontSearch, setFontSearch] = useState('');
+
+  // ── Load Google Fonts ────────────────────────────────────────
+  useEffect(() => {
+    const id = 'gf-timeline';
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?${GOOGLE_FONTS.map(f => `family=${encodeURIComponent(f).replace(/%20/g, '+')}`).join('&')}&display=swap`;
+    document.head.appendChild(link);
+  }, []);
 
   // ── Load ────────────────────────────────────────────────────
   useEffect(() => {
@@ -208,6 +275,9 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         setProject(p);
         setSegments(segs);
         setCaptions(p.captions ?? []);
+        setTextStyle(p.text_style ?? DEFAULT_TEXT_STYLE);
+        setIntroTitle(p.intro_title ?? { text: '', durationSec: 3 });
+        setTextOverlays(p.text_overlays ?? []);
         setLoading(false);
       })
       .catch(() => router.push('/editor'));
@@ -218,6 +288,25 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
   const { compSegments, compCaptions, totalFrames } = useMemo(
     () => buildCompositionProps(segments, captions),
     [segments, captions]
+  );
+
+  const introTitleComp = useMemo((): CompositionIntroTitle | null =>
+    introTitle.text.trim()
+      ? { text: introTitle.text, durationInFrames: Math.max(1, Math.round(introTitle.durationSec * FPS)) }
+      : null,
+    [introTitle]
+  );
+
+  const textOverlaysComp = useMemo((): CompositionTextOverlay[] =>
+    textOverlays
+      .filter(o => o.text.trim() && o.endSec > o.startSec)
+      .map(o => ({
+        id: o.id,
+        text: o.text,
+        startFrame: Math.round(o.startSec * FPS),
+        durationInFrames: Math.max(1, Math.round((o.endSec - o.startSec) * FPS)),
+      })),
+    [textOverlays]
   );
 
   // ── Frame capture ────────────────────────────────────────────
@@ -274,6 +363,56 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ segments: cleanSegs, captions: caps }),
+    });
+  }
+
+  async function persistStyle(style: TextStyle, intro: TLIntroTitle, overlays: TLTextOverlay[]) {
+    await fetch(`/api/editor/timeline/${params.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text_style: style, intro_title: intro, text_overlays: overlays }),
+    });
+  }
+
+  // ── Style helpers ────────────────────────────────────────────
+  function patchStyle(patch: Partial<TextStyle>) {
+    setTextStyle(prev => {
+      const next = { ...prev, ...patch };
+      persistStyle(next, introTitle, textOverlays);
+      return next;
+    });
+  }
+
+  function patchIntroTitle(patch: Partial<TLIntroTitle>) {
+    setIntroTitle(prev => {
+      const next = { ...prev, ...patch };
+      persistStyle(textStyle, next, textOverlays);
+      return next;
+    });
+  }
+
+  function addTextOverlay() {
+    const overlay: TLTextOverlay = { id: crypto.randomUUID(), text: '', startSec: 0, endSec: 3 };
+    setTextOverlays(prev => {
+      const next = [...prev, overlay];
+      persistStyle(textStyle, introTitle, next);
+      return next;
+    });
+  }
+
+  function patchTextOverlay(id: string, patch: Partial<TLTextOverlay>) {
+    setTextOverlays(prev => {
+      const next = prev.map(o => o.id === id ? { ...o, ...patch } : o);
+      persistStyle(textStyle, introTitle, next);
+      return next;
+    });
+  }
+
+  function removeTextOverlay(id: string) {
+    setTextOverlays(prev => {
+      const next = prev.filter(o => o.id !== id);
+      persistStyle(textStyle, introTitle, next);
+      return next;
     });
   }
 
@@ -558,7 +697,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
             <RemotionPlayer
               ref={playerRef}
               component={TimelineComposition}
-              inputProps={{ segments: compSegments, captions: compCaptions }}
+              inputProps={{ segments: compSegments, captions: compCaptions, textStyle: textStyle as CompositionTextStyle, introTitle: introTitleComp, textOverlays: textOverlaysComp }}
               durationInFrames={Math.max(1, totalFrames)}
               compositionWidth={1920}
               compositionHeight={1080}
@@ -626,7 +765,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
 
           {/* Tabs */}
           <div className="flex border-b border-zinc-800 flex-shrink-0">
-            {(['segment', 'captions'] as const).map(tab => (
+            {(['segment', 'captions', 'style'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setRightTab(tab)}
@@ -878,6 +1017,237 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                 )}
               </div>
             )}
+
+            {/* ── Style panel ───────────────────────────────── */}
+            {rightTab === 'style' && (
+              <div className="overflow-y-auto flex-1 divide-y divide-zinc-800/60">
+
+                {/* Font */}
+                <div className="px-4 py-3 space-y-2">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Font</p>
+
+                  {/* Font picker */}
+                  <div className="relative">
+                    <button
+                      onClick={() => { setFontPickerOpen(o => !o); setFontSearch(''); }}
+                      className="w-full flex items-center justify-between bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded px-2.5 py-1.5 text-xs text-white transition-colors"
+                      style={{ fontFamily: `'${textStyle.fontFamily}', system-ui, sans-serif` }}
+                    >
+                      <span>{textStyle.fontFamily}</span>
+                      <svg className="w-3 h-3 text-zinc-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {fontPickerOpen && (
+                      <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden">
+                        <div className="p-2 border-b border-zinc-800">
+                          <input
+                            autoFocus
+                            value={fontSearch}
+                            onChange={e => setFontSearch(e.target.value)}
+                            placeholder="Search fonts…"
+                            className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
+                        <div className="overflow-y-auto max-h-48">
+                          {GOOGLE_FONTS
+                            .filter(f => f.toLowerCase().includes(fontSearch.toLowerCase()))
+                            .map(f => (
+                              <button
+                                key={f}
+                                onClick={() => { patchStyle({ fontFamily: f }); setFontPickerOpen(false); }}
+                                className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-zinc-800 ${textStyle.fontFamily === f ? 'text-purple-400 bg-purple-900/20' : 'text-zinc-300'}`}
+                                style={{ fontFamily: `'${f}', system-ui, sans-serif` }}
+                              >
+                                {f}
+                              </button>
+                            ))
+                          }
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Preview */}
+                  <div
+                    className="text-center text-sm py-2 px-3 rounded bg-zinc-800 border border-zinc-700/50 text-white truncate"
+                    style={{ fontFamily: `'${textStyle.fontFamily}', system-ui, sans-serif`, fontWeight: textStyle.bold ? 700 : 400, fontStyle: textStyle.italic ? 'italic' : 'normal' }}
+                  >
+                    The quick brown fox
+                  </div>
+                </div>
+
+                {/* Text */}
+                <div className="px-4 py-3 space-y-3">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Text</p>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-zinc-500">Size</span>
+                      <span className="text-xs text-zinc-400 tabular-nums">{textStyle.fontSize}px</span>
+                    </div>
+                    <input
+                      type="range" min={16} max={96} step={2} value={textStyle.fontSize}
+                      onChange={e => patchStyle({ fontSize: parseInt(e.target.value) })}
+                      className="w-full accent-purple-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-zinc-500">Color</span>
+                    <input
+                      type="color" value={textStyle.color}
+                      onChange={e => patchStyle({ color: e.target.value })}
+                      className="w-8 h-6 rounded cursor-pointer border border-zinc-600 bg-transparent"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => patchStyle({ bold: !textStyle.bold })}
+                      className={`flex-1 py-1 rounded text-xs font-bold transition-colors ${textStyle.bold ? 'bg-purple-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}
+                    >B</button>
+                    <button
+                      onClick={() => patchStyle({ italic: !textStyle.italic })}
+                      className={`flex-1 py-1 rounded text-xs italic transition-colors ${textStyle.italic ? 'bg-purple-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}
+                    >I</button>
+                    <button
+                      onClick={() => patchStyle({ shadow: !textStyle.shadow })}
+                      className={`flex-1 py-1 rounded text-xs transition-colors ${textStyle.shadow ? 'bg-purple-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}
+                      style={{ textShadow: '1px 1px 3px rgba(0,0,0,0.9)' }}
+                    >S</button>
+                  </div>
+                </div>
+
+                {/* Background */}
+                <div className="px-4 py-3 space-y-3">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Background</p>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-zinc-500">Color</span>
+                    <input
+                      type="color" value={textStyle.bgColor}
+                      onChange={e => patchStyle({ bgColor: e.target.value })}
+                      className="w-8 h-6 rounded cursor-pointer border border-zinc-600 bg-transparent"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-zinc-500">Opacity</span>
+                      <span className="text-xs text-zinc-400 tabular-nums">{Math.round(textStyle.bgOpacity * 100)}%</span>
+                    </div>
+                    <input
+                      type="range" min={0} max={1} step={0.05} value={textStyle.bgOpacity}
+                      onChange={e => patchStyle({ bgOpacity: parseFloat(e.target.value) })}
+                      className="w-full accent-purple-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Position */}
+                <div className="px-4 py-3 space-y-2">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Caption position</p>
+                  <div className="flex gap-1.5">
+                    {(['top', 'center', 'bottom'] as const).map(pos => (
+                      <button
+                        key={pos}
+                        onClick={() => patchStyle({ captionPosition: pos })}
+                        className={`flex-1 py-1 rounded text-xs capitalize transition-colors ${textStyle.captionPosition === pos ? 'bg-purple-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}
+                      >
+                        {pos}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Intro title */}
+                <div className="px-4 py-3 space-y-3">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Intro title</p>
+                  <input
+                    type="text"
+                    value={introTitle.text}
+                    onChange={e => patchIntroTitle({ text: e.target.value })}
+                    placeholder="Title text…"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500"
+                  />
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-zinc-500">Duration</span>
+                      <span className="text-xs text-zinc-400 tabular-nums">{introTitle.durationSec.toFixed(1)}s</span>
+                    </div>
+                    <input
+                      type="range" min={0.5} max={10} step={0.5} value={introTitle.durationSec}
+                      onChange={e => patchIntroTitle({ durationSec: parseFloat(e.target.value) })}
+                      className="w-full accent-purple-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Text overlays */}
+                <div className="px-4 py-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Text overlays</p>
+                    <button
+                      onClick={addTextOverlay}
+                      className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded transition-colors"
+                    >
+                      + Add
+                    </button>
+                  </div>
+
+                  {textOverlays.length === 0 && (
+                    <p className="text-xs text-zinc-700">No overlays yet — click Add to create one.</p>
+                  )}
+
+                  <div className="space-y-3">
+                    {textOverlays.map(ov => (
+                      <div key={ov.id} className="bg-zinc-800/60 border border-zinc-700/50 rounded-lg p-2.5 space-y-2">
+                        <div className="flex items-start gap-1.5">
+                          <input
+                            type="text"
+                            value={ov.text}
+                            onChange={e => patchTextOverlay(ov.id, { text: e.target.value })}
+                            placeholder="Overlay text…"
+                            className="flex-1 bg-zinc-700 border border-zinc-600 rounded px-2 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+                          />
+                          <button
+                            onClick={() => removeTextOverlay(ov.id)}
+                            className="text-zinc-600 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 flex-1">
+                            <span className="text-[10px] text-zinc-500 w-6">from</span>
+                            <input
+                              type="number" min={0} step={0.1} value={ov.startSec}
+                              onChange={e => patchTextOverlay(ov.id, { startSec: Math.max(0, parseFloat(e.target.value) || 0) })}
+                              className="flex-1 bg-zinc-700 border border-zinc-600 rounded px-1.5 py-0.5 text-xs text-white text-right focus:outline-none focus:border-purple-500"
+                            />
+                            <span className="text-[10px] text-zinc-600">s</span>
+                          </div>
+                          <div className="flex items-center gap-1 flex-1">
+                            <span className="text-[10px] text-zinc-500 w-4">to</span>
+                            <input
+                              type="number" min={0} step={0.1} value={ov.endSec}
+                              onChange={e => patchTextOverlay(ov.id, { endSec: Math.max(0, parseFloat(e.target.value) || 0) })}
+                              className="flex-1 bg-zinc-700 border border-zinc-600 rounded px-1.5 py-0.5 text-xs text-white text-right focus:outline-none focus:border-purple-500"
+                            />
+                            <span className="text-[10px] text-zinc-600">s</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
           </div>
         </div>
       </div>

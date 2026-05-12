@@ -57,7 +57,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     const rawText = (await request.text()).trim();
     const body = rawText ? JSON.parse(rawText) : {};
-    const allowed = ['title', 'segments', 'captions', 'status'];
+    const allowed = ['title', 'segments', 'captions', 'status', 'text_style', 'intro_title', 'text_overlays'];
     const updates = Object.fromEntries(Object.entries(body).filter(([k]) => allowed.includes(k)));
 
     const { error } = await supabase
