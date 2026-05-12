@@ -85,6 +85,7 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
     }
   }
 
+  // Text box — constrained to stay well inside the 1920×1080 canvas
   const textBoxStyle: React.CSSProperties = {
     backgroundColor: hexToRgba(textStyle.bgColor, textStyle.bgOpacity),
     color: textStyle.color,
@@ -97,10 +98,17 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
     padding: '12px 24px',
     borderRadius: 10,
     textAlign: 'center' as const,
-    maxWidth: '80%',
+    // calc keeps the box at most 80% of the canvas minus fixed side margins
+    maxWidth: 'calc(min(80%, 1400px))',
+    wordBreak: 'break-word',
+    overflowWrap: 'break-word',
+    boxSizing: 'border-box' as const,
   };
 
   const captionPos = CAPTION_POSITION[textStyle.captionPosition] ?? CAPTION_POSITION.bottom;
+
+  // Shared outer padding so text never touches canvas edges (120px each side on 1920px canvas)
+  const outerPad: React.CSSProperties = { paddingLeft: 120, paddingRight: 120 };
 
   return (
     <AbsoluteFill style={{ backgroundColor: 'black' }}>
@@ -124,7 +132,7 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
       {/* Intro title — centered overlay at the start */}
       {introTitle && introTitle.durationInFrames > 0 && introTitle.text.trim() && (
         <Sequence from={0} durationInFrames={introTitle.durationInFrames}>
-          <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center', paddingLeft: 48, paddingRight: 48 }}>
+          <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center', ...outerPad }}>
             <div style={{ ...textBoxStyle, fontSize: Math.round(textStyle.fontSize * 1.5), fontWeight: 700 }}>
               {introTitle.text}
             </div>
@@ -138,7 +146,7 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
         if (dur <= 0 || !cap.text.trim()) return null;
         return (
           <Sequence key={`cap-${i}`} from={cap.startFrame} durationInFrames={dur}>
-            <AbsoluteFill style={{ ...captionPos, paddingLeft: 48, paddingRight: 48 }}>
+            <AbsoluteFill style={{ ...captionPos, ...outerPad }}>
               <div style={textBoxStyle}>{cap.text}</div>
             </AbsoluteFill>
           </Sequence>
@@ -150,7 +158,7 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
         if (ov.durationInFrames <= 0 || !ov.text.trim()) return null;
         return (
           <Sequence key={`ov-${ov.id}`} from={ov.startFrame} durationInFrames={ov.durationInFrames}>
-            <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center', paddingLeft: 48, paddingRight: 48 }}>
+            <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center', ...outerPad }}>
               <div style={textBoxStyle}>{ov.text}</div>
             </AbsoluteFill>
           </Sequence>
@@ -164,7 +172,7 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
         if (dur <= 0) return null;
         return (
           <Sequence key={`title-${si}`} from={seg.startFrame} durationInFrames={dur}>
-            <AbsoluteFill style={{ justifyContent: 'flex-start', alignItems: 'center', paddingTop: 48 }}>
+            <AbsoluteFill style={{ justifyContent: 'flex-start', alignItems: 'center', paddingTop: 56, ...outerPad }}>
               <div style={{ ...textBoxStyle, fontSize: Math.round(textStyle.fontSize * 1.1), fontWeight: 700, borderRadius: 12 }}>
                 {seg.title}
               </div>
