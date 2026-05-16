@@ -256,6 +256,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
   const [rightTab, setRightTab] = useState<'segment' | 'captions' | 'style'>('segment');
   const [fontPickerOpen, setFontPickerOpen] = useState(false);
   const [fontSearch, setFontSearch] = useState('');
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
 
   // ── Load Google Fonts ────────────────────────────────────────
   useEffect(() => {
@@ -926,8 +927,13 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                   </div>
 
                   {/* Title overlay */}
-                  <div className="px-4 py-3 space-y-2.5">
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Title overlay</p>
+                  <div className="px-4 py-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Title overlay</p>
+                      {sel.title.trim() && (
+                        <span className="text-[10px] text-zinc-600">Style in Style tab</span>
+                      )}
+                    </div>
                     <input
                       type="text" placeholder="Optional…"
                       value={sel.title}
@@ -935,40 +941,6 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       onBlur={() => persist(segments, captions)}
                       className="w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500"
                     />
-                    {sel.title.trim() && (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-zinc-500 w-6 flex-shrink-0">Size</span>
-                          <input
-                            type="range" min={16} max={120} step={2}
-                            value={sel.titleFontSize ?? Math.round(textStyle.fontSize * 1.1)}
-                            onChange={e => patchSegment(selectedIdx, { titleFontSize: parseInt(e.target.value) })}
-                            onMouseUp={() => persist(segments, captions)}
-                            onTouchEnd={() => persist(segments, captions)}
-                            className="flex-1 accent-purple-500"
-                          />
-                          <span className="text-[10px] text-zinc-400 tabular-nums w-8 text-right">
-                            {sel.titleFontSize ?? Math.round(textStyle.fontSize * 1.1)}px
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-zinc-500 w-6 flex-shrink-0">Color</span>
-                          <input
-                            type="color"
-                            value={sel.titleColor ?? textStyle.color}
-                            onChange={e => patchSegment(selectedIdx, { titleColor: e.target.value })}
-                            onBlur={() => persist(segments, captions)}
-                            className="w-7 h-5 rounded cursor-pointer border border-zinc-600 bg-transparent flex-shrink-0"
-                          />
-                          <div className="flex gap-1 ml-auto">
-                            <button
-                              onClick={() => { patchSegment(selectedIdx, { titleBold: !(sel.titleBold ?? true) }); persist(segments, captions); }}
-                              className={`px-2 py-0.5 rounded text-xs font-bold transition-colors ${(sel.titleBold ?? true) ? 'bg-purple-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}
-                            >B</button>
-                          </div>
-                        </div>
-                      </>
-                    )}
                   </div>
 
                   {/* Actions */}
@@ -1215,158 +1187,198 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                   </div>
                 </div>
 
-                {/* Intro title */}
-                <div className="px-4 py-3 space-y-3">
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Intro title</p>
-                  <input
-                    type="text"
-                    value={introTitle.text}
-                    onChange={e => patchIntroTitle({ text: e.target.value })}
-                    placeholder="Title text…"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500"
-                  />
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-500">Duration</span>
-                      <span className="text-xs text-zinc-400 tabular-nums">{introTitle.durationSec.toFixed(1)}s</span>
-                    </div>
-                    <input
-                      type="range" min={0.5} max={10} step={0.5} value={introTitle.durationSec}
-                      onChange={e => patchIntroTitle({ durationSec: parseFloat(e.target.value) })}
-                      className="w-full accent-purple-500"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-500">Size</span>
-                      <span className="text-xs text-zinc-400 tabular-nums">{introTitle.fontSize ?? Math.round(textStyle.fontSize * 1.5)}px</span>
-                    </div>
-                    <input
-                      type="range" min={16} max={160} step={2}
-                      value={introTitle.fontSize ?? Math.round(textStyle.fontSize * 1.5)}
-                      onChange={e => patchIntroTitle({ fontSize: parseInt(e.target.value) })}
-                      className="w-full accent-purple-500"
-                    />
-                  </div>
+                {/* ── Text elements — click any row to edit ── */}
+                <div className="px-4 py-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500">Color</span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => patchIntroTitle({ color: undefined })}
-                        className="text-[10px] text-zinc-600 hover:text-zinc-300 transition-colors"
-                        title="Reset to global color"
-                      >reset</button>
-                      <input
-                        type="color"
-                        value={introTitle.color ?? textStyle.color}
-                        onChange={e => patchIntroTitle({ color: e.target.value })}
-                        className="w-8 h-6 rounded cursor-pointer border border-zinc-600 bg-transparent"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Text elements</p>
                     <button
-                      onClick={() => patchIntroTitle({ bold: !(introTitle.bold ?? true) })}
-                      className={`flex-1 py-1 rounded text-xs font-bold transition-colors ${(introTitle.bold ?? true) ? 'bg-purple-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}
-                    >B</button>
-                  </div>
-                </div>
-
-                {/* Text overlays */}
-                <div className="px-4 py-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Text overlays</p>
-                    <button
-                      onClick={addTextOverlay}
+                      onClick={() => { addTextOverlay(); }}
                       className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded transition-colors"
-                    >
-                      + Add
-                    </button>
+                    >+ Overlay</button>
                   </div>
 
-                  {textOverlays.length === 0 && (
-                    <p className="text-xs text-zinc-700">No overlays yet — click Add to create one.</p>
-                  )}
+                  {/* Intro title row */}
+                  <div className={`rounded-lg overflow-hidden border transition-colors ${selectedTextId === '__intro__' ? 'border-purple-500' : 'border-zinc-700/60'}`}>
+                    <button
+                      onClick={() => setSelectedTextId(selectedTextId === '__intro__' ? null : '__intro__')}
+                      className="w-full flex items-center gap-2 px-3 py-2 bg-zinc-800/50 hover:bg-zinc-800 transition-colors text-left"
+                    >
+                      <span className="text-[10px] bg-blue-900/40 text-blue-400 px-1.5 py-0.5 rounded font-mono flex-shrink-0">INTRO</span>
+                      <span className={`flex-1 text-xs truncate ${introTitle.text ? 'text-zinc-200' : 'text-zinc-600 italic'}`}>
+                        {introTitle.text || 'No text set…'}
+                      </span>
+                      {introTitle.text && <span className="text-[10px] text-zinc-600 flex-shrink-0 tabular-nums">{introTitle.durationSec.toFixed(1)}s</span>}
+                    </button>
+                    {selectedTextId === '__intro__' && (
+                      <div className="px-3 py-3 space-y-2.5 bg-zinc-900/60 border-t border-zinc-700/40">
+                        <input
+                          type="text" value={introTitle.text}
+                          onChange={e => patchIntroTitle({ text: e.target.value })}
+                          placeholder="Intro title text…"
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500"
+                        />
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-zinc-500 w-12 flex-shrink-0">Duration</span>
+                          <input type="range" min={0.5} max={10} step={0.5} value={introTitle.durationSec}
+                            onChange={e => patchIntroTitle({ durationSec: parseFloat(e.target.value) })}
+                            className="flex-1 accent-purple-500"
+                          />
+                          <span className="text-[10px] text-zinc-400 tabular-nums w-8 text-right">{introTitle.durationSec.toFixed(1)}s</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-zinc-500 w-12 flex-shrink-0">Size</span>
+                          <input type="range" min={16} max={160} step={2}
+                            value={introTitle.fontSize ?? Math.round(textStyle.fontSize * 1.5)}
+                            onChange={e => patchIntroTitle({ fontSize: parseInt(e.target.value) })}
+                            className="flex-1 accent-purple-500"
+                          />
+                          <span className="text-[10px] text-zinc-400 tabular-nums w-8 text-right">{introTitle.fontSize ?? Math.round(textStyle.fontSize * 1.5)}px</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-zinc-500 w-12 flex-shrink-0">Color</span>
+                          <input type="color" value={introTitle.color ?? textStyle.color}
+                            onChange={e => patchIntroTitle({ color: e.target.value })}
+                            className="w-7 h-5 rounded cursor-pointer border border-zinc-600 bg-transparent"
+                          />
+                          <button onClick={() => patchIntroTitle({ color: undefined })}
+                            className="text-[10px] text-zinc-600 hover:text-zinc-300 transition-colors ml-1">reset</button>
+                          <button
+                            onClick={() => patchIntroTitle({ bold: !(introTitle.bold ?? true) })}
+                            className={`ml-auto px-2 py-0.5 rounded text-xs font-bold transition-colors ${(introTitle.bold ?? true) ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                          >B</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
-                  <div className="space-y-3">
-                    {textOverlays.map(ov => (
-                      <div key={ov.id} className="bg-zinc-800/60 border border-zinc-700/50 rounded-lg p-2.5 space-y-2">
-                        {/* Text + delete */}
-                        <div className="flex items-start gap-1.5">
+                  {/* Segment title rows */}
+                  {segments.map((seg, si) => !seg.title.trim() ? null : (
+                    <div key={`segtitle-${si}`} className={`rounded-lg overflow-hidden border transition-colors ${selectedTextId === `__seg__${si}` ? 'border-purple-500' : 'border-zinc-700/60'}`}>
+                      <button
+                        onClick={() => setSelectedTextId(selectedTextId === `__seg__${si}` ? null : `__seg__${si}`)}
+                        className="w-full flex items-center gap-2 px-3 py-2 bg-zinc-800/50 hover:bg-zinc-800 transition-colors text-left"
+                      >
+                        <span className="text-[10px] bg-zinc-700 text-zinc-400 px-1.5 py-0.5 rounded font-mono flex-shrink-0">TITLE</span>
+                        <span className="flex-1 text-xs text-zinc-200 truncate">{seg.title}</span>
+                        <span className="text-[10px] text-zinc-600 flex-shrink-0">seg {si + 1}</span>
+                      </button>
+                      {selectedTextId === `__seg__${si}` && (
+                        <div className="px-3 py-3 space-y-2.5 bg-zinc-900/60 border-t border-zinc-700/40">
                           <input
-                            type="text"
+                            type="text" value={seg.title}
+                            onChange={e => patchSegment(si, { title: e.target.value })}
+                            onBlur={() => persist(segments, captions)}
+                            placeholder="Segment title…"
+                            className="w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500"
+                          />
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-zinc-500 w-12 flex-shrink-0">Size</span>
+                            <input type="range" min={16} max={120} step={2}
+                              value={seg.titleFontSize ?? Math.round(textStyle.fontSize * 1.1)}
+                              onChange={e => patchSegment(si, { titleFontSize: parseInt(e.target.value) })}
+                              onMouseUp={() => persist(segments, captions)}
+                              onTouchEnd={() => persist(segments, captions)}
+                              className="flex-1 accent-purple-500"
+                            />
+                            <span className="text-[10px] text-zinc-400 tabular-nums w-8 text-right">{seg.titleFontSize ?? Math.round(textStyle.fontSize * 1.1)}px</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-zinc-500 w-12 flex-shrink-0">Color</span>
+                            <input type="color" value={seg.titleColor ?? textStyle.color}
+                              onChange={e => patchSegment(si, { titleColor: e.target.value })}
+                              onBlur={() => persist(segments, captions)}
+                              className="w-7 h-5 rounded cursor-pointer border border-zinc-600 bg-transparent"
+                            />
+                            <button
+                              onClick={() => { patchSegment(si, { titleBold: !(seg.titleBold ?? true) }); persist(segments, captions); }}
+                              className={`ml-auto px-2 py-0.5 rounded text-xs font-bold transition-colors ${(seg.titleBold ?? true) ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                            >B</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Text overlay rows */}
+                  {textOverlays.map(ov => (
+                    <div key={ov.id} className={`rounded-lg overflow-hidden border transition-colors ${selectedTextId === ov.id ? 'border-purple-500' : 'border-zinc-700/60'}`}>
+                      <div className="flex items-stretch">
+                        <button
+                          onClick={() => setSelectedTextId(selectedTextId === ov.id ? null : ov.id)}
+                          className="flex-1 flex items-center gap-2 px-3 py-2 bg-zinc-800/50 hover:bg-zinc-800 transition-colors text-left min-w-0"
+                        >
+                          <span className="text-[10px] bg-purple-900/40 text-purple-400 px-1.5 py-0.5 rounded font-mono flex-shrink-0">TEXT</span>
+                          <span className={`flex-1 text-xs truncate ${ov.text ? 'text-zinc-200' : 'text-zinc-600 italic'}`}>
+                            {ov.text || 'Empty…'}
+                          </span>
+                          <span className="text-[10px] text-zinc-600 flex-shrink-0 tabular-nums">{ov.startSec.toFixed(1)}–{ov.endSec.toFixed(1)}s</span>
+                        </button>
+                        <button
+                          onClick={() => { if (selectedTextId === ov.id) setSelectedTextId(null); removeTextOverlay(ov.id); }}
+                          className="px-2.5 text-zinc-600 hover:text-red-400 transition-colors bg-zinc-800/50 hover:bg-zinc-800 border-l border-zinc-700/40"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      {selectedTextId === ov.id && (
+                        <div className="px-3 py-3 space-y-2.5 bg-zinc-900/60 border-t border-zinc-700/40">
+                          <textarea
                             value={ov.text}
                             onChange={e => patchTextOverlay(ov.id, { text: e.target.value })}
                             placeholder="Overlay text…"
-                            className="flex-1 bg-zinc-700 border border-zinc-600 rounded px-2 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+                            rows={2}
+                            className="w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500 resize-none"
                           />
-                          <button
-                            onClick={() => removeTextOverlay(ov.id)}
-                            className="text-zinc-600 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-
-                        {/* Timing */}
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1 flex-1">
-                            <span className="text-[10px] text-zinc-500 w-6">from</span>
-                            <input
-                              type="number" min={0} step={0.1} value={ov.startSec}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-zinc-500 flex-shrink-0">from</span>
+                            <input type="number" min={0} step={0.1} value={ov.startSec}
                               onChange={e => patchTextOverlay(ov.id, { startSec: Math.max(0, parseFloat(e.target.value) || 0) })}
-                              className="flex-1 bg-zinc-700 border border-zinc-600 rounded px-1.5 py-0.5 text-xs text-white text-right focus:outline-none focus:border-purple-500"
+                              className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-xs text-white text-right focus:outline-none focus:border-purple-500"
                             />
                             <span className="text-[10px] text-zinc-600">s</span>
-                          </div>
-                          <div className="flex items-center gap-1 flex-1">
-                            <span className="text-[10px] text-zinc-500 w-4">to</span>
-                            <input
-                              type="number" min={0} step={0.1} value={ov.endSec}
+                            <span className="text-[10px] text-zinc-500 flex-shrink-0 ml-1">to</span>
+                            <input type="number" min={0} step={0.1} value={ov.endSec}
                               onChange={e => patchTextOverlay(ov.id, { endSec: Math.max(0, parseFloat(e.target.value) || 0) })}
-                              className="flex-1 bg-zinc-700 border border-zinc-600 rounded px-1.5 py-0.5 text-xs text-white text-right focus:outline-none focus:border-purple-500"
+                              className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-xs text-white text-right focus:outline-none focus:border-purple-500"
                             />
                             <span className="text-[10px] text-zinc-600">s</span>
                           </div>
-                        </div>
-
-                        {/* Size */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-zinc-500 w-6 flex-shrink-0">Size</span>
-                          <input
-                            type="range" min={16} max={120} step={2}
-                            value={ov.fontSize ?? textStyle.fontSize}
-                            onChange={e => patchTextOverlay(ov.id, { fontSize: parseInt(e.target.value) })}
-                            className="flex-1 accent-purple-500"
-                          />
-                          <span className="text-[10px] text-zinc-400 tabular-nums w-8 text-right">{ov.fontSize ?? textStyle.fontSize}px</span>
-                        </div>
-
-                        {/* Color + B I toggles */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-zinc-500 w-6 flex-shrink-0">Color</span>
-                          <input
-                            type="color"
-                            value={ov.color ?? textStyle.color}
-                            onChange={e => patchTextOverlay(ov.id, { color: e.target.value })}
-                            className="w-7 h-5 rounded cursor-pointer border border-zinc-600 bg-transparent flex-shrink-0"
-                          />
-                          <div className="flex gap-1 ml-auto">
-                            <button
-                              onClick={() => patchTextOverlay(ov.id, { bold: !(ov.bold ?? textStyle.bold) })}
-                              className={`px-2 py-0.5 rounded text-xs font-bold transition-colors ${(ov.bold ?? textStyle.bold) ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
-                            >B</button>
-                            <button
-                              onClick={() => patchTextOverlay(ov.id, { italic: !(ov.italic ?? textStyle.italic) })}
-                              className={`px-2 py-0.5 rounded text-xs italic transition-colors ${(ov.italic ?? textStyle.italic) ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
-                            >I</button>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-zinc-500 w-10 flex-shrink-0">Size</span>
+                            <input type="range" min={16} max={120} step={2}
+                              value={ov.fontSize ?? textStyle.fontSize}
+                              onChange={e => patchTextOverlay(ov.id, { fontSize: parseInt(e.target.value) })}
+                              className="flex-1 accent-purple-500"
+                            />
+                            <span className="text-[10px] text-zinc-400 tabular-nums w-8 text-right">{ov.fontSize ?? textStyle.fontSize}px</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-zinc-500 w-10 flex-shrink-0">Color</span>
+                            <input type="color" value={ov.color ?? textStyle.color}
+                              onChange={e => patchTextOverlay(ov.id, { color: e.target.value })}
+                              className="w-7 h-5 rounded cursor-pointer border border-zinc-600 bg-transparent"
+                            />
+                            <div className="flex gap-1 ml-auto">
+                              <button
+                                onClick={() => patchTextOverlay(ov.id, { bold: !(ov.bold ?? textStyle.bold) })}
+                                className={`px-2 py-0.5 rounded text-xs font-bold transition-colors ${(ov.bold ?? textStyle.bold) ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                              >B</button>
+                              <button
+                                onClick={() => patchTextOverlay(ov.id, { italic: !(ov.italic ?? textStyle.italic) })}
+                                className={`px-2 py-0.5 rounded text-xs italic transition-colors ${(ov.italic ?? textStyle.italic) ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                              >I</button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {textOverlays.length === 0 && !introTitle.text && segments.every(s => !s.title.trim()) && (
+                    <p className="text-xs text-zinc-700 text-center py-2">No text elements — add a title, overlay, or segment title</p>
+                  )}
                 </div>
 
               </div>
