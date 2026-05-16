@@ -41,6 +41,7 @@ interface TLSegment {
   titleFontSize?: number;
   titleColor?: string;
   titleBold?: boolean;
+  titlePosition?: 'top' | 'center' | 'bottom';
 }
 
 interface TLCaption {
@@ -68,6 +69,7 @@ interface TLIntroTitle {
   fontSize?: number;
   color?: string;
   bold?: boolean;
+  position?: 'top' | 'center' | 'bottom';
 }
 
 interface TLTextOverlay {
@@ -79,6 +81,7 @@ interface TLTextOverlay {
   color?: string;
   bold?: boolean;
   italic?: boolean;
+  position?: 'top' | 'center' | 'bottom';
 }
 
 interface TLProject {
@@ -215,7 +218,7 @@ function buildCompositionProps(segments: TLSegment[], captions: TLCaption[]): {
       .filter(Boolean) as { videoUrl: string; startFrame: number; durationFrames: number }[];
     const segDur = clips.reduce((s, c) => s + c.durationFrames, 0);
     if (clips.length > 0) {
-      compSegments.push({ clips, title: seg.title, volume: seg.volume, startFrame: absFrame, titleFontSize: seg.titleFontSize, titleColor: seg.titleColor, titleBold: seg.titleBold });
+      compSegments.push({ clips, title: seg.title, volume: seg.volume, startFrame: absFrame, titleFontSize: seg.titleFontSize, titleColor: seg.titleColor, titleBold: seg.titleBold, titlePosition: seg.titlePosition });
       absFrame += segDur;
     }
   }
@@ -309,6 +312,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
           fontSize: introTitle.fontSize,
           color: introTitle.color,
           bold: introTitle.bold,
+          position: introTitle.position,
         }
       : null,
     [introTitle]
@@ -326,6 +330,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         color: o.color,
         bold: o.bold,
         italic: o.italic,
+        position: o.position,
       })),
     [textOverlays]
   );
@@ -1247,6 +1252,17 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                             className={`ml-auto px-2 py-0.5 rounded text-xs font-bold transition-colors ${(introTitle.bold ?? true) ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
                           >B</button>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-zinc-500 w-12 flex-shrink-0">Position</span>
+                          <div className="flex gap-1 flex-1">
+                            {(['top', 'center', 'bottom'] as const).map(pos => (
+                              <button key={pos}
+                                onClick={() => patchIntroTitle({ position: pos })}
+                                className={`flex-1 py-0.5 rounded text-[10px] capitalize transition-colors ${(introTitle.position ?? 'center') === pos ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                              >{pos}</button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1293,6 +1309,17 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                               onClick={() => { patchSegment(si, { titleBold: !(seg.titleBold ?? true) }); persist(segments, captions); }}
                               className={`ml-auto px-2 py-0.5 rounded text-xs font-bold transition-colors ${(seg.titleBold ?? true) ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
                             >B</button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-zinc-500 w-12 flex-shrink-0">Position</span>
+                            <div className="flex gap-1 flex-1">
+                              {(['top', 'center', 'bottom'] as const).map(pos => (
+                                <button key={pos}
+                                  onClick={() => { patchSegment(si, { titlePosition: pos }); persist(segments, captions); }}
+                                  className={`flex-1 py-0.5 rounded text-[10px] capitalize transition-colors ${(seg.titlePosition ?? 'top') === pos ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                                >{pos}</button>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       )}
@@ -1369,6 +1396,17 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                                 onClick={() => patchTextOverlay(ov.id, { italic: !(ov.italic ?? textStyle.italic) })}
                                 className={`px-2 py-0.5 rounded text-xs italic transition-colors ${(ov.italic ?? textStyle.italic) ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
                               >I</button>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-zinc-500 w-10 flex-shrink-0">Position</span>
+                            <div className="flex gap-1 flex-1">
+                              {(['top', 'center', 'bottom'] as const).map(pos => (
+                                <button key={pos}
+                                  onClick={() => patchTextOverlay(ov.id, { position: pos })}
+                                  className={`flex-1 py-0.5 rounded text-[10px] capitalize transition-colors ${(ov.position ?? 'center') === pos ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                                >{pos}</button>
+                              ))}
                             </div>
                           </div>
                         </div>

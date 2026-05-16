@@ -18,6 +18,7 @@ export interface CompositionSegment {
   titleFontSize?: number;
   titleColor?: string;
   titleBold?: boolean;
+  titlePosition?: 'top' | 'center' | 'bottom';
 }
 
 export interface CompositionCaption {
@@ -45,6 +46,7 @@ export interface CompositionIntroTitle {
   fontSize?: number;
   color?: string;
   bold?: boolean;
+  position?: 'top' | 'center' | 'bottom';
 }
 
 export interface CompositionTextOverlay {
@@ -57,6 +59,7 @@ export interface CompositionTextOverlay {
   color?: string;
   bold?: boolean;
   italic?: boolean;
+  position?: 'top' | 'center' | 'bottom';
 }
 
 export interface TimelineCompositionProps {
@@ -157,7 +160,7 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
       {/* Intro title */}
       {introTitle && introTitle.durationInFrames > 0 && introTitle.text.trim() && (
         <Sequence from={0} durationInFrames={introTitle.durationInFrames}>
-          <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center', ...outerPad }}>
+          <AbsoluteFill style={{ ...(CAPTION_POSITION[introTitle.position ?? 'center']), ...outerPad }}>
             <div style={mergeStyle({
               fontSize: introTitle.fontSize ?? Math.round(textStyle.fontSize * 1.5),
               color:    introTitle.color,
@@ -187,7 +190,7 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
         if (ov.durationInFrames <= 0 || !ov.text.trim()) return null;
         return (
           <Sequence key={`ov-${ov.id}`} from={ov.startFrame} durationInFrames={ov.durationInFrames}>
-            <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center', ...outerPad }}>
+            <AbsoluteFill style={{ ...(CAPTION_POSITION[ov.position ?? 'center']), ...outerPad }}>
               <div style={mergeStyle({ fontSize: ov.fontSize, color: ov.color, bold: ov.bold, italic: ov.italic })}>
                 {ov.text}
               </div>
@@ -196,14 +199,14 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
         );
       })}
 
-      {/* Segment title overlays — per-segment overrides, always at top */}
+      {/* Segment title overlays — per-segment overrides */}
       {segments.map((seg, si) => {
         if (!seg.title.trim()) return null;
         const dur = seg.clips.reduce((s, c) => s + c.durationFrames, 0);
         if (dur <= 0) return null;
         return (
           <Sequence key={`title-${si}`} from={seg.startFrame} durationInFrames={dur}>
-            <AbsoluteFill style={{ justifyContent: 'flex-start', alignItems: 'center', paddingTop: 56, ...outerPad }}>
+            <AbsoluteFill style={{ ...(CAPTION_POSITION[seg.titlePosition ?? 'top']), ...outerPad }}>
               <div style={mergeStyle({
                 fontSize: seg.titleFontSize ?? Math.round(textStyle.fontSize * 1.1),
                 color:    seg.titleColor,
