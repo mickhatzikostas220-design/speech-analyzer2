@@ -14,6 +14,10 @@ export interface CompositionSegment {
   title: string;
   volume: number;
   startFrame: number;
+  // Per-segment title overrides
+  titleFontSize?: number;
+  titleColor?: string;
+  titleBold?: boolean;
 }
 
 export interface CompositionCaption {
@@ -37,6 +41,10 @@ export interface CompositionTextStyle {
 export interface CompositionIntroTitle {
   text: string;
   durationInFrames: number;
+  // Per-element overrides
+  fontSize?: number;
+  color?: string;
+  bold?: boolean;
 }
 
 export interface CompositionTextOverlay {
@@ -44,6 +52,11 @@ export interface CompositionTextOverlay {
   text: string;
   startFrame: number;
   durationInFrames: number;
+  // Per-element overrides
+  fontSize?: number;
+  color?: string;
+  bold?: boolean;
+  italic?: boolean;
 }
 
 export interface TimelineCompositionProps {
@@ -68,6 +81,9 @@ const CAPTION_POSITION: Record<'top' | 'center' | 'bottom', React.CSSProperties>
   bottom: { justifyContent: 'flex-end',   alignItems: 'center', paddingBottom: 56 },
 };
 
+// 120px side margins keeps text well inside the 1920×1080 canvas
+const outerPad: React.CSSProperties = { paddingLeft: 120, paddingRight: 120 };
+
 export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
   segments, captions, textStyle, introTitle, textOverlays,
 }) => {
@@ -85,8 +101,8 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
     }
   }
 
-  // Text box — constrained to stay well inside the 1920×1080 canvas
-  const textBoxStyle: React.CSSProperties = {
+  // Base style derived from the global template
+  const base: React.CSSProperties = {
     backgroundColor: hexToRgba(textStyle.bgColor, textStyle.bgOpacity),
     color: textStyle.color,
     fontSize: textStyle.fontSize,
@@ -98,17 +114,26 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
     padding: '12px 24px',
     borderRadius: 10,
     textAlign: 'center' as const,
-    // calc keeps the box at most 80% of the canvas minus fixed side margins
     maxWidth: 'calc(min(80%, 1400px))',
     wordBreak: 'break-word',
     overflowWrap: 'break-word',
     boxSizing: 'border-box' as const,
   };
 
-  const captionPos = CAPTION_POSITION[textStyle.captionPosition] ?? CAPTION_POSITION.bottom;
+  // Merge per-element overrides on top of the base style
+  function mergeStyle(overrides: {
+    fontSize?: number; color?: string; bold?: boolean; italic?: boolean;
+  } = {}): React.CSSProperties {
+    return {
+      ...base,
+      ...(overrides.fontSize  !== undefined && { fontSize:    overrides.fontSize }),
+      ...(overrides.color     !== undefined && { color:       overrides.color }),
+      ...(overrides.bold      !== undefined && { fontWeight:  overrides.bold ? 700 : 400 }),
+      ...(overrides.italic    !== undefined && { fontStyle:   overrides.italic ? 'italic' : 'normal' }),
+    };
+  }
 
-  // Shared outer padding so text never touches canvas edges (120px each side on 1920px canvas)
-  const outerPad: React.CSSProperties = { paddingLeft: 120, paddingRight: 120 };
+  const captionPos = CAPTION_POSITION[textStyle.captionPosition] ?? CAPTION_POSITION.bottom;
 
   return (
     <AbsoluteFill style={{ backgroundColor: 'black' }}>
@@ -129,43 +154,49 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
         ))}
       </Series>
 
-      {/* Intro title — centered overlay at the start */}
+      {/* Intro title */}
       {introTitle && introTitle.durationInFrames > 0 && introTitle.text.trim() && (
         <Sequence from={0} durationInFrames={introTitle.durationInFrames}>
           <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center', ...outerPad }}>
-            <div style={{ ...textBoxStyle, fontSize: Math.round(textStyle.fontSize * 1.5), fontWeight: 700 }}>
+            <div style={mergeStyle({
+              fontSize: introTitle.fontSize ?? Math.round(textStyle.fontSize * 1.5),
+              color:    introTitle.color,
+              bold:     introTitle.bold ?? true,
+            })}>
               {introTitle.text}
             </div>
           </AbsoluteFill>
         </Sequence>
       )}
 
-      {/* Captions */}
+      {/* Captions — use global style */}
       {captions.map((cap, i) => {
         const dur = cap.endFrame - cap.startFrame;
         if (dur <= 0 || !cap.text.trim()) return null;
         return (
           <Sequence key={`cap-${i}`} from={cap.startFrame} durationInFrames={dur}>
             <AbsoluteFill style={{ ...captionPos, ...outerPad }}>
-              <div style={textBoxStyle}>{cap.text}</div>
+              <div style={base}>{cap.text}</div>
             </AbsoluteFill>
           </Sequence>
         );
       })}
 
-      {/* Text overlays — centered */}
+      {/* Text overlays — per-element overrides */}
       {textOverlays.map((ov) => {
         if (ov.durationInFrames <= 0 || !ov.text.trim()) return null;
         return (
           <Sequence key={`ov-${ov.id}`} from={ov.startFrame} durationInFrames={ov.durationInFrames}>
             <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center', ...outerPad }}>
-              <div style={textBoxStyle}>{ov.text}</div>
+              <div style={mergeStyle({ fontSize: ov.fontSize, color: ov.color, bold: ov.bold, italic: ov.italic })}>
+                {ov.text}
+              </div>
             </AbsoluteFill>
           </Sequence>
         );
       })}
 
-      {/* Segment title overlays — always at top */}
+      {/* Segment title overlays — per-segment overrides, always at top */}
       {segments.map((seg, si) => {
         if (!seg.title.trim()) return null;
         const dur = seg.clips.reduce((s, c) => s + c.durationFrames, 0);
@@ -173,7 +204,11 @@ export const TimelineComposition: React.FC<TimelineCompositionProps> = ({
         return (
           <Sequence key={`title-${si}`} from={seg.startFrame} durationInFrames={dur}>
             <AbsoluteFill style={{ justifyContent: 'flex-start', alignItems: 'center', paddingTop: 56, ...outerPad }}>
-              <div style={{ ...textBoxStyle, fontSize: Math.round(textStyle.fontSize * 1.1), fontWeight: 700, borderRadius: 12 }}>
+              <div style={mergeStyle({
+                fontSize: seg.titleFontSize ?? Math.round(textStyle.fontSize * 1.1),
+                color:    seg.titleColor,
+                bold:     seg.titleBold ?? true,
+              })}>
                 {seg.title}
               </div>
             </AbsoluteFill>

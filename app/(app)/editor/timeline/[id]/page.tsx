@@ -38,6 +38,9 @@ interface TLSegment {
   trimEnd: number;
   title: string;
   volume: number;
+  titleFontSize?: number;
+  titleColor?: string;
+  titleBold?: boolean;
 }
 
 interface TLCaption {
@@ -62,6 +65,9 @@ interface TextStyle {
 interface TLIntroTitle {
   text: string;
   durationSec: number;
+  fontSize?: number;
+  color?: string;
+  bold?: boolean;
 }
 
 interface TLTextOverlay {
@@ -69,6 +75,10 @@ interface TLTextOverlay {
   text: string;
   startSec: number;
   endSec: number;
+  fontSize?: number;
+  color?: string;
+  bold?: boolean;
+  italic?: boolean;
 }
 
 interface TLProject {
@@ -205,7 +215,7 @@ function buildCompositionProps(segments: TLSegment[], captions: TLCaption[]): {
       .filter(Boolean) as { videoUrl: string; startFrame: number; durationFrames: number }[];
     const segDur = clips.reduce((s, c) => s + c.durationFrames, 0);
     if (clips.length > 0) {
-      compSegments.push({ clips, title: seg.title, volume: seg.volume, startFrame: absFrame });
+      compSegments.push({ clips, title: seg.title, volume: seg.volume, startFrame: absFrame, titleFontSize: seg.titleFontSize, titleColor: seg.titleColor, titleBold: seg.titleBold });
       absFrame += segDur;
     }
   }
@@ -292,7 +302,13 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
 
   const introTitleComp = useMemo((): CompositionIntroTitle | null =>
     introTitle.text.trim()
-      ? { text: introTitle.text, durationInFrames: Math.max(1, Math.round(introTitle.durationSec * FPS)) }
+      ? {
+          text: introTitle.text,
+          durationInFrames: Math.max(1, Math.round(introTitle.durationSec * FPS)),
+          fontSize: introTitle.fontSize,
+          color: introTitle.color,
+          bold: introTitle.bold,
+        }
       : null,
     [introTitle]
   );
@@ -305,6 +321,10 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         text: o.text,
         startFrame: Math.round(o.startSec * FPS),
         durationInFrames: Math.max(1, Math.round((o.endSec - o.startSec) * FPS)),
+        fontSize: o.fontSize,
+        color: o.color,
+        bold: o.bold,
+        italic: o.italic,
       })),
     [textOverlays]
   );
@@ -906,8 +926,8 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                   </div>
 
                   {/* Title overlay */}
-                  <div className="px-4 py-3">
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Title overlay</p>
+                  <div className="px-4 py-3 space-y-2.5">
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Title overlay</p>
                     <input
                       type="text" placeholder="Optional…"
                       value={sel.title}
@@ -915,6 +935,40 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       onBlur={() => persist(segments, captions)}
                       className="w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500"
                     />
+                    {sel.title.trim() && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-zinc-500 w-6 flex-shrink-0">Size</span>
+                          <input
+                            type="range" min={16} max={120} step={2}
+                            value={sel.titleFontSize ?? Math.round(textStyle.fontSize * 1.1)}
+                            onChange={e => patchSegment(selectedIdx, { titleFontSize: parseInt(e.target.value) })}
+                            onMouseUp={() => persist(segments, captions)}
+                            onTouchEnd={() => persist(segments, captions)}
+                            className="flex-1 accent-purple-500"
+                          />
+                          <span className="text-[10px] text-zinc-400 tabular-nums w-8 text-right">
+                            {sel.titleFontSize ?? Math.round(textStyle.fontSize * 1.1)}px
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-zinc-500 w-6 flex-shrink-0">Color</span>
+                          <input
+                            type="color"
+                            value={sel.titleColor ?? textStyle.color}
+                            onChange={e => patchSegment(selectedIdx, { titleColor: e.target.value })}
+                            onBlur={() => persist(segments, captions)}
+                            className="w-7 h-5 rounded cursor-pointer border border-zinc-600 bg-transparent flex-shrink-0"
+                          />
+                          <div className="flex gap-1 ml-auto">
+                            <button
+                              onClick={() => { patchSegment(selectedIdx, { titleBold: !(sel.titleBold ?? true) }); persist(segments, captions); }}
+                              className={`px-2 py-0.5 rounded text-xs font-bold transition-colors ${(sel.titleBold ?? true) ? 'bg-purple-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}
+                            >B</button>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Actions */}
@@ -1182,6 +1236,40 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       className="w-full accent-purple-500"
                     />
                   </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-zinc-500">Size</span>
+                      <span className="text-xs text-zinc-400 tabular-nums">{introTitle.fontSize ?? Math.round(textStyle.fontSize * 1.5)}px</span>
+                    </div>
+                    <input
+                      type="range" min={16} max={160} step={2}
+                      value={introTitle.fontSize ?? Math.round(textStyle.fontSize * 1.5)}
+                      onChange={e => patchIntroTitle({ fontSize: parseInt(e.target.value) })}
+                      className="w-full accent-purple-500"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-zinc-500">Color</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => patchIntroTitle({ color: undefined })}
+                        className="text-[10px] text-zinc-600 hover:text-zinc-300 transition-colors"
+                        title="Reset to global color"
+                      >reset</button>
+                      <input
+                        type="color"
+                        value={introTitle.color ?? textStyle.color}
+                        onChange={e => patchIntroTitle({ color: e.target.value })}
+                        className="w-8 h-6 rounded cursor-pointer border border-zinc-600 bg-transparent"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => patchIntroTitle({ bold: !(introTitle.bold ?? true) })}
+                      className={`flex-1 py-1 rounded text-xs font-bold transition-colors ${(introTitle.bold ?? true) ? 'bg-purple-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}
+                    >B</button>
+                  </div>
                 </div>
 
                 {/* Text overlays */}
@@ -1203,6 +1291,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                   <div className="space-y-3">
                     {textOverlays.map(ov => (
                       <div key={ov.id} className="bg-zinc-800/60 border border-zinc-700/50 rounded-lg p-2.5 space-y-2">
+                        {/* Text + delete */}
                         <div className="flex items-start gap-1.5">
                           <input
                             type="text"
@@ -1220,6 +1309,8 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                             </svg>
                           </button>
                         </div>
+
+                        {/* Timing */}
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1 flex-1">
                             <span className="text-[10px] text-zinc-500 w-6">from</span>
@@ -1238,6 +1329,39 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                               className="flex-1 bg-zinc-700 border border-zinc-600 rounded px-1.5 py-0.5 text-xs text-white text-right focus:outline-none focus:border-purple-500"
                             />
                             <span className="text-[10px] text-zinc-600">s</span>
+                          </div>
+                        </div>
+
+                        {/* Size */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-zinc-500 w-6 flex-shrink-0">Size</span>
+                          <input
+                            type="range" min={16} max={120} step={2}
+                            value={ov.fontSize ?? textStyle.fontSize}
+                            onChange={e => patchTextOverlay(ov.id, { fontSize: parseInt(e.target.value) })}
+                            className="flex-1 accent-purple-500"
+                          />
+                          <span className="text-[10px] text-zinc-400 tabular-nums w-8 text-right">{ov.fontSize ?? textStyle.fontSize}px</span>
+                        </div>
+
+                        {/* Color + B I toggles */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-zinc-500 w-6 flex-shrink-0">Color</span>
+                          <input
+                            type="color"
+                            value={ov.color ?? textStyle.color}
+                            onChange={e => patchTextOverlay(ov.id, { color: e.target.value })}
+                            className="w-7 h-5 rounded cursor-pointer border border-zinc-600 bg-transparent flex-shrink-0"
+                          />
+                          <div className="flex gap-1 ml-auto">
+                            <button
+                              onClick={() => patchTextOverlay(ov.id, { bold: !(ov.bold ?? textStyle.bold) })}
+                              className={`px-2 py-0.5 rounded text-xs font-bold transition-colors ${(ov.bold ?? textStyle.bold) ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                            >B</button>
+                            <button
+                              onClick={() => patchTextOverlay(ov.id, { italic: !(ov.italic ?? textStyle.italic) })}
+                              className={`px-2 py-0.5 rounded text-xs italic transition-colors ${(ov.italic ?? textStyle.italic) ? 'bg-purple-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                            >I</button>
                           </div>
                         </div>
                       </div>
