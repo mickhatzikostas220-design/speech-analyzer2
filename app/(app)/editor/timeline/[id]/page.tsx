@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { preloadVideo } from '@remotion/preload';
@@ -10,10 +10,16 @@ import type { CompositionSegment, CompositionCaption } from '@/components/editor
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const RemotionPlayer = dynamic<any>(
   () => import('@remotion/player').then((m) => m.Player),
-  { ssr: false, loading: () => <div className="w-full aspect-video bg-black" /> }
+  { ssr: false, loading: () => <div className="w-full h-full bg-black" /> }
 );
 
 const FPS = 30;
+const TRACK_LABEL_WIDTH = 112;
+const RULER_HEIGHT = 28;
+const VIDEO_TRACK_HEIGHT = 64;
+const MIN_ZOOM = 20; // px per second at min
+const MAX_ZOOM = 400;
+const DEFAULT_ZOOM = 80;
 
 // ── Types ────────────────────────────────────────────────────
 interface WordTimestamp { word: string; start: number; end: number; }
@@ -68,6 +74,12 @@ async function safeJson(res: Response) {
 function fmtTime(s: number) {
   const m = Math.floor(s / 60);
   return `${m}:${(s % 60).toFixed(1).padStart(4, '0')}`;
+}
+
+function fmtRulerTime(s: number) {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return m > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `${sec}s`;
 }
 
 function escapeDrawtext(t: string) {
@@ -170,6 +182,17 @@ function buildCompositionProps(segments: TLSegment[], captions: TLCaption[]): {
   };
 }
 
+// ── Segment start times ──────────────────────────────────────
+function buildSegmentOffsets(segments: TLSegment[]): number[] {
+  const offsets: number[] = [];
+  let t = 0;
+  for (const seg of segments) {
+    offsets.push(t);
+    t += segEffectiveDuration(seg);
+  }
+  return offsets;
+}
+
 // ── Page ─────────────────────────────────────────────────────
 export default function TimelineEditorPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -179,6 +202,8 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
   const trimDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const playerRef = useRef<any>(null);
+  const timelineScrollRef = useRef<HTMLDivElement>(null);
+  const playheadDragRef = useRef<{ dragging: boolean; startX: number; startTime: number }>({ dragging: false, startX: 0, startTime: 0 });
 
   const [project, setProject] = useState<TLProject | null>(null);
   const [segments, setSegments] = useState<TLSegment[]>([]);
@@ -191,6 +216,9 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
   const [error, setError] = useState<string | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [rightTab, setRightTab] = useState<'segment' | 'captions'>('segment');
+  const [zoomLevel, setZoomLevel] = useState(DEFAULT_ZOOM); // px per second
+  const [playheadTime, setPlayheadTime] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
 
   // ── Load ────────────────────────────────────────────────────
   useEffect(() => {
@@ -221,7 +249,6 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
-  // Preload every clip video URL so OffthreadVideo can seek instantly (no black frames)
   useEffect(() => {
     const urls = new Set<string>();
     segments.forEach(seg => seg.clips.forEach(clip => { if (clip.videoUrl) urls.add(clip.videoUrl); }));
@@ -234,6 +261,9 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
     () => buildCompositionProps(segments, captions),
     [segments, captions]
   );
+
+  const segmentOffsets = useMemo(() => buildSegmentOffsets(segments), [segments]);
+  const totalSeconds = totalFrames / FPS;
 
   // ── Frame capture ────────────────────────────────────────────
   async function captureFrame(url: string, timeSeconds: number): Promise<string | null> {
@@ -366,11 +396,12 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
     next.forEach(seg => loadTrimPreviews(seg));
   }
 
-  // ── Select segment + seek player ─────────────────────────────
   function handleSelectSegment(i: number) {
     setSelectedIdx(i);
     setRightTab('segment');
     loadTrimPreviews(segments[i]);
+    const t = segmentOffsets[i] ?? 0;
+    setPlayheadTime(t);
     if (playerRef.current && compSegments[i] !== undefined) {
       playerRef.current.seekTo(compSegments[i].startFrame);
     }
@@ -480,52 +511,98 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
     }
   }
 
+  // ── Timeline ruler ticks ─────────────────────────────────────
+  const rulerTicks = useMemo(() => {
+    const totalWidth = Math.max(totalSeconds * zoomLevel + 200, 600);
+    const secondsVisible = totalWidth / zoomLevel;
+    let step = 1;
+    if (zoomLevel < 30) step = 10;
+    else if (zoomLevel < 60) step = 5;
+    else if (zoomLevel < 120) step = 2;
+    const ticks = [];
+    for (let t = 0; t <= secondsVisible + step; t += step) {
+      ticks.push(t);
+    }
+    return { ticks, step };
+  }, [totalSeconds, zoomLevel]);
+
+  // ── Playhead drag ────────────────────────────────────────────
+  const handlePlayheadMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    playheadDragRef.current = { dragging: true, startX: e.clientX, startTime: playheadTime };
+    const onMove = (ev: MouseEvent) => {
+      if (!playheadDragRef.current.dragging) return;
+      const dx = ev.clientX - playheadDragRef.current.startX;
+      const dt = dx / zoomLevel;
+      const newTime = Math.max(0, Math.min(totalSeconds, playheadDragRef.current.startTime + dt));
+      setPlayheadTime(newTime);
+      if (playerRef.current) playerRef.current.seekTo(Math.round(newTime * FPS));
+    };
+    const onUp = () => {
+      playheadDragRef.current.dragging = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [playheadTime, zoomLevel, totalSeconds]);
+
+  const handleRulerClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left + scrollLeft;
+    const t = Math.max(0, Math.min(totalSeconds, x / zoomLevel));
+    setPlayheadTime(t);
+    if (playerRef.current) playerRef.current.seekTo(Math.round(t * FPS));
+  }, [scrollLeft, zoomLevel, totalSeconds]);
+
   // ── Render ───────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex flex-col bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden" style={{ minHeight: '82vh' }}>
-        <div className="h-11 border-b border-zinc-800 bg-zinc-900 animate-pulse flex-shrink-0" />
-        <div className="flex flex-1 min-h-0">
-          <div className="flex-1 flex flex-col">
-            <div className="aspect-video bg-black animate-pulse" />
-            <div className="h-28 border-t border-zinc-800 bg-zinc-900 animate-pulse" />
-          </div>
-          <div className="w-72 border-l border-zinc-800 bg-zinc-900 animate-pulse" />
+      <div className="flex flex-col bg-zinc-950 h-screen overflow-hidden">
+        <div className="h-10 border-b border-zinc-800 bg-zinc-900 animate-pulse flex-shrink-0" />
+        <div className="flex flex-1 min-h-0 gap-0.5 p-0.5 pt-0">
+          <div className="w-52 bg-zinc-900 animate-pulse rounded-sm" />
+          <div className="flex-1 bg-black animate-pulse rounded-sm" />
+          <div className="w-72 bg-zinc-900 animate-pulse rounded-sm" />
         </div>
+        <div className="h-48 border-t border-zinc-800 bg-zinc-900 animate-pulse flex-shrink-0" />
       </div>
     );
   }
 
   if (!project) return null;
 
-  const totalSeconds = totalFrames / FPS;
   const sel = selectedIdx !== null ? segments[selectedIdx] : null;
   const selPreview = sel ? trimPreviews[sel.id] : undefined;
   const selFirst = sel?.clips[0];
   const selLast = sel ? sel.clips[sel.clips.length - 1] : undefined;
+  const timelineContentWidth = Math.max(totalSeconds * zoomLevel + 300, 800);
+  const playheadLeft = TRACK_LABEL_WIDTH + playheadTime * zoomLevel - scrollLeft;
+
+  // Unique clips for media panel
+  const allClips = segments.flatMap(s => s.clips);
+  const uniqueClipNames = Array.from(new Map(allClips.map(c => [c.clipId, c])).values());
 
   return (
-    <div className="flex flex-col bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden" style={{ minHeight: '82vh' }}>
+    <div className="flex flex-col bg-zinc-950 h-screen overflow-hidden text-white">
 
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-4 h-11 border-b border-zinc-800 flex-shrink-0">
+      <div className="flex items-center gap-3 px-3 h-10 border-b border-zinc-800 bg-zinc-900 flex-shrink-0">
         <button
           onClick={() => router.push('/editor')}
-          className="text-zinc-500 hover:text-white transition-colors"
+          className="text-zinc-500 hover:text-white transition-colors p-1 rounded hover:bg-zinc-800"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
 
-        <h1 className="text-sm font-medium text-white truncate">{project.title}</h1>
-        <span className="text-xs text-zinc-600 flex-shrink-0 tabular-nums">
+        <h1 className="text-sm font-semibold text-white truncate">{project.title}</h1>
+        <span className="text-xs text-zinc-500 flex-shrink-0 tabular-nums">
           {segments.length} seg{segments.length !== 1 ? 's' : ''} · {fmtTime(totalSeconds)}
         </span>
 
-        {error && (
-          <span className="text-xs text-red-400 truncate flex-1">{error}</span>
-        )}
+        {error && <span className="text-xs text-red-400 truncate flex-1">{error}</span>}
 
         <div className="ml-auto flex items-center gap-2 flex-shrink-0">
           <button
@@ -537,7 +614,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
           <button
             onClick={handleExport}
             disabled={exporting || segments.length === 0}
-            className="flex items-center gap-1.5 text-xs bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-md transition-colors font-medium"
+            className="flex items-center gap-1.5 text-xs bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-3 py-1.5 rounded transition-colors font-medium"
           >
             {exporting ? (
               <>
@@ -559,14 +636,48 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         </div>
       </div>
 
-      {/* ── Main ───────────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0">
+      {/* ── Main 3-panel area ───────────────────────────────────── */}
+      <div className="flex flex-1 min-h-0 gap-[3px] p-[3px] pb-0">
 
-        {/* Left: Player + Timeline */}
-        <div className="flex-1 flex flex-col min-w-0">
+        {/* LEFT: Media / Assets Panel */}
+        <div className="w-52 flex-shrink-0 flex flex-col bg-zinc-900 border border-zinc-800 rounded-sm overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-800 flex-shrink-0">
+            <svg className="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Media</span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {uniqueClipNames.length === 0 ? (
+              <p className="text-[10px] text-zinc-600 text-center mt-6">No clips loaded</p>
+            ) : (
+              uniqueClipNames.map(clip => (
+                <div
+                  key={clip.clipId}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-zinc-800 cursor-default group"
+                >
+                  <div className="w-8 h-5 bg-zinc-800 border border-zinc-700 rounded flex-shrink-0 overflow-hidden">
+                    {clip.videoUrl && (
+                      <video
+                        src={clip.videoUrl}
+                        className="w-full h-full object-cover"
+                        muted
+                        preload="metadata"
+                      />
+                    )}
+                  </div>
+                  <span className="text-[10px] text-zinc-400 truncate leading-tight">
+                    {clip.clipName.replace(/\.[^.]+$/, '')}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
-          {/* Player */}
-          <div className="bg-black flex-shrink-0">
+        {/* CENTER: Preview */}
+        <div className="flex-1 min-w-0 flex flex-col bg-black border border-zinc-800 rounded-sm overflow-hidden">
+          <div className="flex-1 min-h-0 flex items-center justify-center bg-black p-2">
             <RemotionPlayer
               ref={playerRef}
               component={TimelineComposition}
@@ -575,67 +686,17 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
               compositionWidth={1920}
               compositionHeight={1080}
               fps={FPS}
-              style={{ width: '100%', aspectRatio: '16/9' }}
+              style={{ width: '100%', maxHeight: '100%', aspectRatio: '16/9' }}
               controls
               clickToPlay
               showVolumeControls
               pauseWhenBuffering
             />
           </div>
-
-          {/* Timeline strip */}
-          <div className="border-t border-zinc-800 flex-shrink-0 flex flex-col" style={{ minHeight: '7rem' }}>
-            <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800/60">
-              <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">Timeline</span>
-              <span className="text-[10px] text-zinc-700 tabular-nums">{fmtTime(totalSeconds)}</span>
-            </div>
-
-            <div className="flex items-stretch gap-1 px-2 py-2 overflow-x-auto flex-1">
-              {segments.length === 0 ? (
-                <div className="flex-1 flex items-center justify-center">
-                  <p className="text-xs text-zinc-700">No segments — bring a project from the Script Editor</p>
-                </div>
-              ) : (
-                segments.map((seg, i) => {
-                  const dur = segEffectiveDuration(seg);
-                  const isSelected = selectedIdx === i;
-                  return (
-                    <button
-                      key={seg.id}
-                      onClick={() => handleSelectSegment(i)}
-                      style={{ flexGrow: Math.max(dur, 0.5), flexBasis: 0, minWidth: 72 }}
-                      className={`relative flex flex-col justify-between text-left rounded-md px-2 py-1.5 overflow-hidden transition-all border ${
-                        isSelected
-                          ? 'bg-purple-600/20 border-purple-500 ring-1 ring-inset ring-purple-500/60'
-                          : 'bg-zinc-800/70 border-zinc-700/60 hover:border-zinc-500'
-                      }`}
-                    >
-                      {/* Colour bar at top */}
-                      <div className={`absolute top-0 inset-x-0 h-0.5 ${isSelected ? 'bg-purple-400' : 'bg-zinc-600'}`} />
-                      <span className={`text-[11px] leading-tight line-clamp-2 mt-0.5 ${isSelected ? 'text-purple-100' : 'text-zinc-300'}`}>
-                        {seg.scriptLine}
-                      </span>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className={`text-[10px] tabular-nums ${isSelected ? 'text-purple-400' : 'text-zinc-600'}`}>
-                          {fmtTime(dur)}
-                        </span>
-                        {seg.clips[0] && (
-                          <span className={`text-[9px] truncate max-w-[55%] ${isSelected ? 'text-purple-400/70' : 'text-zinc-700'}`}>
-                            {seg.clips[0].clipName.split('.')[0]}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
         </div>
 
-        {/* Right: Inspector / Captions */}
-        <div className="w-72 border-l border-zinc-800 flex flex-col flex-shrink-0">
-
+        {/* RIGHT: Properties / Inspector */}
+        <div className="w-72 flex-shrink-0 flex flex-col bg-zinc-900 border border-zinc-800 rounded-sm overflow-hidden">
           {/* Tabs */}
           <div className="flex border-b border-zinc-800 flex-shrink-0">
             {(['segment', 'captions'] as const).map(tab => (
@@ -659,18 +720,14 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
           {/* Panel body */}
           <div className="flex-1 overflow-y-auto">
 
-            {/* ── Segment inspector ─────────────────────────── */}
+            {/* Segment inspector */}
             {rightTab === 'segment' && (
               sel && selectedIdx !== null ? (
                 <div className="divide-y divide-zinc-800/60">
-
-                  {/* Script line */}
                   <div className="px-4 py-3">
                     <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Script line</p>
                     <p className="text-sm text-white leading-snug">{sel.scriptLine}</p>
                   </div>
-
-                  {/* Source clips */}
                   {sel.clips.length > 0 && (
                     <div className="px-4 py-3">
                       <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Source</p>
@@ -683,8 +740,6 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       </div>
                     </div>
                   )}
-
-                  {/* Trim */}
                   <div className="px-4 py-3 space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Trim</p>
@@ -695,8 +750,6 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                         Auto-trim
                       </button>
                     </div>
-
-                    {/* Trim start */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-zinc-500">Cut in</span>
@@ -721,8 +774,6 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                         <div className="rounded bg-zinc-800 border border-zinc-700 aspect-video animate-pulse" />
                       )}
                     </div>
-
-                    {/* Trim end */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-zinc-500">Cut out</span>
@@ -748,8 +799,6 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       )}
                     </div>
                   </div>
-
-                  {/* Volume */}
                   <div className="px-4 py-3">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Volume</p>
@@ -763,8 +812,6 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       className="w-full accent-purple-500"
                     />
                   </div>
-
-                  {/* Title overlay */}
                   <div className="px-4 py-3">
                     <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Title overlay</p>
                     <input
@@ -775,13 +822,10 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       className="w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500"
                     />
                   </div>
-
-                  {/* Actions */}
                   <div className="px-4 py-3 flex items-center gap-2">
                     <button
                       onClick={() => moveSegment(selectedIdx, -1)}
                       disabled={selectedIdx === 0}
-                      title="Move earlier"
                       className="flex-1 text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 py-1.5 rounded transition-colors"
                     >
                       ↑ Earlier
@@ -789,14 +833,12 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                     <button
                       onClick={() => moveSegment(selectedIdx, 1)}
                       disabled={selectedIdx === segments.length - 1}
-                      title="Move later"
                       className="flex-1 text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 py-1.5 rounded transition-colors"
                     >
                       ↓ Later
                     </button>
                     <button
                       onClick={() => removeSegment(selectedIdx)}
-                      title="Remove segment"
                       className="px-2.5 py-1.5 text-zinc-600 hover:text-red-400 bg-zinc-800 hover:bg-zinc-700 rounded transition-colors"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -807,19 +849,19 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full py-16 gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center">
                     <svg className="w-5 h-5 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   </div>
                   <p className="text-xs text-zinc-600 text-center leading-relaxed">
-                    Click a segment<br />in the timeline to edit it
+                    Click a clip in the<br />timeline to edit it
                   </p>
                 </div>
               )
             )}
 
-            {/* ── Captions panel ────────────────────────────── */}
+            {/* Captions panel */}
             {rightTab === 'captions' && (
               <div className="flex flex-col h-full">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/60 flex-shrink-0">
@@ -840,7 +882,6 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                     {generatingCaps ? 'Generating…' : captions.length > 0 ? 'Regenerate' : 'Generate'}
                   </button>
                 </div>
-
                 {captions.length === 0 ? (
                   <div className="flex flex-col items-center justify-center flex-1 gap-2">
                     <svg className="w-8 h-8 text-zinc-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -877,6 +918,222 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* ── Timeline Panel ──────────────────────────────────────── */}
+      <div className="flex-shrink-0 flex flex-col bg-zinc-900 border border-zinc-800 rounded-sm mx-[3px] mb-[3px] mt-[3px] overflow-hidden" style={{ height: '220px' }}>
+
+        {/* Timeline Toolbar */}
+        <div className="flex items-center justify-between px-3 h-9 border-b border-zinc-800 flex-shrink-0 gap-4">
+          {/* Left tools */}
+          <div className="flex items-center gap-1">
+            {/* Scissors / split icon placeholder */}
+            <button className="p-1.5 rounded text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors" title="Split (S)">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+            </button>
+            <button
+              onClick={() => selectedIdx !== null && removeSegment(selectedIdx)}
+              disabled={selectedIdx === null}
+              className="p-1.5 rounded text-zinc-500 hover:text-red-400 hover:bg-zinc-800 disabled:opacity-30 transition-colors"
+              title="Delete selected"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+            <div className="w-px h-4 bg-zinc-700 mx-1" />
+            <button
+              onClick={() => selectedIdx !== null && moveSegment(selectedIdx, -1)}
+              disabled={selectedIdx === null || selectedIdx === 0}
+              className="p-1.5 rounded text-zinc-500 hover:text-white hover:bg-zinc-800 disabled:opacity-30 transition-colors"
+              title="Move earlier"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={() => selectedIdx !== null && moveSegment(selectedIdx, 1)}
+              disabled={selectedIdx === null || selectedIdx === segments.length - 1}
+              className="p-1.5 rounded text-zinc-500 hover:text-white hover:bg-zinc-800 disabled:opacity-30 transition-colors"
+              title="Move later"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Center: playhead time */}
+          <span className="text-xs tabular-nums text-zinc-400 font-mono">{fmtTime(playheadTime)}</span>
+
+          {/* Right: zoom */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setZoomLevel(z => Math.max(MIN_ZOOM, z / 1.5))}
+              className="p-1.5 rounded text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+              </svg>
+            </button>
+            <input
+              type="range" min={MIN_ZOOM} max={MAX_ZOOM} step={5}
+              value={zoomLevel}
+              onChange={e => setZoomLevel(Number(e.target.value))}
+              className="w-20 accent-purple-500 cursor-pointer"
+            />
+            <button
+              onClick={() => setZoomLevel(z => Math.min(MAX_ZOOM, z * 1.5))}
+              className="p-1.5 rounded text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+            <span className="text-[10px] text-zinc-600 tabular-nums w-8 text-right">{Math.round(zoomLevel)}px</span>
+          </div>
+        </div>
+
+        {/* Timeline body: labels col + scrollable tracks */}
+        <div className="flex flex-1 min-h-0 overflow-hidden relative">
+
+          {/* Track labels column */}
+          <div
+            className="flex-shrink-0 border-r border-zinc-800 flex flex-col"
+            style={{ width: TRACK_LABEL_WIDTH }}
+          >
+            {/* Ruler corner */}
+            <div
+              className="flex-shrink-0 border-b border-zinc-800 bg-zinc-950"
+              style={{ height: RULER_HEIGHT }}
+            />
+            {/* Video track label */}
+            <div
+              className="flex items-center gap-2 px-3 border-b border-zinc-800/50 bg-zinc-900"
+              style={{ height: VIDEO_TRACK_HEIGHT }}
+            >
+              <svg className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <span className="text-[10px] text-zinc-400 font-medium truncate">Video</span>
+            </div>
+          </div>
+
+          {/* Scrollable ruler + tracks */}
+          <div
+            ref={timelineScrollRef}
+            className="flex-1 overflow-x-auto overflow-y-hidden flex flex-col"
+            onScroll={e => setScrollLeft((e.target as HTMLDivElement).scrollLeft)}
+            style={{ scrollbarWidth: 'thin', scrollbarColor: '#3f3f46 transparent' }}
+          >
+            <div style={{ width: timelineContentWidth, minWidth: '100%' }}>
+
+              {/* Ruler */}
+              <div
+                className="relative bg-zinc-950 border-b border-zinc-800 cursor-crosshair select-none flex-shrink-0"
+                style={{ height: RULER_HEIGHT }}
+                onClick={handleRulerClick}
+              >
+                {rulerTicks.ticks.map(t => {
+                  const x = t * zoomLevel;
+                  const isMajor = t % (rulerTicks.step * 5) === 0 || rulerTicks.step >= 5;
+                  return (
+                    <div key={t} className="absolute top-0 flex flex-col items-start" style={{ left: x }}>
+                      <div
+                        className={`w-px ${isMajor ? 'bg-zinc-500' : 'bg-zinc-700'}`}
+                        style={{ height: isMajor ? RULER_HEIGHT : Math.floor(RULER_HEIGHT * 0.4) }}
+                      />
+                      {isMajor && (
+                        <span className="absolute top-1 text-[9px] text-zinc-500 tabular-nums pl-0.5 whitespace-nowrap">
+                          {fmtRulerTime(t)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Video track content */}
+              <div
+                className="relative bg-zinc-900/50 border-b border-zinc-800/50"
+                style={{ height: VIDEO_TRACK_HEIGHT }}
+              >
+                {segments.length === 0 ? (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="border-2 border-dashed border-zinc-700/50 rounded mx-2 my-2 flex-1 h-full flex items-center justify-center" style={{ width: 'calc(100% - 16px)' }}>
+                      <span className="text-[10px] text-zinc-700">No segments</span>
+                    </div>
+                  </div>
+                ) : (
+                  segments.map((seg, i) => {
+                    const dur = segEffectiveDuration(seg);
+                    const left = segmentOffsets[i] * zoomLevel;
+                    const width = Math.max(dur * zoomLevel, 4);
+                    const isSelected = selectedIdx === i;
+                    const clipThumb = seg.clips[0];
+                    return (
+                      <div
+                        key={seg.id}
+                        onClick={() => handleSelectSegment(i)}
+                        className={`absolute top-1.5 bottom-1.5 rounded cursor-pointer overflow-hidden transition-all select-none border ${
+                          isSelected
+                            ? 'border-purple-400 ring-1 ring-purple-400/60 shadow-lg shadow-purple-900/30'
+                            : 'border-zinc-600/60 hover:border-zinc-400'
+                        }`}
+                        style={{ left, width }}
+                      >
+                        {/* Top color bar */}
+                        <div className={`absolute top-0 inset-x-0 h-0.5 ${isSelected ? 'bg-purple-400' : 'bg-violet-500/60'}`} />
+                        {/* Video thumbnail bg */}
+                        {clipThumb?.videoUrl && (
+                          <video
+                            src={clipThumb.videoUrl}
+                            className="absolute inset-0 w-full h-full object-cover opacity-30"
+                            muted
+                            preload="metadata"
+                          />
+                        )}
+                        <div className={`absolute inset-0 ${isSelected ? 'bg-purple-600/25' : 'bg-violet-700/20'}`} />
+                        {/* Label */}
+                        <div className="absolute inset-0 flex flex-col justify-between p-1.5">
+                          <span className={`text-[10px] leading-tight line-clamp-2 font-medium ${isSelected ? 'text-purple-100' : 'text-zinc-200'}`}>
+                            {seg.scriptLine}
+                          </span>
+                          <span className={`text-[9px] tabular-nums ${isSelected ? 'text-purple-300' : 'text-zinc-500'}`}>
+                            {fmtTime(dur)}
+                          </span>
+                        </div>
+                        {/* Right edge trim handle visual */}
+                        <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/10 hover:bg-white/30 cursor-ew-resize" />
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/10 hover:bg-white/30 cursor-ew-resize" />
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Playhead (absolutely positioned over both label + tracks) */}
+          {totalSeconds > 0 && (
+            <div
+              className="absolute top-0 bottom-0 pointer-events-none"
+              style={{ left: playheadLeft, zIndex: 20 }}
+            >
+              {/* Vertical line */}
+              <div className="absolute top-0 bottom-0 w-px bg-white/90" />
+              {/* Draggable handle */}
+              <button
+                className="pointer-events-auto absolute w-3 h-3 rounded-full bg-white border-2 border-white/60 shadow-md cursor-col-resize -translate-x-1/2"
+                style={{ top: RULER_HEIGHT - 6 }}
+                onMouseDown={handlePlayheadMouseDown}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
