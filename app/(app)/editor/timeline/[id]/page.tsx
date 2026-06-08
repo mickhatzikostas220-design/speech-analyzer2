@@ -580,15 +580,38 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
     if (!file) return;
     setUploadingOverlay(true);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch(`/api/editor/timeline/${params.id}/overlay`, { method: 'POST', body: fd });
-      const data = await safeJson(res);
-      if (data.error) { setError(data.error); return; }
+      // Step 1: get signed upload URL (no file data sent to Next.js server)
+      const signRes = await fetch(`/api/editor/timeline/${params.id}/overlay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name }),
+      });
+      const signData = await safeJson(signRes);
+      if (signData.error) { setError(signData.error); return; }
+
+      // Step 2: PUT file directly to Supabase (browser → Supabase, no server size limit)
+      const uploadRes = await fetch(signData.signedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type || 'image/png', 'x-upsert': 'true' },
+      });
+      if (!uploadRes.ok) {
+        const msg = await uploadRes.text().catch(() => uploadRes.status.toString());
+        throw new Error(`Upload failed: ${msg}`);
+      }
+
+      // Step 3: get a public/signed read URL for preview
+      const readRes = await fetch(`/api/editor/timeline/${params.id}/overlay/url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: signData.path }),
+      });
+      const readData = await safeJson(readRes);
+
       const newOverlay: TLOverlay = {
-        id: data.id,
-        url: data.url,
-        path: data.path,
+        id: signData.id,
+        url: readData.url ?? '',
+        path: signData.path,
         name: file.name,
         x: 5,
         y: 5,
