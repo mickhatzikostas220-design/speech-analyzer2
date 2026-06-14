@@ -1,8 +1,10 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { createClient } from '@/lib/supabase/client';
+import { createFFmpeg, maybeCompressMedia, COMPRESS_TARGET_BYTES } from '@/lib/editor/compress';
+import type { FFmpeg } from '@ffmpeg/ffmpeg';
 
 interface Props {
   onAnalysisCreated: (id: string) => void;
@@ -35,7 +37,9 @@ function getMediaDuration(file: File): Promise<number> {
 
 export function UploadZone({ onAnalysisCreated }: Props) {
   const supabase = createClient();
+  const ffmpegRef = useRef<FFmpeg | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [phase, setPhase] = useState<'compressing' | 'uploading'>('uploading');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,25 +49,41 @@ export function UploadZone({ onAnalysisCreated }: Props) {
 
     setError(null);
     setUploading(true);
+    setPhase('uploading');
     setProgress(5);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated.');
 
-      const ext = file.name.split('.').pop() ?? 'bin';
-      const filePath = `${user.id}/${Date.now()}.${ext}`;
-      const fileType: 'video' | 'audio' = file.type.startsWith('video/') ? 'video' : 'audio';
+      // Duration is read from the original file (compression preserves it).
+      const durationSeconds = await getMediaDuration(file);
 
-      const [durationSeconds] = await Promise.all([getMediaDuration(file)]);
+      // Compress oversized files in the browser so they fit under the
+      // Supabase Storage limit before they ever leave the device.
+      let uploadFile = file;
+      if (file.size > COMPRESS_TARGET_BYTES) {
+        setPhase('compressing');
+        setProgress(0);
+        if (!ffmpegRef.current) ffmpegRef.current = await createFFmpeg();
+        uploadFile = await maybeCompressMedia(ffmpegRef.current, file, {
+          onProgress: (r) => setProgress(Math.round(r * 100)),
+        });
+      }
+
+      setPhase('uploading');
       setProgress(15);
+
+      const ext = uploadFile.name.split('.').pop() ?? 'bin';
+      const filePath = `${user.id}/${Date.now()}.${ext}`;
+      const fileType: 'video' | 'audio' = uploadFile.type.startsWith('video/') ? 'video' : 'audio';
 
       const uploadTimeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Upload timed out. Check your connection and try again.')), 120000)
       );
 
       const { error: storageErr } = await Promise.race([
-        supabase.storage.from('speeches').upload(filePath, file, { contentType: file.type, cacheControl: '3600' }),
+        supabase.storage.from('speeches').upload(filePath, uploadFile, { contentType: uploadFile.type, cacheControl: '3600' }),
         uploadTimeout,
       ]);
 
@@ -124,7 +144,9 @@ export function UploadZone({ onAnalysisCreated }: Props) {
         {uploading ? (
           <div className="space-y-4 py-2">
             <div className="w-10 h-10 mx-auto border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-zinc-400 text-sm">Uploading… {progress}%</p>
+            <p className="text-zinc-400 text-sm">
+              {phase === 'compressing' ? 'Compressing' : 'Uploading'}… {progress}%
+            </p>
             <div className="w-40 mx-auto bg-zinc-800 rounded-full h-1">
               <div
                 className="bg-purple-500 h-1 rounded-full transition-all duration-500"
@@ -145,7 +167,7 @@ export function UploadZone({ onAnalysisCreated }: Props) {
                 {isDragActive ? 'Drop to upload' : 'Drop your speech or presentation here'}
               </p>
               <p className="text-zinc-600 text-xs mt-1">
-                MP4, MOV, AVI, WebM, MP3, WAV, FLAC — up to 500 MB
+                MP4, MOV, AVI, WebM, MP3, WAV, FLAC — up to 500 MB (large files are compressed automatically)
               </p>
             </div>
             <button

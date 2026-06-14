@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { maybeCompressMedia, COMPRESS_TARGET_BYTES } from '@/lib/editor/compress';
 
 interface WordTimestamp {
   word: string;
@@ -123,7 +124,9 @@ function findBestMatch(
   trans: { norm: string; start: number; end: number }[],
   startFrom = 0,
 ): { score: number; start: number; end: number; lastMatchedIdx: number } | null {
-  const BUFFER = 0.3;
+  // Small padding around the matched words. Kept tight so adjacent clips don't
+  // bleed into each other at the seams when segments are assembled.
+  const BUFFER = 0.1;
   const searchRange = scriptWords.length * 4;
 
   let bestScore = 0;
@@ -258,6 +261,26 @@ function narrowToScriptLine(
   };
 }
 
+// Default word-aligned trim (seconds) for one outer edge of a segment, so
+// consecutive segments butt up against speech instead of silence/padding.
+function edgeTrim(
+  clip: ScriptClip | undefined,
+  sliceStart: number,
+  sliceEnd: number,
+  edge: 'start' | 'end',
+): number {
+  const BUF = 0.05;
+  if (!clip) return 0;
+  const words = (clip.transcription ?? [])
+    .filter((w) => w.start >= sliceStart - 0.05 && w.end <= sliceEnd + 0.05)
+    .sort((a, b) => a.start - b.start);
+  if (!words.length) return 0;
+  const raw = edge === 'start'
+    ? words[0].start - sliceStart - BUF
+    : sliceEnd - words[words.length - 1].end - BUF;
+  return Math.max(0, Math.round(raw * 100) / 100);
+}
+
 // ── Main page ────────────────────────────────────────────────
 export default function ScriptEditorPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -354,8 +377,19 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
       const newClips: ScriptClip[] = [...clips];
 
       for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setUploadMsg(`Uploading ${i + 1} of ${files.length}: ${file.name}`);
+        const original = files[i];
+
+        // Compress large clips in the browser so they fit under the Storage limit.
+        let file = original;
+        if (original.size > COMPRESS_TARGET_BYTES) {
+          setUploadMsg(`Compressing ${i + 1} of ${files.length}: ${original.name}…`);
+          const ffmpeg = await getFFmpeg();
+          file = await maybeCompressMedia(ffmpeg, original, {
+            onProgress: (r) => setUploadMsg(`Compressing ${i + 1} of ${files.length}: ${Math.round(r * 100)}%`),
+          });
+        }
+
+        setUploadMsg(`Uploading ${i + 1} of ${files.length}: ${original.name}`);
 
         const signRes = await fetch(`/api/editor/script/${params.id}/signed-upload`, {
           method: 'POST',
@@ -381,7 +415,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
         const videoUrl = signed?.signedUrl ?? null;
 
         const newClip: ScriptClip = {
-          id: clipId, name: file.name, path,
+          id: clipId, name: original.name, path,
           duration: null, transcribed: false,
           transcription: [], speechSegments: [],
           videoUrl: videoUrl ?? null,
@@ -565,11 +599,16 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
     try {
       const tlSegments = segments
         .filter(s => s.clips.length > 0)
-        .map(s => ({
+        .map(s => {
+          const first = s.clips[0];
+          const last = s.clips[s.clips.length - 1];
+          const firstSrc = clips.find(c => c.id === first.clipId);
+          const lastSrc = clips.find(c => c.id === last.clipId);
+          return {
           id: s.id,
           scriptLine: s.scriptLine,
-          trimStart: 0,
-          trimEnd: 0,
+          trimStart: edgeTrim(firstSrc, first.start, first.end, 'start'),
+          trimEnd: edgeTrim(lastSrc, last.start, last.end, 'end'),
           title: '',
           volume: 1,
           clips: s.clips.map(sc => {
@@ -583,7 +622,8 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
               transcription: src?.transcription ?? [],
             };
           }),
-        }));
+          };
+        });
 
       const res = await fetch('/api/editor/timeline', {
         method: 'POST',
