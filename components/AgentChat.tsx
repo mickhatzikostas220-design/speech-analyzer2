@@ -1,13 +1,17 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 type ToolStep = { name: string; ok?: boolean };
 type Role = 'user' | 'assistant';
+type DeleteState = 'pending' | 'deleting' | 'done' | 'cancelled';
+
 interface UIMessage {
   role: Role;
   content: string;
   tools: ToolStep[];
+  confirmDelete?: { id: string; title: string; state: DeleteState };
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -16,13 +20,19 @@ const TOOL_LABELS: Record<string, string> = {
   get_transcript: 'Reading the transcript',
   search_transcripts: 'Searching transcripts',
   compare_speeches: 'Comparing speeches',
+  open_speech: 'Opening the speech',
+  go_to_page: 'Navigating',
+  rename_speech: 'Renaming the speech',
+  reprocess_speech: 'Re-running the analysis',
+  export_speech: 'Preparing the download',
+  delete_speech: 'Preparing to delete',
 };
 
 const SUGGESTIONS = [
+  'Open my most recent speech',
   'Which of my speeches scored highest?',
   'Why did engagement drop in my latest speech?',
-  'Compare my two most recent speeches.',
-  'How has my mind-wandering score changed over time?',
+  'Compare my two most recent speeches',
 ];
 
 function toolLabel(name: string): string {
@@ -30,10 +40,12 @@ function toolLabel(name: string): string {
 }
 
 export function AgentChat() {
+  const router = useRouter();
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const pendingNav = useRef<string | null>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -47,6 +59,41 @@ export function AgentChat() {
       next[next.length - 1] = fn(next[next.length - 1]);
       return next;
     });
+  }
+
+  function runAction(action: string, args: Record<string, unknown>) {
+    const id = typeof args.id === 'string' ? args.id : '';
+    if (action === 'navigate' && typeof args.path === 'string') {
+      // Defer until the stream finishes so the assistant's reply renders first.
+      pendingNav.current = args.path;
+    } else if (action === 'export' && id) {
+      const format = typeof args.format === 'string' ? args.format : 'json';
+      window.open(`/api/analyses/${id}/export?format=${format}`, '_blank');
+    } else if (action === 'reprocess' && id) {
+      fetch(`/api/analyses/${id}/process`, { method: 'POST' }).catch(() => {});
+    } else if (action === 'confirm_delete' && id) {
+      const title = typeof args.title === 'string' ? args.title : 'this speech';
+      patchAssistant((m) => ({ ...m, confirmDelete: { id, title, state: 'pending' } }));
+    }
+  }
+
+  function setDeleteState(msgIndex: number, state: DeleteState) {
+    setMessages((prev) =>
+      prev.map((m, i) =>
+        i === msgIndex && m.confirmDelete ? { ...m, confirmDelete: { ...m.confirmDelete, state } } : m,
+      ),
+    );
+  }
+
+  async function confirmDelete(msgIndex: number, id: string) {
+    setDeleteState(msgIndex, 'deleting');
+    try {
+      const res = await fetch(`/api/analyses/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('delete failed');
+      setDeleteState(msgIndex, 'done');
+    } catch {
+      setDeleteState(msgIndex, 'pending');
+    }
   }
 
   async function send(text: string) {
@@ -75,7 +122,15 @@ export function AgentChat() {
 
       const handle = (line: string) => {
         if (!line.trim()) return;
-        let event: { type: string; text?: string; name?: string; ok?: boolean; message?: string };
+        let event: {
+          type: string;
+          text?: string;
+          name?: string;
+          ok?: boolean;
+          message?: string;
+          action?: string;
+          args?: Record<string, unknown>;
+        };
         try {
           event = JSON.parse(line);
         } catch {
@@ -96,6 +151,8 @@ export function AgentChat() {
             }
             return { ...m, tools };
           });
+        } else if (event.type === 'action' && event.action) {
+          runAction(event.action, event.args ?? {});
         } else if (event.type === 'error' && event.message) {
           patchAssistant((m) => ({
             ...m,
@@ -120,6 +177,11 @@ export function AgentChat() {
       }));
     } finally {
       setLoading(false);
+      if (pendingNav.current) {
+        const path = pendingNav.current;
+        pendingNav.current = null;
+        router.push(path);
+      }
     }
   }
 
@@ -128,15 +190,15 @@ export function AgentChat() {
       <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
         <div className="w-5 h-5 rounded-md bg-gradient-to-br from-purple-500 to-indigo-500 flex-shrink-0" />
         <h2 className="text-sm font-medium text-zinc-200">Assistant</h2>
-        <span className="text-xs text-zinc-600">· asks across all your speeches</span>
+        <span className="text-xs text-zinc-600">· can read and act across your speeches</span>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-center gap-4">
             <p className="text-zinc-400 text-sm max-w-sm">
-              Ask anything about your speeches. I can look up scores, read transcripts,
-              compare sessions, and find moments across everything you&apos;ve analyzed.
+              Ask anything about your speeches — or tell me to do things for you: open a
+              speech, rename or export one, re-run a failed analysis, or compare sessions.
             </p>
             <div className="flex flex-wrap gap-2 justify-center max-w-md">
               {SUGGESTIONS.map((q) => (
@@ -183,6 +245,44 @@ export function AgentChat() {
                   <span className="opacity-40 animate-pulse">Thinking…</span>
                 )
               )}
+
+              {msg.confirmDelete && (
+                <div className="mt-2 pt-2 border-t border-zinc-700">
+                  {msg.confirmDelete.state === 'pending' && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-zinc-400">
+                        Delete <span className="text-zinc-200">&ldquo;{msg.confirmDelete.title}&rdquo;</span>?
+                        This permanently removes it and its file.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => confirmDelete(i, msg.confirmDelete!.id)}
+                          className="text-xs px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded-md transition-colors"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => setDeleteState(i, 'cancelled')}
+                          className="text-xs px-3 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-md transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {msg.confirmDelete.state === 'deleting' && (
+                    <p className="text-xs text-zinc-400">Deleting…</p>
+                  )}
+                  {msg.confirmDelete.state === 'done' && (
+                    <p className="text-xs text-emerald-400">
+                      Deleted &ldquo;{msg.confirmDelete.title}&rdquo;.
+                    </p>
+                  )}
+                  {msg.confirmDelete.state === 'cancelled' && (
+                    <p className="text-xs text-zinc-500">Okay, I left it in place.</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -199,7 +299,7 @@ export function AgentChat() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about your speeches…"
+          placeholder="Ask me anything, or tell me what to do…"
           disabled={loading}
           className="flex-1 bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-purple-500 placeholder-zinc-600 disabled:opacity-50"
         />

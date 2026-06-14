@@ -10,6 +10,7 @@ export type AgentEvent =
   | { type: 'text'; text: string }
   | { type: 'tool_use'; name: string }
   | { type: 'tool_result'; name: string; ok: boolean }
+  | { type: 'action'; action: string; args: Record<string, unknown> }
   | { type: 'error'; message: string }
   | { type: 'done' };
 
@@ -22,10 +23,23 @@ const SYSTEM_PROMPT = `You are ACA's neural speech-analysis assistant. ACA analy
 speeches and presentations with Facebook Research's Tribe v2 fMRI-based brain-encoding \
 model, producing timestamped neural-engagement feedback.
 
-You have tools that read the signed-in user's own speeches and analyses. Use them to \
-ground every answer in their real data — never invent scores, timestamps, or quotes. \
-When the user refers to their speeches in general, call list_speeches first to find the \
-relevant one(s), then fetch detail as needed.
+You are a hands-on assistant: you can both READ the signed-in user's data and TAKE \
+ACTIONS in the app for them. Use the read tools to ground every answer in their real \
+data — never invent scores, timestamps, or quotes. When the user refers to their \
+speeches in general, call list_speeches first to find the relevant one(s), then fetch \
+detail or act as needed.
+
+## Acting in the app
+You can open a speech (open_speech), navigate to a page (go_to_page), rename a speech \
+(rename_speech), re-run a stuck/failed analysis (reprocess_speech), download an export \
+(export_speech), and delete a speech (delete_speech). Guidelines:
+- Take an action only when the user clearly asks for it. If the request is ambiguous, ask first.
+- You usually need a speech's ID — call list_speeches to resolve "my latest", "the TED one", etc.
+- delete_speech does NOT delete immediately: it asks the user to confirm in the UI, so it is \
+safe to call when they ask to delete. Tell them you've asked them to confirm.
+- After acting, confirm in one short sentence what you did (or set in motion).
+- To start a brand-new analysis you can't upload a file for them — send them to the dashboard \
+with go_to_page and tell them to drop the file there.
 
 ## How to read the scores (all 0–100)
 - Overall Engagement, Auditory, Language, Attention, Prosody, Emotional, Memory: higher is better.
@@ -87,6 +101,9 @@ export async function* runAgent(
       yield { type: 'tool_use', name: tu.name };
       const result = await executeTool(tu.name, tu.input, ctx);
       yield { type: 'tool_result', name: tu.name, ok: !result.isError };
+      if (result.action) {
+        yield { type: 'action', action: result.action.action, args: result.action.args };
+      }
       toolResults.push({
         type: 'tool_result',
         tool_use_id: tu.id,

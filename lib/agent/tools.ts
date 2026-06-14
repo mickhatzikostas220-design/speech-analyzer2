@@ -10,10 +10,29 @@ export interface ToolContext {
   userId: string;
 }
 
+// Some tools don't just return data — they ask the browser to DO something
+// (navigate, download, kick off processing, confirm a delete). The server-side
+// executor validates ownership and emits one of these; the client performs it.
+export interface ClientAction {
+  action: 'navigate' | 'export' | 'reprocess' | 'confirm_delete';
+  args: Record<string, unknown>;
+}
+
 export interface ToolResult {
   content: string;
   isError: boolean;
+  action?: ClientAction;
 }
+
+const PAGE_PATHS: Record<string, string> = {
+  dashboard: '/dashboard',
+  history: '/history',
+  compare: '/compare',
+  editor: '/editor',
+  assistant: '/assistant',
+};
+
+const EXPORT_FORMATS = ['transcript', 'feedback', 'json'] as const;
 
 function formatMs(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -26,6 +45,10 @@ function ok(data: unknown): ToolResult {
 
 function fail(message: string): ToolResult {
   return { content: message, isError: true };
+}
+
+function act(action: ClientAction['action'], args: Record<string, unknown>, ack: string): ToolResult {
+  return { content: ack, isError: false, action: { action, args } };
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +144,102 @@ export const TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ['analysis_ids'],
+    },
+  },
+
+  // --- Action tools: these DO things in the app on the user's behalf. ---
+  {
+    name: 'open_speech',
+    description:
+      "Open a specific speech's analysis page in the app for the user. Use this when " +
+      'they ask to "open", "go to", "show me", or "pull up" a particular speech. Get ' +
+      'the ID from list_speeches first.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        analysis_id: { type: 'string', description: 'The speech/analysis UUID to open.' },
+      },
+      required: ['analysis_id'],
+    },
+  },
+  {
+    name: 'go_to_page',
+    description:
+      'Navigate the user to one of the app\'s main pages. Use when they ask to go ' +
+      'somewhere, or to start something that lives on a page — e.g. "upload a new ' +
+      'speech" / "start a new analysis" → dashboard. Pages: dashboard (upload + recent), ' +
+      'history (all speeches), compare (compare speeches), editor (video editor).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'string',
+          enum: ['dashboard', 'history', 'compare', 'editor'],
+          description: 'Which page to open.',
+        },
+      },
+      required: ['page'],
+    },
+  },
+  {
+    name: 'rename_speech',
+    description:
+      "Rename a speech (change its title). Use when the user asks to rename or retitle " +
+      'a speech. Get the ID from list_speeches first.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        analysis_id: { type: 'string', description: 'The speech/analysis UUID.' },
+        title: { type: 'string', description: 'The new title.' },
+      },
+      required: ['analysis_id', 'title'],
+    },
+  },
+  {
+    name: 'reprocess_speech',
+    description:
+      'Re-run the neural analysis for a speech that is pending, errored, or stuck ' +
+      'processing (e.g. "retry my failed analysis"). Does nothing for speeches that are ' +
+      'already complete. Get the ID from list_speeches first.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        analysis_id: { type: 'string', description: 'The speech/analysis UUID.' },
+      },
+      required: ['analysis_id'],
+    },
+  },
+  {
+    name: 'export_speech',
+    description:
+      'Download an export of a completed speech for the user: "transcript" (.txt), ' +
+      '"feedback" (.csv of engagement drops), or "json" (full report). Use when they ask ' +
+      'to export, download, or save a speech. Get the ID from list_speeches first.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        analysis_id: { type: 'string', description: 'The speech/analysis UUID.' },
+        format: {
+          type: 'string',
+          enum: ['transcript', 'feedback', 'json'],
+          description: 'Which export to download.',
+        },
+      },
+      required: ['analysis_id', 'format'],
+    },
+  },
+  {
+    name: 'delete_speech',
+    description:
+      'Delete a speech and its file. This is destructive: calling this tool asks the ' +
+      'user to confirm in the UI before anything is deleted — so call it when the user ' +
+      'clearly asks to delete a speech, and let them confirm. Get the ID from list_speeches first.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        analysis_id: { type: 'string', description: 'The speech/analysis UUID to delete.' },
+      },
+      required: ['analysis_id'],
     },
   },
 ];
@@ -306,12 +425,105 @@ async function compareSpeeches(input: Record<string, unknown>, ctx: ToolContext)
   });
 }
 
+// Fetch a speech the user owns; returns null if it doesn't exist for them.
+async function findOwnedSpeech(
+  ctx: ToolContext,
+  id: string,
+  columns = 'id, title, status',
+): Promise<Record<string, unknown> | null> {
+  const { data } = await ctx.supabase
+    .from('analyses')
+    .select(columns)
+    .eq('id', id)
+    .eq('user_id', ctx.userId)
+    .single();
+  return (data as Record<string, unknown> | null) ?? null;
+}
+
+async function openSpeech(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
+  const id = typeof input.analysis_id === 'string' ? input.analysis_id : '';
+  if (!id) return fail('analysis_id is required.');
+  const speech = await findOwnedSpeech(ctx, id);
+  if (!speech) return fail('No speech found with that ID for this user.');
+  return act('navigate', { path: `/analysis/${id}` }, `Opening "${speech.title}".`);
+}
+
+async function goToPage(input: Record<string, unknown>, _ctx: ToolContext): Promise<ToolResult> {
+  const page = typeof input.page === 'string' ? input.page : '';
+  const path = PAGE_PATHS[page];
+  if (!path) return fail(`Unknown page "${page}".`);
+  return act('navigate', { path }, `Opening the ${page} page.`);
+}
+
+async function renameSpeech(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
+  const id = typeof input.analysis_id === 'string' ? input.analysis_id : '';
+  const title = typeof input.title === 'string' ? input.title.trim() : '';
+  if (!id) return fail('analysis_id is required.');
+  if (!title) return fail('A non-empty title is required.');
+
+  const speech = await findOwnedSpeech(ctx, id, 'id, title');
+  if (!speech) return fail('No speech found with that ID for this user.');
+
+  const { error } = await ctx.supabase
+    .from('analyses')
+    .update({ title })
+    .eq('id', id)
+    .eq('user_id', ctx.userId);
+  if (error) return fail(`Rename failed: ${error.message}`);
+  return ok({ id, old_title: speech.title, new_title: title, renamed: true });
+}
+
+async function reprocessSpeech(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
+  const id = typeof input.analysis_id === 'string' ? input.analysis_id : '';
+  if (!id) return fail('analysis_id is required.');
+  const speech = await findOwnedSpeech(ctx, id);
+  if (!speech) return fail('No speech found with that ID for this user.');
+  if (speech.status === 'complete') {
+    return ok({ id, status: 'complete', note: 'This speech is already analyzed — nothing to reprocess.' });
+  }
+  return act('reprocess', { id }, `Started re-running the analysis for "${speech.title}". It can take a few minutes.`);
+}
+
+async function exportSpeech(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
+  const id = typeof input.analysis_id === 'string' ? input.analysis_id : '';
+  const format = typeof input.format === 'string' ? input.format : 'json';
+  if (!id) return fail('analysis_id is required.');
+  if (!(EXPORT_FORMATS as readonly string[]).includes(format)) {
+    return fail(`Unknown export format "${format}". Use transcript, feedback, or json.`);
+  }
+  const speech = await findOwnedSpeech(ctx, id);
+  if (!speech) return fail('No speech found with that ID for this user.');
+  if (speech.status !== 'complete') {
+    return fail('That speech is not analyzed yet, so there is nothing to export.');
+  }
+  return act('export', { id, format }, `Downloading the ${format} export of "${speech.title}".`);
+}
+
+async function deleteSpeech(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
+  const id = typeof input.analysis_id === 'string' ? input.analysis_id : '';
+  if (!id) return fail('analysis_id is required.');
+  const speech = await findOwnedSpeech(ctx, id, 'id, title');
+  if (!speech) return fail('No speech found with that ID for this user.');
+  // Don't delete here — the client shows a confirmation and performs the delete.
+  return act(
+    'confirm_delete',
+    { id, title: speech.title },
+    `Asked the user to confirm deleting "${speech.title}". It will only be deleted if they confirm.`,
+  );
+}
+
 const EXECUTORS: Record<string, (input: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult>> = {
   list_speeches: listSpeeches,
   get_speech_analysis: getSpeechAnalysis,
   get_transcript: getTranscript,
   search_transcripts: searchTranscripts,
   compare_speeches: compareSpeeches,
+  open_speech: openSpeech,
+  go_to_page: goToPage,
+  rename_speech: renameSpeech,
+  reprocess_speech: reprocessSpeech,
+  export_speech: exportSpeech,
+  delete_speech: deleteSpeech,
 };
 
 export async function executeTool(
