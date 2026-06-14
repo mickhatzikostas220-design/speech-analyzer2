@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { maybeCompressMedia, COMPRESS_TARGET_BYTES } from '@/lib/editor/compress';
 
 interface EditorClip {
   id: string;
@@ -145,6 +146,7 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
   const [clips, setClips] = useState<EditorClip[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState('');
   const [processing, setProcessing] = useState(false);
   const [processingMsg, setProcessingMsg] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -209,14 +211,26 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
   async function handleUpload(file: File) {
     setUploading(true);
     setError(null);
+    setUploadMsg('');
     videoInFFmpeg.current = false;
 
     try {
+      // Step 0: compress large files in the browser to fit under the Storage limit
+      let uploadFile = file;
+      if (file.size > COMPRESS_TARGET_BYTES) {
+        setUploadMsg('Loading compressor…');
+        const ffmpeg = await getFFmpeg();
+        uploadFile = await maybeCompressMedia(ffmpeg, file, {
+          onProgress: (r) => setUploadMsg(`Compressing video… ${Math.round(r * 100)}%`),
+        });
+      }
+      setUploadMsg('Uploading…');
+
       // Step 1: get a signed upload URL from server (admin key, no RLS)
       const signRes = await fetch(`/api/editor/${params.id}/signed-upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: file.name }),
+        body: JSON.stringify({ fileName: uploadFile.name }),
       });
       const signData = await safeJson(signRes);
       if (signData.error) throw new Error(`Could not get upload URL: ${signData.error}`);
@@ -226,8 +240,8 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
       // Step 2: PUT file directly to Supabase (browser → Supabase, no Vercel limit)
       const uploadRes = await fetch(uploadUrl, {
         method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type || 'video/mp4', 'x-upsert': 'true' },
+        body: uploadFile,
+        headers: { 'Content-Type': uploadFile.type || 'video/mp4', 'x-upsert': 'true' },
       });
       if (!uploadRes.ok) {
         const msg = await uploadRes.text().catch(() => uploadRes.status.toString());
@@ -238,7 +252,7 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
       const { data: signedData } = await supabase.storage.from('speeches').createSignedUrl(path, 3600);
       const signed = signedData?.signedUrl ? { signedUrl: signedData.signedUrl } : null;
 
-      // Save metadata to DB
+      // Save metadata to DB (keep the original filename for display)
       await fetch(`/api/editor/${params.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -251,6 +265,7 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
       setError(e instanceof Error ? e.message : 'Upload failed');
     } finally {
       setUploading(false);
+      setUploadMsg('');
     }
   }
 
@@ -517,7 +532,7 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
-                  <span className="text-sm text-zinc-400">Uploading…</span>
+                  <span className="text-sm text-zinc-400">{uploadMsg || 'Uploading…'}</span>
                 </div>
               ) : (
                 <UploadZone onFile={handleUpload} />

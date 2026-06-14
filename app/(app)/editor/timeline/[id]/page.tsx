@@ -138,25 +138,35 @@ function buildCompositionProps(segments: TLSegment[], captions: TLCaption[]): {
   compCaptions: CompositionCaption[];
   totalFrames: number;
 } {
-  let absFrame = 0;
+  // Single source of truth for timeline position: accumulate real seconds and
+  // convert to frames at each boundary with one rounding step. The absSec clock
+  // is advanced identically to generateCaptionsFromSegments (every clip with
+  // effEnd > effStart), so captions and video pieces stay in lockstep — and both
+  // match the seconds-based ffmpeg export instead of drifting frame-by-frame.
+  let absSec = 0;
   const compSegments: CompositionSegment[] = [];
   for (const seg of segments) {
     const lastIdx = seg.clips.length - 1;
-    const clips = seg.clips
-      .map((clip, ci) => {
-        const effStart = clip.start + (ci === 0 ? seg.trimStart : 0);
-        const effEnd = clip.end - (ci === lastIdx ? seg.trimEnd : 0);
-        if (effEnd <= effStart || !clip.videoUrl) return null;
-        const startFrame = Math.round(effStart * FPS);
-        const durationFrames = Math.round(effEnd * FPS) - startFrame;
-        if (durationFrames <= 0) return null;
-        return { videoUrl: clip.videoUrl, startFrame, durationFrames };
-      })
-      .filter(Boolean) as { videoUrl: string; startFrame: number; durationFrames: number }[];
-    const segDur = clips.reduce((s, c) => s + c.durationFrames, 0);
+    const segStartFrame = Math.round(absSec * FPS);
+    const clips: { videoUrl: string; startFrame: number; durationFrames: number }[] = [];
+    for (let ci = 0; ci < seg.clips.length; ci++) {
+      const clip = seg.clips[ci];
+      const effStart = clip.start + (ci === 0 ? seg.trimStart : 0);
+      const effEnd = clip.end - (ci === lastIdx ? seg.trimEnd : 0);
+      if (effEnd <= effStart) continue;
+      const pieceStartFrame = Math.round(absSec * FPS);
+      const pieceEndFrame = Math.round((absSec + (effEnd - effStart)) * FPS);
+      absSec += effEnd - effStart;
+      const durationFrames = pieceEndFrame - pieceStartFrame;
+      if (!clip.videoUrl || durationFrames <= 0) continue;
+      clips.push({
+        videoUrl: clip.videoUrl,
+        startFrame: Math.round(effStart * FPS), // in-clip seek offset for OffthreadVideo
+        durationFrames,
+      });
+    }
     if (clips.length > 0) {
-      compSegments.push({ clips, title: seg.title, volume: seg.volume, startFrame: absFrame });
-      absFrame += segDur;
+      compSegments.push({ clips, title: seg.title, volume: seg.volume, startFrame: segStartFrame });
     }
   }
   return {
@@ -166,7 +176,7 @@ function buildCompositionProps(segments: TLSegment[], captions: TLCaption[]): {
       startFrame: Math.round(cap.start * FPS),
       endFrame: Math.round(cap.end * FPS),
     })),
-    totalFrames: absFrame,
+    totalFrames: Math.round(absSec * FPS),
   };
 }
 
@@ -410,12 +420,27 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
       const progressHandler = ({ progress }: { progress: number }) =>
         setExportProgress(Math.round(Math.min(progress, 1) * 100));
       ff.on('progress', progressHandler);
+      // Download each unique source once, mapped to a stable ffmpeg input index.
       const uniquePaths = Array.from(new Set(validSegs.flatMap(s => s.clips.map(c => c.clipPath))));
+      const pathIndex = new Map<string, number>();
+      const inputArgs: string[] = [];
       for (const path of uniquePaths) {
         const url = urlMap.get(path);
         if (!url) throw new Error(`No signed URL for ${path}`);
-        await ff.writeFile(`src_${btoa(path).replace(/[+/=]/g, '_')}.mp4`, await fetchFile(url));
+        const name = `src_${pathIndex.size}.mp4`;
+        await ff.writeFile(name, await fetchFile(url));
+        inputArgs.push('-i', name);
+        pathIndex.set(path, pathIndex.size);
       }
+
+      // Assemble every piece in ONE normalized trim + concat pass. Normalizing
+      // each piece to a common 1920x1080 / SAR / fps / sample-rate lets clips
+      // from different sources concat cleanly (plain -c copy concat breaks on
+      // mixed resolutions), and a single encode removes the per-piece audio
+      // priming gaps that made the seams drift.
+      const vParts: string[] = [];
+      const aParts: string[] = [];
+      const concatRefs: string[] = [];
       let pieceIdx = 0;
       for (const seg of validSegs) {
         const lastClipIdx = seg.clips.length - 1;
@@ -424,21 +449,35 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
           const effStart = clip.start + (ci === 0 ? seg.trimStart : 0);
           const effEnd   = clip.end   - (ci === lastClipIdx ? seg.trimEnd : 0);
           if (effEnd <= effStart) continue;
-          const srcName = `src_${btoa(clip.clipPath).replace(/[+/=]/g, '_')}.mp4`;
-          await ff.exec([
-            '-i', srcName, '-ss', String(effStart), '-to', String(effEnd),
-            '-af', `volume=${seg.volume}`,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-            '-c:a', 'aac', '-b:a', '128k',
-            `piece_${pieceIdx}.mp4`,
-          ]);
+          const idx = pathIndex.get(clip.clipPath)!;
+          vParts.push(
+            `[${idx}:v]trim=start=${effStart}:end=${effEnd},setpts=PTS-STARTPTS,` +
+            `scale=1920:1080:force_original_aspect_ratio=decrease,` +
+            `pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${FPS},format=yuv420p[v${pieceIdx}]`
+          );
+          aParts.push(
+            `[${idx}:a]atrim=start=${effStart}:end=${effEnd},asetpts=PTS-STARTPTS,` +
+            `volume=${seg.volume},aformat=sample_rates=48000:channel_layouts=stereo[a${pieceIdx}]`
+          );
+          concatRefs.push(`[v${pieceIdx}][a${pieceIdx}]`);
           pieceIdx++;
         }
       }
       if (pieceIdx === 0) throw new Error('No valid segments to export');
-      const concatList = Array.from({ length: pieceIdx }, (_, i) => `file 'piece_${i}.mp4'`).join('\n');
-      await ff.writeFile('concat.txt', new TextEncoder().encode(concatList));
-      await ff.exec(['-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', 'assembled.mp4']);
+      const filterComplex = [
+        ...vParts,
+        ...aParts,
+        `${concatRefs.join('')}concat=n=${pieceIdx}:v=1:a=1[cv][ca]`,
+      ].join(';');
+      await ff.exec([
+        ...inputArgs,
+        '-filter_complex', filterComplex,
+        '-map', '[cv]', '-map', '[ca]',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+        '-c:a', 'aac', '-b:a', '128k',
+        '-movflags', '+faststart',
+        'assembled.mp4',
+      ]);
       let absTime = 0;
       const titleFilters: string[] = [];
       for (const seg of validSegs) {
@@ -468,10 +507,9 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
       a.download = `${(project?.title ?? 'export').replace(/[^a-z0-9]/gi, '_')}.mp4`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
-      for (let i = 0; i < pieceIdx; i++) { try { await ff.deleteFile(`piece_${i}.mp4`); } catch { /* ignore */ } }
+      for (let i = 0; i < uniquePaths.length; i++) { try { await ff.deleteFile(`src_${i}.mp4`); } catch { /* ignore */ } }
       try { await ff.deleteFile('assembled.mp4'); } catch { /* ignore */ }
       try { await ff.deleteFile('output.mp4'); } catch { /* ignore */ }
-      try { await ff.deleteFile('concat.txt'); } catch { /* ignore */ }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Export failed');
     } finally {
