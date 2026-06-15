@@ -64,6 +64,9 @@ cp .env.local.example .env.local
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3002` for local dev |
 | `TRIBE_SERVER_URL` | Leave blank to use mock data (see GPU server section) |
 | `TRIBE_SERVER_SECRET` | Optional bearer token for your GPU server |
+| `APP_ENCRYPTION_KEY` | **Agent:** long random string (`openssl rand -hex 32`) — encrypts users' API keys + OAuth tokens |
+| `GOOGLE_CLIENT_ID` | **Agent (optional):** Google OAuth client ID for the Gmail connection |
+| `GOOGLE_CLIENT_SECRET` | **Agent (optional):** Google OAuth client secret |
 
 ### 4. Run locally
 
@@ -140,6 +143,27 @@ Visit `/admin/requests` while signed in with your `ADMIN_EMAIL` account. From he
 To add additional admins, change `ADMIN_EMAIL` to the new admin's email, or modify the check in `app/admin/layout.tsx` to allow multiple emails.
 
 ---
+
+## Personal AI Agent
+
+The **Assistant** tab is a personal AI agent for each user. It's a general assistant that's also aware of the user's own Orator speech analyses, and it can connect to outside apps (starting with Gmail).
+
+**Setup**
+
+1. Run the agent schema — in the Supabase SQL Editor, run `supabase/agent.sql`.
+2. Set `APP_ENCRYPTION_KEY` (required) — this encrypts every user's API key and OAuth tokens at rest (AES-256-GCM). Without it, key storage and app connections are disabled.
+3. (Optional) Set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` to enable the Gmail connection. In the Google Cloud console, create an OAuth client and add `<NEXT_PUBLIC_APP_URL>/api/agent/connect/google/callback` as an authorized redirect URI.
+
+**How it works**
+
+- **Bring your own key (required).** Each user adds their own OpenAI or Anthropic API key in **Assistant → Settings** and picks a model (or types a custom model ID). Usage is billed to them, not to you. Keys are validated on save and stored encrypted.
+- **Speech-aware.** The agent has read-only tools to list and read the user's analyses, so it can answer questions, draft follow-ups, or repurpose talks.
+- **Connected apps with user-controlled autonomy.** Each connection has a permission level the user sets:
+  - *Read only* — search and read (e.g. inbox) but never write.
+  - *Draft & confirm* — can also create drafts; never sends.
+  - *Act directly* — can send/act on its own.
+  The agent only ever sees the tools its permission level allows. Every write the agent performs is recorded in the `agent_actions` audit log.
+- **Extensible.** Tools live in `lib/agent/tools/` and are assembled per-request in `lib/agent/tools/registry.ts`. One Google OAuth app unlocks Gmail today and Calendar / Drive later — add a connector file and register it.
 
 ## Analysis export
 
