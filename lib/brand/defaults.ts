@@ -9,12 +9,14 @@ export const DEFAULT_BRAND: BrandKit = {
   name: 'Speaker Hub',
   tagline: 'Every tool a speaker needs, in one place.',
   colors: {
-    signature: '#F8E337', // brand yellow
-    accent: '#01B0DD', // brand blue
-    ink: '#1A1A1A',
+    // Neutral black/white/navy default — the look before a speaker
+    // personalizes their hub during setup.
+    signature: '#1A2B50', // navy
+    accent: '#2E4D8E', // steel navy (links / accents)
+    ink: '#111114', // near-black
     paper: '#FFFFFF',
-    page: '#F8F8F6',
-    onSignature: '#1A1A1A',
+    page: '#F6F6F9',
+    onSignature: '#FFFFFF', // white text on navy
   },
   fonts: {
     display: "'Montserrat', 'Gotham', system-ui, sans-serif",
@@ -28,8 +30,8 @@ export const DEFAULT_BRAND: BrandKit = {
   },
   hero: {},
   voice: {
-    tone: 'Bold, warm, second-person, anti-corporate-BS',
-    greeting: "Let's stir things up.",
+    tone: 'Polished, confident, human',
+    greeting: "let's get to work.",
     about:
       'A single, deeply-branded command center that brings every tool a professional speaker needs into one place.',
   },

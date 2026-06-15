@@ -45,26 +45,32 @@
   --pink-200:    #FFE5D6;
   --pink-300:    #FFD2BC;
 
-  /* ---- Neutral / ink ramp (warm-leaning greys) ---- */
-  --ink-900:     #1A1A1A;
-  --ink-800:     #333333;
-  --ink-600:     #595959;
-  --ink-500:     #767676;
-  --ink-400:     #9B9B9B;
-  --ink-300:     #C7C7C7;
-  --ink-200:     #E4E4E4;
-  --ink-100:     #F1F1F0;
-  --ink-50:      #F8F8F6;
+  /* ---- Neutral / ink ramp (cool, near-neutral greys) ---- */
+  --ink-900:     #111114;
+  --ink-800:     #1E1E24;
+  --ink-600:     #4A4A52;
+  --ink-500:     #6E6E78;
+  --ink-400:     #9A9AA4;
+  --ink-300:     #C9C9D1;
+  --ink-200:     #E5E5EA;
+  --ink-100:     #F0F0F4;
+  --ink-50:      #F6F6F9;
+
+  /* ---- Navy (default signature family) ---- */
+  --navy:        #1A2B50;
+  --navy-strong: #11203F;
+  --navy-accent: #2E4D8E;
 
   /* ============================================================
      PER-SPEAKER BRAND HOOKS
-     These are the tokens overridden per user. Defaults point at
-     the Hatzikostas palette so an un-themed app still looks right.
+     These are the tokens overridden per user. Defaults are a clean
+     black / white / navy scheme — the look before a speaker
+     personalizes their hub during setup.
      ============================================================ */
-  --signature:        var(--yellow);     /* the loud signature color   */
-  --signature-strong: var(--yellow-500); /* pressed / hover signature  */
-  --on-signature:     var(--ink-900);    /* text that sits on signature*/
-  --accent-2:         var(--blue);       /* secondary accent           */
+  --signature:        var(--navy);        /* the loud signature color   */
+  --signature-strong: var(--navy-strong); /* pressed / hover signature  */
+  --on-signature:     var(--paper);       /* white text sits on navy    */
+  --accent-2:         var(--navy-accent);  /* secondary accent           */
 
   /* ---- Semantic text ---- */
   --text-strong:   var(--ink-900);
@@ -73,7 +79,7 @@
   --text-faint:    var(--ink-400);
   --text-on-dark:  var(--paper);
   --text-on-brand: var(--on-signature);
-  --text-link:     var(--blue-600);
+  --text-link:     var(--navy-accent);
 
   /* ---- Surfaces ---- */
   --surface-page:    var(--ink-50);
@@ -92,7 +98,7 @@
   /* ---- Accents (functional) ---- */
   --accent:          var(--signature);
   --accent-strong:   var(--signature-strong);
-  --focus-ring:      var(--blue-500);
+  --focus-ring:      var(--navy-accent);
 
   /* ---- Status ---- */
   --success:       #1F9D55;
@@ -187,7 +193,7 @@
   --shadow-hard-signature: 5px 5px 0 var(--signature);
   --shadow-hard-red:    5px 5px 0 var(--red);
 
-  --focus-shadow: 0 0 0 3px rgba(1, 176, 221, 0.45);
+  --focus-shadow: 0 0 0 3px rgba(46, 77, 142, 0.40);
 
   --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
