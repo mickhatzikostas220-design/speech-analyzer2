@@ -201,6 +201,34 @@ system's hub kit:
 > Connecting a calendar does a server-side `fetch` of the ICS URL, so (like brand
 > extraction) it depends on your deployment's outbound-network policy.
 
+## Personal AI Agent
+
+The **Assistant** tab (and hub tile) is a personal AI agent for each speaker — a
+general assistant that's also aware of their own Orator analyses and can connect to
+outside apps (starting with Gmail).
+
+**Setup**
+
+1. Run `supabase/agent.sql` in the Supabase SQL editor.
+2. Set `APP_ENCRYPTION_KEY` (required) — encrypts every user's API key + OAuth tokens
+   at rest (AES-256-GCM). Without it, key storage and connections are disabled.
+3. (Optional) Set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` for the Gmail connection;
+   add `<NEXT_PUBLIC_APP_URL>/api/agent/connect/google/callback` as an authorized
+   redirect URI in your Google OAuth client.
+
+**How it works**
+
+- **Bring your own key.** Each user adds their own OpenAI or Anthropic key in
+  **Assistant → Settings** and picks a model. Usage is billed to them; keys are
+  validated on save and stored encrypted.
+- **Speech-aware.** Read-only tools let it list and read the user's analyses to answer
+  questions, draft follow-ups, or repurpose talks.
+- **Connected apps with user-controlled autonomy** (*read only* / *draft & confirm* /
+  *act directly*). The model only ever sees the tools its level allows; every write is
+  recorded in the `agent_actions` audit log.
+- **Extensible.** Tools live in `lib/agent/tools/` and are assembled per request in
+  `lib/agent/tools/registry.ts`.
+
 ## Analysis export
 
 On any completed analysis page, you can export:

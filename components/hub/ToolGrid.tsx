@@ -6,6 +6,7 @@ import {
   GitCompareArrows,
   Library,
   Sparkles,
+  Bot,
   ArrowUpRight,
   type LucideIcon,
 } from 'lucide-react';
@@ -31,6 +32,14 @@ export function ToolGrid({ analysisCount }: { analysisCount: number }) {
       bg: 'var(--signature)',
       fg: 'var(--on-signature)',
       count: analysisCount > 0 ? `${analysisCount} ${analysisCount === 1 ? 'analysis' : 'analyses'}` : undefined,
+    },
+    {
+      icon: Bot,
+      name: 'Assistant',
+      desc: 'Your personal AI agent — knows your talks, drafts your emails, and connects your apps.',
+      href: '/agent',
+      bg: 'var(--accent-2)',
+      fg: '#fff',
     },
     {
       icon: PenLine,
