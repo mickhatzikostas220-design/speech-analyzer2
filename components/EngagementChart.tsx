@@ -68,16 +68,16 @@ export function EngagementChart({ timeline, feedbackPoints, currentTimeMs, durat
         {/* Threshold line */}
         <line
           x1={0} y1={thresholdY} x2={100} y2={thresholdY}
-          stroke="#52525b" strokeWidth="0.4" strokeDasharray="1,1"
+          stroke="var(--ink-300)" strokeWidth="0.4" strokeDasharray="1,1"
         />
 
         {/* Fill */}
-        <path d={fillPath} fill="url(#engGrad)" opacity="0.25" />
+        <path d={fillPath} fill="url(#engGrad)" opacity="0.18" />
 
         <defs>
           <linearGradient id="engGrad" x1="0" y1="0" x2="0" y2="1" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#a855f7" />
-            <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--signature)" />
+            <stop offset="100%" stopColor="var(--signature)" stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -85,7 +85,7 @@ export function EngagementChart({ timeline, feedbackPoints, currentTimeMs, durat
         <polyline
           points={points}
           fill="none"
-          stroke="#a855f7"
+          stroke="var(--signature)"
           strokeWidth="0.8"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -98,23 +98,23 @@ export function EngagementChart({ timeline, feedbackPoints, currentTimeMs, durat
             key={fp.id}
             x1={xPct(fp.timecode_ms)} y1={0}
             x2={xPct(fp.timecode_ms)} y2={HEIGHT}
-            stroke={fp.severity === 'high' ? '#ef4444' : fp.severity === 'medium' ? '#f59e0b' : '#3b82f6'}
+            stroke={fp.severity === 'high' ? 'var(--score-low)' : fp.severity === 'medium' ? 'var(--score-mid)' : 'var(--accent-2)'}
             strokeWidth="0.5"
-            opacity="0.6"
+            opacity="0.55"
           />
         ))}
 
         {/* Playhead */}
         <line
           x1={currentX} y1={0} x2={currentX} y2={HEIGHT}
-          stroke="white" strokeWidth="0.5" opacity="0.5"
+          stroke="var(--ink-900)" strokeWidth="0.5" opacity="0.55"
         />
       </svg>
 
       {/* Y-axis labels */}
-      <div className="flex justify-between text-xs text-zinc-600">
+      <div className="flex justify-between text-xs text-faint">
         <span>0:00</span>
-        <span className="text-zinc-500">
+        <span className="text-muted">
           55 engagement threshold · click to seek
         </span>
         <span>{Math.floor(totalMs / 60000)}:{String(Math.floor((totalMs % 60000) / 1000)).padStart(2, '0')}</span>

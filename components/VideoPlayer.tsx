@@ -17,9 +17,9 @@ function formatTime(s: number) {
 }
 
 function severityGlow(severity: string) {
-  if (severity === 'high') return 'border-red-500/60 shadow-red-500/20';
-  if (severity === 'medium') return 'border-amber-500/60 shadow-amber-500/20';
-  return 'border-blue-500/60 shadow-blue-500/20';
+  if (severity === 'high') return 'border-[color:var(--danger)]';
+  if (severity === 'medium') return 'border-[color:var(--score-mid)]';
+  return 'border-[color:var(--accent-2)]';
 }
 
 export function VideoPlayer({ fileUrl, fileType, activeFeedback, onTimeUpdate, seekToMs }: Props) {
@@ -75,14 +75,14 @@ export function VideoPlayer({ fileUrl, fileType, activeFeedback, onTimeUpdate, s
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+    <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-surface-card">
       {/* Video */}
       {fileType === 'video' ? (
-        <div className="relative bg-black aspect-video">
+        <div className="relative aspect-video bg-black">
           <video
             ref={mediaRef as React.RefObject<HTMLVideoElement>}
             src={fileUrl}
-            className="w-full h-full object-contain"
+            className="h-full w-full object-contain"
             preload="metadata"
           />
 
@@ -90,12 +90,12 @@ export function VideoPlayer({ fileUrl, fileType, activeFeedback, onTimeUpdate, s
           {activeFeedback && (
             <div
               key={activeFeedback.id}
-              className={`absolute top-4 left-4 right-4 border rounded-xl p-3 backdrop-blur-md bg-zinc-950/80 shadow-lg feedback-overlay-enter ${severityGlow(activeFeedback.severity)}`}
+              className={`feedback-overlay-enter absolute left-4 right-4 top-4 rounded-[var(--radius-md)] border-2 bg-[color:var(--ink-900)]/80 p-3 shadow-lg backdrop-blur-md ${severityGlow(activeFeedback.severity)}`}
             >
-              <p className="text-white text-sm font-medium leading-snug">
+              <p className="text-sm font-medium leading-snug text-white">
                 {activeFeedback.feedback_text}
               </p>
-              <p className="text-zinc-400 text-xs mt-1">
+              <p className="mt-1 text-xs text-[color:var(--ink-300)]">
                 → {activeFeedback.improvement_suggestion}
               </p>
             </div>
@@ -103,16 +103,16 @@ export function VideoPlayer({ fileUrl, fileType, activeFeedback, onTimeUpdate, s
         </div>
       ) : (
         /* Audio — show waveform placeholder and feedback card */
-        <div className="relative bg-zinc-950 h-36 flex items-center justify-center">
-          <div className="flex items-end gap-0.5 h-16 px-4">
+        <div className="relative flex h-36 items-center justify-center bg-[var(--surface-sunk)]">
+          <div className="flex h-16 items-end gap-0.5 px-4">
             {Array.from({ length: 80 }).map((_, i) => (
               <div
                 key={i}
-                className="w-1 rounded-sm bg-zinc-800"
+                className="w-1 rounded-sm"
                 style={{
                   height: `${20 + Math.sin(i * 0.4) * 15 + Math.random() * 20}%`,
-                  opacity: (i / 80) < (progress / 100) ? 1 : 0.4,
-                  background: (i / 80) < (progress / 100) ? '#a855f7' : undefined,
+                  opacity: (i / 80) < (progress / 100) ? 1 : 0.5,
+                  background: (i / 80) < (progress / 100) ? 'var(--signature)' : 'var(--ink-300)',
                 }}
               />
             ))}
@@ -120,10 +120,10 @@ export function VideoPlayer({ fileUrl, fileType, activeFeedback, onTimeUpdate, s
           {activeFeedback && (
             <div
               key={activeFeedback.id}
-              className={`absolute bottom-3 left-3 right-3 border rounded-xl p-3 backdrop-blur-md bg-zinc-950/90 feedback-overlay-enter ${severityGlow(activeFeedback.severity)}`}
+              className={`feedback-overlay-enter absolute bottom-3 left-3 right-3 rounded-[var(--radius-md)] border-2 bg-[color:var(--ink-900)]/90 p-3 backdrop-blur-md ${severityGlow(activeFeedback.severity)}`}
             >
-              <p className="text-white text-xs font-medium">{activeFeedback.feedback_text}</p>
-              <p className="text-zinc-400 text-xs mt-0.5">→ {activeFeedback.improvement_suggestion}</p>
+              <p className="text-xs font-medium text-white">{activeFeedback.feedback_text}</p>
+              <p className="mt-0.5 text-xs text-[color:var(--ink-300)]">→ {activeFeedback.improvement_suggestion}</p>
             </div>
           )}
         </div>
@@ -134,18 +134,18 @@ export function VideoPlayer({ fileUrl, fileType, activeFeedback, onTimeUpdate, s
       )}
 
       {/* Controls */}
-      <div className="px-4 pb-4 pt-3 space-y-2">
+      <div className="space-y-2 px-4 pb-4 pt-3">
         {/* Progress bar */}
         <div
-          className="h-1 bg-zinc-800 rounded-full cursor-pointer relative group"
+          className="group relative h-1.5 cursor-pointer rounded-full bg-[var(--ink-200)]"
           onClick={seek}
         >
           <div
-            className="h-full bg-purple-500 rounded-full pointer-events-none transition-all"
+            className="pointer-events-none h-full rounded-full bg-[var(--signature)] transition-all"
             style={{ width: `${progress}%` }}
           />
           <div
-            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+            className="pointer-events-none absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-[var(--ink-900)] opacity-0 shadow transition-opacity group-hover:opacity-100"
             style={{ left: `calc(${progress}% - 6px)` }}
           />
         </div>
@@ -153,20 +153,20 @@ export function VideoPlayer({ fileUrl, fileType, activeFeedback, onTimeUpdate, s
         <div className="flex items-center gap-4">
           <button
             onClick={togglePlay}
-            className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-zinc-200 transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--signature)] transition-transform hover:scale-105"
           >
             {playing ? (
-              <svg className="w-3.5 h-3.5 text-zinc-950" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="h-3.5 w-3.5" style={{ color: 'var(--on-signature)' }} fill="currentColor" viewBox="0 0 24 24">
                 <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
               </svg>
             ) : (
-              <svg className="w-3.5 h-3.5 text-zinc-950 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="ml-0.5 h-3.5 w-3.5" style={{ color: 'var(--on-signature)' }} fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7L8 5z" />
               </svg>
             )}
           </button>
 
-          <span className="text-xs text-zinc-500 tabular-nums">
+          <span className="text-xs tabular-nums text-muted">
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
         </div>

@@ -6,14 +6,14 @@ import type { Analysis, AnalysisDetail, ROITimepoint } from '@/types';
 type MetricKey = 'engagement' | 'auditory' | 'language' | 'attention' | 'dmn' | 'prosody' | 'emotional' | 'memory';
 
 const METRICS: { key: MetricKey; label: string; color: string }[] = [
-  { key: 'engagement', label: 'Engagement', color: '#8b5cf6' },
+  { key: 'engagement', label: 'Engagement', color: '#1A2B50' },
   { key: 'auditory',   label: 'Auditory',   color: '#06b6d4' },
   { key: 'language',   label: 'Language',   color: '#a855f7' },
   { key: 'attention',  label: 'Attention',  color: '#22c55e' },
   { key: 'dmn',        label: 'DMN',        color: '#f59e0b' },
   { key: 'prosody',    label: 'Prosody',    color: '#f472b6' },
   { key: 'emotional',  label: 'Emotional',  color: '#fb923c' },
-  { key: 'memory',     label: 'Memory',     color: '#34d399' },
+  { key: 'memory',     label: 'Memory',     color: '#10b981' },
 ];
 
 const CHART_H = 120;
@@ -109,11 +109,11 @@ function CompareChart({ dataA, dataB, activeMetrics, focusMetric, labelA, labelB
         {/* Grid */}
         {[25, 50, 75].map(v => (
           <line key={v} x1={0} y1={yVal(v)} x2={100} y2={yVal(v)}
-            stroke="#27272a" strokeWidth="0.3" strokeDasharray="1,1" />
+            stroke="var(--ink-200)" strokeWidth="0.3" strokeDasharray="1,1" />
         ))}
-        <text x={0.5} y={yVal(75) - 1} fontSize="2.5" fill="#52525b">75</text>
-        <text x={0.5} y={yVal(50) - 1} fontSize="2.5" fill="#52525b">50</text>
-        <text x={0.5} y={yVal(25) - 1} fontSize="2.5" fill="#52525b">25</text>
+        <text x={0.5} y={yVal(75) - 1} fontSize="2.5" fill="var(--text-muted)">75</text>
+        <text x={0.5} y={yVal(50) - 1} fontSize="2.5" fill="var(--text-muted)">50</text>
+        <text x={0.5} y={yVal(25) - 1} fontSize="2.5" fill="var(--text-muted)">25</text>
 
         {METRICS.filter(m => activeMetrics.has(m.key)).map(({ key, color }) => {
           const tsA = getTimestamps(dataA, key);
@@ -126,7 +126,7 @@ function CompareChart({ dataA, dataB, activeMetrics, focusMetric, labelA, labelB
 
           const isolated = focusMetric === key;
           const colorA = color;
-          const colorB = isolated ? '#ffffff' : color;
+          const colorB = isolated ? 'var(--ink-900)' : color;
           const dashB  = isolated ? undefined : '2,1.5';
 
           return (
@@ -145,13 +145,13 @@ function CompareChart({ dataA, dataB, activeMetrics, focusMetric, labelA, labelB
       </svg>
 
       {/* A/B labels */}
-      <div className="absolute top-2 right-2 flex items-center gap-4 text-xs text-zinc-500">
+      <div className="absolute top-2 right-2 flex items-center gap-4 text-xs text-muted">
         <span className="flex items-center gap-1.5">
-          <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={focusMetric ? METRICS.find(m => m.key === focusMetric)?.color ?? 'white' : 'white'} strokeWidth="1.5" /></svg>
+          <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={focusMetric ? METRICS.find(m => m.key === focusMetric)?.color ?? 'var(--ink-900)' : 'var(--ink-900)'} strokeWidth="1.5" /></svg>
           {labelA}
         </span>
         <span className="flex items-center gap-1.5">
-          <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={focusMetric ? 'white' : 'white'} strokeWidth="1.5" strokeDasharray={focusMetric ? undefined : '3,2'} /></svg>
+          <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={focusMetric ? 'var(--ink-900)' : 'var(--ink-900)'} strokeWidth="1.5" strokeDasharray={focusMetric ? undefined : '3,2'} /></svg>
           {labelB}
         </span>
       </div>
@@ -283,21 +283,21 @@ function CompareSummary({ dataA, dataB, labelA, labelB }: { dataA: ChartData; da
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-5">
+    <div className="card p-5 space-y-5">
       <div>
-        <h2 className="text-sm font-medium text-zinc-300 mb-2">Summary</h2>
-        <p className="text-sm text-zinc-400 leading-relaxed">{summary}</p>
+        <h2 className="text-sm font-medium text-body mb-2">Summary</h2>
+        <p className="text-sm text-muted leading-relaxed">{summary}</p>
       </div>
 
-      <div className="border-t border-zinc-800 pt-5 space-y-4">
-        <h2 className="text-sm font-medium text-zinc-300">Generate Claude Prompt</h2>
+      <div className="border-t border-[var(--border-subtle)] pt-5 space-y-4">
+        <h2 className="text-sm font-medium text-body">Generate Claude Prompt</h2>
 
         <div className="space-y-1.5">
-          <p className="text-xs text-zinc-500">Who is this report for?</p>
+          <p className="text-xs text-muted">Who is this report for?</p>
           <div className="flex flex-wrap gap-2">
             {[['myself', 'Myself'], ['a client', 'A client'], ['a team', 'My team'], ['an executive', 'An executive']].map(([val, label]) => (
               <button key={val} onClick={() => setChoices(c => ({ ...c, audience: val }))}
-                className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${choices.audience === val ? 'bg-purple-600 border-purple-500 text-white' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${choices.audience === val ? 'bg-signature text-on-signature border-2 border-[var(--border-strong)]' : 'border-2 border-[var(--border-strong)] text-strong hover:bg-[var(--surface-sunk)]'}`}>
                 {label}
               </button>
             ))}
@@ -305,11 +305,11 @@ function CompareSummary({ dataA, dataB, labelA, labelB }: { dataA: ChartData; da
         </div>
 
         <div className="space-y-1.5">
-          <p className="text-xs text-zinc-500">What tone?</p>
+          <p className="text-xs text-muted">What tone?</p>
           <div className="flex flex-wrap gap-2">
             {[['professional', 'Professional'], ['conversational', 'Conversational'], ['technical', 'Technical']].map(([val, label]) => (
               <button key={val} onClick={() => setChoices(c => ({ ...c, tone: val }))}
-                className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${choices.tone === val ? 'bg-purple-600 border-purple-500 text-white' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${choices.tone === val ? 'bg-signature text-on-signature border-2 border-[var(--border-strong)]' : 'border-2 border-[var(--border-strong)] text-strong hover:bg-[var(--surface-sunk)]'}`}>
                 {label}
               </button>
             ))}
@@ -317,11 +317,11 @@ function CompareSummary({ dataA, dataB, labelA, labelB }: { dataA: ChartData; da
         </div>
 
         <div className="space-y-1.5">
-          <p className="text-xs text-zinc-500">How long?</p>
+          <p className="text-xs text-muted">How long?</p>
           <div className="flex flex-wrap gap-2">
             {[['a brief 1-paragraph summary', 'Brief'], ['a standard 2-section report', 'Standard'], ['a detailed 3-section report', 'Detailed']].map(([val, label]) => (
               <button key={val} onClick={() => setChoices(c => ({ ...c, length: val }))}
-                className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${choices.length === val ? 'bg-purple-600 border-purple-500 text-white' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${choices.length === val ? 'bg-signature text-on-signature border-2 border-[var(--border-strong)]' : 'border-2 border-[var(--border-strong)] text-strong hover:bg-[var(--surface-sunk)]'}`}>
                 {label}
               </button>
             ))}
@@ -329,11 +329,11 @@ function CompareSummary({ dataA, dataB, labelA, labelB }: { dataA: ChartData; da
         </div>
 
         <div className="space-y-1.5">
-          <p className="text-xs text-zinc-500">What to include?</p>
+          <p className="text-xs text-muted">What to include?</p>
           <div className="flex flex-wrap gap-2">
             {INCLUDE_OPTIONS.map(({ key, label }) => (
               <button key={key} onClick={() => toggleInclude(key)}
-                className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${choices.include.includes(key) ? 'bg-zinc-700 border-zinc-600 text-white' : 'border-zinc-800 text-zinc-600 hover:border-zinc-700'}`}>
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${choices.include.includes(key) ? 'bg-signature text-on-signature border-2 border-[var(--border-strong)]' : 'border-2 border-[var(--border-strong)] text-strong hover:bg-[var(--surface-sunk)]'}`}>
                 {label}
               </button>
             ))}
@@ -341,22 +341,22 @@ function CompareSummary({ dataA, dataB, labelA, labelB }: { dataA: ChartData; da
         </div>
 
         <div className="space-y-1.5">
-          <p className="text-xs text-zinc-500">Anything else you want in the report?</p>
+          <p className="text-xs text-muted">Anything else you want in the report?</p>
           <textarea
             value={extra}
             onChange={e => setExtra(e.target.value)}
             placeholder="e.g. Focus on the opening 2 minutes, compare speaking style for a healthcare audience, suggest ways to improve the weaker speech…"
             rows={3}
-            className="w-full bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm rounded-lg px-3 py-2 placeholder-zinc-600 focus:outline-none focus:border-purple-500 resize-none"
+            className="input w-full text-sm resize-none"
           />
         </div>
 
         <button onClick={handleCopy} disabled={choices.include.length === 0}
-          className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors">
+          className="btn-primary w-full">
           {copied ? 'Copied!' : 'Copy Prompt'}
         </button>
 
-        <p className="text-xs text-zinc-600 text-center">Paste this into claude.ai to generate your report</p>
+        <p className="text-xs text-muted text-center">Paste this into claude.ai to generate your report</p>
       </div>
     </div>
   );
@@ -367,19 +367,19 @@ function StatCard({ label, valA, valB, unit = '' }: { label: string; valA: numbe
   const b = valB ?? 0;
   const diff = a - b;
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex-1">
-      <p className="text-xs text-zinc-500 mb-2">{label}</p>
+    <div className="card p-4 flex-1">
+      <p className="text-xs text-muted mb-2">{label}</p>
       <div className="flex items-end gap-3">
         <div>
-          <p className="text-xl font-bold text-white">{a}{unit}</p>
-          <p className="text-xs text-zinc-600 mt-0.5">Speech A</p>
+          <p className="text-xl font-bold text-strong">{a}{unit}</p>
+          <p className="text-xs text-faint mt-0.5">Speech A</p>
         </div>
         <div>
-          <p className="text-xl font-bold text-zinc-400">{b}{unit}</p>
-          <p className="text-xs text-zinc-600 mt-0.5">Speech B</p>
+          <p className="text-xl font-bold text-muted">{b}{unit}</p>
+          <p className="text-xs text-faint mt-0.5">Speech B</p>
         </div>
         {valA !== null && valB !== null && (
-          <p className={`text-sm font-medium ml-auto ${diff > 0 ? 'text-green-400' : diff < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
+          <p className={`text-sm font-medium ml-auto ${diff > 0 ? 'text-[var(--success)]' : diff < 0 ? 'text-[var(--danger)]' : 'text-muted'}`}>
             {diff > 0 ? '+' : ''}{diff}
           </p>
         )}
@@ -436,18 +436,18 @@ export default function ComparePage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-white">Compare Speeches</h1>
-        <p className="text-zinc-500 text-sm mt-1">Overlay two analyses to compare neural engagement across every metric.</p>
+        <h1 className="text-xl font-extrabold text-strong">Compare Speeches</h1>
+        <p className="text-muted text-sm mt-1">Overlay two analyses to compare neural engagement across every metric.</p>
       </div>
 
       {/* Selection */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex flex-col sm:flex-row gap-4 items-end">
+      <div className="card p-5 flex flex-col sm:flex-row gap-4 items-end">
         <div className="flex-1">
-          <label className="text-xs text-zinc-500 block mb-1.5">Speech A <span className="text-white">(solid line)</span></label>
+          <label className="text-xs text-muted block mb-1.5">Speech A <span className="text-strong">(solid line)</span></label>
           <select
             value={idA}
             onChange={e => setIdA(e.target.value)}
-            className="w-full bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-purple-500"
+            className="input w-full text-sm"
           >
             <option value="">Select a speech…</option>
             {analyses.map(a => (
@@ -456,11 +456,11 @@ export default function ComparePage() {
           </select>
         </div>
         <div className="flex-1">
-          <label className="text-xs text-zinc-500 block mb-1.5">Speech B <span className="text-zinc-400">(dashed line)</span></label>
+          <label className="text-xs text-muted block mb-1.5">Speech B <span className="text-muted">(dashed line)</span></label>
           <select
             value={idB}
             onChange={e => setIdB(e.target.value)}
-            className="w-full bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-purple-500"
+            className="input w-full text-sm"
           >
             <option value="">Select a speech…</option>
             {analyses.map(a => (
@@ -471,7 +471,7 @@ export default function ComparePage() {
         <button
           onClick={handleCompare}
           disabled={!idA || !idB || loading}
-          className="px-5 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors"
+          className="btn-primary"
         >
           {loading ? 'Loading…' : 'Compare'}
         </button>
@@ -487,9 +487,9 @@ export default function ComparePage() {
           </div>
 
           {/* Metric pills */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
+          <div className="card p-5 space-y-4">
             <div>
-              <p className="text-xs text-zinc-500 mb-3">Click a metric to isolate it — click again to show all</p>
+              <p className="text-xs text-muted mb-3">Click a metric to isolate it — click again to show all</p>
               <div className="flex flex-wrap gap-2">
                 {METRICS.map(({ key, label, color }) => {
                   const isFocused = focusMetric === key;
@@ -498,12 +498,12 @@ export default function ComparePage() {
                     <button
                       key={key}
                       onClick={() => toggleMetric(key)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                         isFocused
-                          ? 'border-white/40 bg-white/10 text-white'
+                          ? 'bg-signature text-on-signature border-2 border-[var(--border-strong)]'
                           : isDimmed
-                          ? 'border-zinc-800 text-zinc-600'
-                          : 'border-zinc-700 text-zinc-300 hover:border-zinc-500'
+                          ? 'border-2 border-[var(--border-subtle)] text-faint'
+                          : 'border-2 border-[var(--border-strong)] text-strong hover:bg-[var(--surface-sunk)]'
                       }`}
                     >
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
@@ -524,11 +524,11 @@ export default function ComparePage() {
             />
 
             {/* Color legend */}
-            <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 border-t border-zinc-800">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 border-t border-[var(--border-subtle)]">
               {METRICS.filter(m => !focusMetric || focusMetric === m.key).map(({ key, label, color }) => (
                 <div key={key} className="flex items-center gap-1.5">
                   <div className="w-3 h-0.5 rounded-full" style={{ background: color }} />
-                  <span className="text-[11px] text-zinc-500">{label}</span>
+                  <span className="text-[11px] text-muted">{label}</span>
                 </div>
               ))}
             </div>

@@ -38,11 +38,14 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-white">All Analyses</h1>
+    <div className="mx-auto max-w-3xl px-4 py-10">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <p className="eyebrow mb-1">Talk Library</p>
+          <h1 className="display-h1" style={{ fontSize: 'var(--text-h2)' }}>All your talks</h1>
+        </div>
         {!loading && analyses.length > 0 && (
-          <span className="text-zinc-600 text-sm">{filtered.length} of {analyses.length}</span>
+          <span className="text-sm text-muted">{filtered.length} of {analyses.length}</span>
         )}
       </div>
 
@@ -50,7 +53,7 @@ export default function HistoryPage() {
       {!loading && analyses.length > 0 && (
         <div className="relative mb-5">
           <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600"
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
             fill="none" stroke="currentColor" viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -58,17 +61,17 @@ export default function HistoryPage() {
           </svg>
           <input
             type="text"
-            placeholder="Search analyses…"
+            placeholder="Search your talks…"
             value={query}
             onChange={(e) => handleSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-zinc-900 border border-zinc-800 focus:border-zinc-600 text-white text-sm rounded-xl outline-none transition-colors placeholder-zinc-600"
+            className="input w-full pl-9 text-sm"
           />
           {query && (
             <button
               onClick={() => handleSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted transition-colors hover:text-strong"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -79,19 +82,19 @@ export default function HistoryPage() {
       {loading ? (
         <div className="space-y-3">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl h-20 animate-pulse" />
+            <div key={i} className="h-20 animate-pulse rounded-[var(--radius-md)] bg-[var(--surface-sunk)]" />
           ))}
         </div>
       ) : analyses.length === 0 ? (
-        <div className="text-center py-20">
-          <p className="text-zinc-500 text-sm">No analyses yet.</p>
-          <a href="/dashboard" className="mt-3 inline-block text-sm text-purple-400 hover:text-purple-300 transition-colors">
-            Upload your first speech →
+        <div className="py-20 text-center">
+          <p className="text-sm text-muted">No talks yet.</p>
+          <a href="/analyze" className="mt-3 inline-block text-sm font-semibold" style={{ color: 'var(--text-link)' }}>
+            Upload your first talk →
           </a>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-zinc-500 text-sm">No results for "{query}"</p>
+        <div className="py-16 text-center">
+          <p className="text-sm text-muted">No results for “{query}”</p>
         </div>
       ) : (
         <>
@@ -103,21 +106,21 @@ export default function HistoryPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3 mt-8">
+            <div className="mt-8 flex items-center justify-center gap-3">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 disabled:opacity-40 disabled:pointer-events-none text-zinc-300 text-sm rounded-lg transition-colors"
+                className="rounded-[var(--radius-pill)] border-2 border-[var(--border-strong)] px-3.5 py-1.5 text-sm font-bold text-strong transition hover:bg-[var(--surface-sunk)] disabled:pointer-events-none disabled:opacity-40"
               >
                 ← Prev
               </button>
-              <span className="text-zinc-500 text-sm">
+              <span className="text-sm text-muted">
                 {currentPage} / {totalPages}
               </span>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 disabled:opacity-40 disabled:pointer-events-none text-zinc-300 text-sm rounded-lg transition-colors"
+                className="rounded-[var(--radius-pill)] border-2 border-[var(--border-strong)] px-3.5 py-1.5 text-sm font-bold text-strong transition hover:bg-[var(--surface-sunk)] disabled:pointer-events-none disabled:opacity-40"
               >
                 Next →
               </button>

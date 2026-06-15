@@ -10,12 +10,12 @@ export function ScoreRing({ score, size = 72 }: Props) {
   const circ = 2 * Math.PI * r;
   const dash = (score / 100) * circ;
 
-  const color = score >= 70 ? '#22c55e' : score >= 55 ? '#f59e0b' : '#ef4444';
+  const color = score >= 70 ? 'var(--score-high)' : score >= 55 ? 'var(--score-mid)' : 'var(--score-low)';
 
   return (
     <div className="flex flex-col items-center gap-1 shrink-0">
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#27272a" strokeWidth={6} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--ink-200)" strokeWidth={6} />
         <circle
           cx={size / 2} cy={size / 2} r={r}
           fill="none"
@@ -26,7 +26,7 @@ export function ScoreRing({ score, size = 72 }: Props) {
           style={{ transition: 'stroke-dasharray 0.6s ease' }}
         />
       </svg>
-      <span className="text-xs text-zinc-400 -mt-1 leading-none" style={{ color }}>
+      <span className="-mt-1 text-xs leading-none text-muted" style={{ color }}>
         {score}/100
       </span>
     </div>

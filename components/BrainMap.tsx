@@ -114,14 +114,14 @@ export function BrainMap({ activations: a, size = 180 }: Props) {
               className="w-2 h-2 rounded-full flex-shrink-0"
               style={{ background: actColor(a[key]) }}
             />
-            <span className="text-[10px] text-zinc-500">{label}</span>
+            <span className="text-[10px] text-muted">{label}</span>
           </div>
         ))}
       </div>
 
       {/* Color scale */}
       <div className="flex items-center gap-1.5 mt-0.5">
-        <span className="text-[9px] text-zinc-600">low</span>
+        <span className="text-[9px] text-faint">low</span>
         <div
           className="h-1 w-16 rounded-full"
           style={{
@@ -129,7 +129,7 @@ export function BrainMap({ activations: a, size = 180 }: Props) {
               'linear-gradient(to right, rgb(30,60,210), rgb(0,160,255), rgb(0,210,150), rgb(255,195,0), rgb(255,45,0))',
           }}
         />
-        <span className="text-[9px] text-zinc-600">high</span>
+        <span className="text-[9px] text-faint">high</span>
       </div>
     </div>
   );

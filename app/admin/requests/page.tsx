@@ -12,9 +12,9 @@ interface AccessRequest {
 }
 
 function statusBadge(status: AccessRequest['status']) {
-  if (status === 'approved') return 'bg-green-500/10 text-green-400 border-green-500/20';
-  if (status === 'denied') return 'bg-red-500/10 text-red-400 border-red-500/20';
-  return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+  if (status === 'approved') return 'bg-[var(--success-bg)] text-[color:var(--success)] border-[color:var(--success)]/30';
+  if (status === 'denied') return 'bg-[var(--danger-bg)] text-[color:var(--danger)] border-[color:var(--danger)]/30';
+  return 'bg-[var(--warning-bg)] text-[#8A6D00] border-[#8A6D00]/30';
 }
 
 function formatDate(iso: string) {
@@ -80,33 +80,31 @@ export default function AdminRequestsPage() {
   const reviewed = requests.filter((r) => r.status !== 'pending');
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10 space-y-8">
+    <div className="mx-auto max-w-5xl space-y-8 px-4 py-10">
       {/* Toast */}
       {toast && (
-        <div className="fixed top-20 right-4 bg-zinc-800 border border-zinc-700 text-white text-sm px-4 py-2.5 rounded-xl shadow-xl animate-slide-up z-50">
+        <div className="animate-slide-up fixed right-4 top-20 z-50 rounded-[var(--radius-md)] bg-[var(--surface-ink)] px-4 py-2.5 text-sm text-white shadow-xl">
           {toast}
         </div>
       )}
 
       {/* Invite link (shown when email is not configured) */}
       {inviteLink && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 space-y-2">
-          <p className="text-amber-400 text-sm font-medium">Email not configured — send this link manually</p>
+        <div className="space-y-2 rounded-[var(--radius-md)] bg-[var(--warning-bg)] p-4">
+          <p className="text-sm font-semibold text-[#8A6D00]">Email not configured — send this link manually</p>
           <div className="flex gap-2">
-            <input
-              readOnly
-              value={inviteLink}
-              className="flex-1 bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs rounded-lg px-3 py-2 font-mono"
-            />
+            <input readOnly value={inviteLink} className="input flex-1 font-mono text-xs" />
             <button
               onClick={() => { navigator.clipboard.writeText(inviteLink); showToast('Copied!'); }}
-              className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-xs rounded-lg transition-colors border border-zinc-700"
+              className="btn-outline"
+              style={{ padding: '8px 14px', fontSize: 'var(--text-xs)' }}
             >
               Copy
             </button>
             <button
               onClick={() => setInviteLink(null)}
-              className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded-lg transition-colors border border-zinc-700"
+              className="btn-ghost"
+              style={{ padding: '8px 14px', fontSize: 'var(--text-xs)' }}
             >
               Dismiss
             </button>
@@ -115,8 +113,9 @@ export default function AdminRequestsPage() {
       )}
 
       <div>
-        <h1 className="text-2xl font-semibold text-white">Access Requests</h1>
-        <p className="text-zinc-500 text-sm mt-1">
+        <p className="eyebrow mb-1">Admin</p>
+        <h1 className="section-title" style={{ fontSize: 'var(--text-h3)' }}>Access requests</h1>
+        <p className="mt-1 text-sm text-muted">
           {pending.length} pending · {reviewed.length} reviewed
         </p>
       </div>
@@ -124,17 +123,17 @@ export default function AdminRequestsPage() {
       {loading ? (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl h-24 animate-pulse" />
+            <div key={i} className="h-24 animate-pulse rounded-[var(--radius-md)] bg-[var(--surface-sunk)]" />
           ))}
         </div>
       ) : requests.length === 0 ? (
-        <div className="text-center py-20 text-zinc-600 text-sm">No requests yet.</div>
+        <div className="py-20 text-center text-sm text-faint">No requests yet.</div>
       ) : (
         <div className="space-y-8">
           {/* Pending */}
           {pending.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Pending</h2>
+              <h2 className="eyebrow">Pending</h2>
               {pending.map((req) => (
                 <RequestCard
                   key={req.id}
@@ -150,7 +149,7 @@ export default function AdminRequestsPage() {
           {/* Reviewed */}
           {reviewed.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Reviewed</h2>
+              <h2 className="eyebrow">Reviewed</h2>
               {reviewed.map((req) => (
                 <RequestCard key={req.id} req={req} processing={false} />
               ))}
@@ -176,45 +175,48 @@ function RequestCard({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-5">
-      <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="text-white font-medium text-sm">{req.name}</span>
-            <span className={`text-xs border rounded-full px-2 py-0.5 ${statusBadge(req.status)}`}>
+    <div className="card p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-strong">{req.name}</span>
+            <span className={`rounded-full border px-2 py-0.5 text-xs ${statusBadge(req.status)}`}>
               {req.status}
             </span>
           </div>
-          <p className="text-zinc-400 text-xs">{req.email}</p>
-          <p className="text-zinc-600 text-xs mt-0.5">{formatDate(req.created_at)}</p>
+          <p className="text-xs text-muted">{req.email}</p>
+          <p className="mt-0.5 text-xs text-faint">{formatDate(req.created_at)}</p>
 
           <button
             onClick={() => setExpanded(!expanded)}
-            className="text-xs text-purple-400 hover:text-purple-300 transition-colors mt-2"
+            className="mt-2 text-xs font-semibold"
+            style={{ color: 'var(--text-link)' }}
           >
             {expanded ? 'Hide reason' : 'View reason'}
           </button>
 
           {expanded && (
-            <p className="text-zinc-300 text-sm mt-2 leading-relaxed bg-zinc-800 rounded-lg p-3">
+            <p className="mt-2 rounded-[var(--radius-sm)] bg-[var(--surface-sunk)] p-3 text-sm leading-relaxed text-body">
               {req.reason}
             </p>
           )}
         </div>
 
         {req.status === 'pending' && (
-          <div className="flex gap-2 shrink-0">
+          <div className="flex shrink-0 gap-2">
             <button
               onClick={onApprove}
               disabled={processing}
-              className="px-3 py-1.5 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors"
+              className="rounded-[var(--radius-pill)] px-3.5 py-1.5 text-xs font-bold text-white transition-colors disabled:opacity-50"
+              style={{ background: 'var(--success)' }}
             >
               {processing ? '…' : 'Approve'}
             </button>
             <button
               onClick={onDeny}
               disabled={processing}
-              className="px-3 py-1.5 bg-zinc-800 hover:bg-red-600 disabled:opacity-50 text-zinc-300 hover:text-white text-xs font-medium rounded-lg transition-colors border border-zinc-700 hover:border-red-600"
+              className="btn-outline"
+              style={{ padding: '6px 14px', fontSize: 'var(--text-xs)' }}
             >
               {processing ? '…' : 'Deny'}
             </button>

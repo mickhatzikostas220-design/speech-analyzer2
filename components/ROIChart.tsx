@@ -57,7 +57,7 @@ export function ROIChart({ timeline, durationMs, onSeek, currentTimeMs }: Props)
       >
         {/* Grid line at 50 */}
         <line x1={0} y1={yVal(50)} x2={100} y2={yVal(50)}
-          stroke="#3f3f46" strokeWidth="0.3" strokeDasharray="1,1" />
+          stroke="var(--ink-200)" strokeWidth="0.3" strokeDasharray="1,1" />
 
         {LINES.map(({ key, color }) => {
           const pts = timeline
@@ -80,18 +80,18 @@ export function ROIChart({ timeline, durationMs, onSeek, currentTimeMs }: Props)
 
         {/* Playhead */}
         <line x1={currentX} y1={0} x2={currentX} y2={HEIGHT}
-          stroke="white" strokeWidth="0.5" opacity="0.4" />
+          stroke="var(--ink-900)" strokeWidth="0.5" opacity="0.45" />
       </svg>
 
       {/* Legend */}
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         {LINES.map(({ key, label, color }) => (
           <div key={key} className="flex items-center gap-1.5">
-            <div className="w-3 h-0.5 rounded-full" style={{ background: color }} />
-            <span className="text-[11px] text-zinc-500">{label}</span>
+            <div className="h-0.5 w-3 rounded-full" style={{ background: color }} />
+            <span className="text-[11px] text-muted">{label}</span>
           </div>
         ))}
-        <span className="text-[11px] text-zinc-600 ml-auto">click to seek</span>
+        <span className="ml-auto text-[11px] text-faint">click to seek</span>
       </div>
     </div>
   );

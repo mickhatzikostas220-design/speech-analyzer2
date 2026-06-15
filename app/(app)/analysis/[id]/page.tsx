@@ -19,15 +19,15 @@ function formatDate(iso: string) {
 }
 
 function severityColor(severity: string) {
-  if (severity === 'high') return 'border-red-500/40 bg-red-500/5';
-  if (severity === 'medium') return 'border-amber-500/40 bg-amber-500/5';
-  return 'border-blue-500/40 bg-blue-500/5';
+  if (severity === 'high') return 'border-[color:var(--danger)] bg-[var(--danger-bg)]';
+  if (severity === 'medium') return 'border-[color:var(--score-mid)] bg-[var(--warning-bg)]';
+  return 'border-[color:var(--accent-2)] bg-[var(--info-bg)]';
 }
 
 function severityLabel(severity: string) {
-  if (severity === 'high') return 'text-red-400';
-  if (severity === 'medium') return 'text-amber-400';
-  return 'text-blue-400';
+  if (severity === 'high') return 'text-[color:var(--danger)]';
+  if (severity === 'medium') return 'text-[color:var(--warning)]';
+  return 'text-[color:var(--accent-2)]';
 }
 
 function formatMs(ms: number) {
@@ -37,13 +37,13 @@ function formatMs(ms: number) {
 
 function ScorePill({ label, value, description, color }: { label: string; value: number; description: string; color: string }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex-1 min-w-0">
-      <p className="text-xs text-zinc-500 mb-1">{label}</p>
+    <div className="card p-4 flex-1 min-w-0">
+      <p className="text-xs text-muted mb-1">{label}</p>
       <div className="flex items-end gap-2">
         <span className={`text-2xl font-bold ${color}`}>{value}</span>
-        <span className="text-zinc-600 text-sm mb-0.5">/100</span>
+        <span className="text-faint text-sm mb-0.5">/100</span>
       </div>
-      <p className="text-zinc-600 text-xs mt-1 leading-snug">{description}</p>
+      <p className="text-muted text-xs mt-1 leading-snug">{description}</p>
     </div>
   );
 }
@@ -157,7 +157,7 @@ export default function AnalysisPage() {
   if (error) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <p className="text-red-400">{error}</p>
+        <p className="text-[color:var(--danger)]">{error}</p>
       </div>
     );
   }
@@ -165,7 +165,7 @@ export default function AnalysisPage() {
   if (!detail) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <div className="w-8 h-8 mx-auto border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 mx-auto border-2 border-[color:var(--signature)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -185,18 +185,19 @@ export default function AnalysisPage() {
       {/* Delete confirmation modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full">
-            <h3 className="text-white font-semibold mb-2">Delete analysis?</h3>
-            <p className="text-zinc-400 text-sm mb-5">
+          <div className="bg-surface-card border border-[var(--border-subtle)] rounded-[var(--radius-lg)] p-6 max-w-sm w-full shadow-[var(--shadow-lg)]">
+            <h3 className="text-strong font-semibold mb-2">Delete analysis?</h3>
+            <p className="text-muted text-sm mb-5">
               This will permanently delete the recording and all analysis data. This cannot be undone.
             </p>
             <div className="flex gap-3">
               <button onClick={handleDelete} disabled={deleting}
-                className="flex-1 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+                className="flex-1 py-2 disabled:opacity-50 text-on-signature text-sm font-medium rounded-lg transition-colors"
+                style={{ background: 'var(--danger)' }}>
                 {deleting ? 'Deleting…' : 'Delete'}
               </button>
               <button onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium rounded-lg transition-colors">
+                className="flex-1 py-2 hover:bg-[var(--surface-sunk)] text-body text-sm font-medium rounded-lg transition-colors border border-[var(--border-default)]">
                 Cancel
               </button>
             </div>
@@ -214,17 +215,17 @@ export default function AnalysisPage() {
                 value={titleInput}
                 onChange={e => setTitleInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setEditingTitle(false); }}
-                className="text-xl font-semibold bg-zinc-800 border border-zinc-600 text-white rounded-lg px-2 py-0.5 focus:outline-none focus:border-purple-500 w-full"
+                className="input text-xl font-semibold w-full"
               />
-              <button onClick={handleRename} className="text-xs px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors flex-shrink-0">Save</button>
-              <button onClick={() => setEditingTitle(false)} className="text-xs px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg transition-colors flex-shrink-0">Cancel</button>
+              <button onClick={handleRename} className="text-xs px-3 py-1.5 btn-primary !rounded-lg flex-shrink-0">Save</button>
+              <button onClick={() => setEditingTitle(false)} className="text-xs px-3 py-1.5 hover:bg-[var(--surface-sunk)] text-muted rounded-lg transition-colors flex-shrink-0 border border-[var(--border-default)]">Cancel</button>
             </div>
           ) : (
             <div className="flex items-center gap-2 group">
-              <h1 className="text-xl font-semibold text-white truncate">{analysis.title}</h1>
+              <h1 className="text-xl font-extrabold text-strong truncate">{analysis.title}</h1>
               <button
                 onClick={() => { setTitleInput(analysis.title); setEditingTitle(true); }}
-                className="opacity-0 group-hover:opacity-100 p-1 text-zinc-600 hover:text-zinc-300 transition-all"
+                className="opacity-0 group-hover:opacity-100 p-1 text-faint hover:text-body transition-all"
                 title="Rename">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -232,14 +233,14 @@ export default function AnalysisPage() {
               </button>
             </div>
           )}
-          <p className="text-zinc-500 text-xs mt-1">{formatDate(analysis.created_at)}</p>
+          <p className="text-muted text-xs mt-1">{formatDate(analysis.created_at)}</p>
         </div>
         <div className="flex items-center gap-3">
           {analysis.overall_score !== null && (
             <ScoreRing score={analysis.overall_score} size={64} />
           )}
           <button onClick={() => setShowDeleteConfirm(true)}
-            className="p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+            className="p-2 text-faint hover:text-[color:var(--danger)] hover:bg-[var(--danger-bg)] rounded-lg transition-colors"
             title="Delete analysis">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -251,14 +252,14 @@ export default function AnalysisPage() {
 
       {/* Mock data warning */}
       {analysis.status === 'complete' && analysis.is_mock && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 flex items-start gap-3">
-          <svg className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-[var(--warning-bg)] border border-[color:var(--warning)] rounded-[var(--radius-md)] px-4 py-3 flex items-start gap-3">
+          <svg className="w-4 h-4 text-[color:var(--warning)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
           </svg>
           <div>
-            <p className="text-amber-400 text-sm font-medium">Simulated data — Tribe v2 did not run</p>
-            <p className="text-amber-400/70 text-xs mt-0.5">
+            <p className="text-strong text-sm font-medium">Simulated data — Tribe v2 did not run</p>
+            <p className="text-muted text-xs mt-0.5">
               The GPU model failed. Scores are randomly generated and not meaningful.
               Check that your HuggingFace token in Modal is valid and that you have accepted the
               facebook/tribev2 license on huggingface.co, then retry.
@@ -269,12 +270,12 @@ export default function AnalysisPage() {
 
       {/* Processing state */}
       {isPending && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center space-y-3">
-          <div className="w-8 h-8 mx-auto border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-white font-medium">
+        <div className="card p-8 text-center space-y-3">
+          <div className="w-8 h-8 mx-auto border-2 border-[color:var(--signature)] border-t-transparent rounded-full animate-spin" />
+          <p className="text-strong font-medium">
             {analysis.status === 'pending' ? 'Queued for analysis…' : 'Analyzing neural engagement…'}
           </p>
-          <p className="text-zinc-500 text-sm">
+          <p className="text-muted text-sm">
             Running Tribe v2 brain predictions. This takes 10–20 minutes.
           </p>
         </div>
@@ -282,13 +283,13 @@ export default function AnalysisPage() {
 
       {/* Error state */}
       {isError && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 text-center space-y-3">
-          <p className="text-red-400 font-medium">Analysis failed</p>
+        <div className="bg-[var(--danger-bg)] border border-[color:var(--danger)] rounded-[var(--radius-md)] p-6 text-center space-y-3">
+          <p className="text-[color:var(--danger)] font-medium">Analysis failed</p>
           {analysis.error_message && (
-            <p className="text-red-400/70 text-sm">{analysis.error_message}</p>
+            <p className="text-muted text-sm">{analysis.error_message}</p>
           )}
           <button onClick={handleRetry} disabled={retrying}
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors border border-zinc-700">
+            className="btn-outline text-sm !py-2 !px-4">
             {retrying ? 'Retrying…' : 'Retry analysis'}
           </button>
         </div>
@@ -313,7 +314,7 @@ export default function AnalysisPage() {
                   label="Overall Engagement"
                   value={analysis.overall_score}
                   description="Average predicted neural engagement across the full speech"
-                  color="text-purple-400"
+                  color="text-accent"
                 />
               )}
               {analysis.cognitive_load_score !== null && (
@@ -321,7 +322,7 @@ export default function AnalysisPage() {
                   label="Cognitive Load"
                   value={analysis.cognitive_load_score}
                   description="How hard the attention network worked — higher means more demanding content"
-                  color="text-green-400"
+                  color="text-[color:var(--success)]"
                 />
               )}
               {analysis.mind_wandering_score !== null && (
@@ -329,7 +330,7 @@ export default function AnalysisPage() {
                   label="Mind-Wandering Risk"
                   value={analysis.mind_wandering_score}
                   description="Average Default Mode Network activity — higher means the audience's mind was more likely to wander"
-                  color={analysis.mind_wandering_score > 60 ? 'text-red-400' : 'text-amber-400'}
+                  color={analysis.mind_wandering_score > 60 ? 'text-[color:var(--danger)]' : 'text-[color:var(--warning)]'}
                 />
               )}
             </div>
@@ -337,8 +338,8 @@ export default function AnalysisPage() {
 
           {/* Engagement timeline */}
           {engagement_timeline.length > 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-              <h2 className="text-sm font-medium text-zinc-300 mb-3">Neural Engagement Timeline</h2>
+            <div className="card p-4">
+              <h2 className="text-sm font-medium text-body mb-3">Neural Engagement Timeline</h2>
               <EngagementChart
                 timeline={engagement_timeline}
                 feedbackPoints={feedback_points}
@@ -351,9 +352,9 @@ export default function AnalysisPage() {
 
           {/* ROI timeline (4 brain regions over time) */}
           {roi_timeline.length > 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-              <h2 className="text-sm font-medium text-zinc-300 mb-1">Brain Region Activity Over Time</h2>
-              <p className="text-zinc-600 text-xs mb-3">
+            <div className="card p-4">
+              <h2 className="text-sm font-medium text-body mb-1">Brain Region Activity Over Time</h2>
+              <p className="text-muted text-xs mb-3">
                 How each cortical region&apos;s activation changed second by second. Each line is independently normalized 0–100.
               </p>
               <ROIChart
@@ -366,12 +367,12 @@ export default function AnalysisPage() {
           )}
 
           {/* Brain map */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-            <h2 className="text-sm font-medium text-zinc-300 mb-4">Overall Brain Activity Map</h2>
+          <div className="card p-5">
+            <h2 className="text-sm font-medium text-body mb-4">Overall Brain Activity Map</h2>
             {analysis.overall_brain_activations ? (
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
                 <BrainMap activations={analysis.overall_brain_activations} size={160} />
-                <div className="flex-1 space-y-3 text-sm text-zinc-400">
+                <div className="flex-1 space-y-3 text-sm text-muted">
                   <p>
                     Average cortical activation across your speech, derived from Tribe v2&apos;s fMRI
                     encoding model. Warmer colours = higher predicted activation.
@@ -384,7 +385,7 @@ export default function AnalysisPage() {
                       { name: 'DMN',      desc: 'Default Mode Network — elevated DMN = mind-wandering and disengagement.' },
                     ].map(({ name, desc }) => (
                       <div key={name} className="flex items-start gap-2">
-                        <span className="text-zinc-300 font-medium w-20 flex-shrink-0">{name}</span>
+                        <span className="text-strong font-medium w-20 flex-shrink-0">{name}</span>
                         <span>{desc}</span>
                       </div>
                     ))}
@@ -393,13 +394,13 @@ export default function AnalysisPage() {
               </div>
             ) : (
               <div className="text-center py-6">
-                <p className="text-zinc-500 text-sm">Brain map data not available for this analysis.</p>
-                <p className="text-zinc-600 text-xs mt-1">
+                <p className="text-muted text-sm">Brain map data not available for this analysis.</p>
+                <p className="text-faint text-xs mt-1">
                   Re-run the analysis after deploying the latest Modal server to generate brain maps.
                 </p>
                 {!isError && (
                   <button onClick={handleRetry} disabled={retrying}
-                    className="mt-3 px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors border border-zinc-700">
+                    className="mt-3 btn-outline text-xs !py-1.5 !px-4">
                     {retrying ? 'Retrying…' : 'Re-analyze'}
                   </button>
                 )}
@@ -410,23 +411,23 @@ export default function AnalysisPage() {
           {/* Peak moments */}
           {analysis.peak_moments && analysis.peak_moments.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-sm font-medium text-zinc-300">
+              <h2 className="text-sm font-medium text-body">
                 {analysis.peak_moments.length} Peak Moment{analysis.peak_moments.length !== 1 ? 's' : ''} — Your Best
               </h2>
               {analysis.peak_moments.map((pm, i) => (
                 <button
                   key={i}
                   onClick={() => setSeekToMs(pm.start_ms)}
-                  className="w-full text-left border border-green-500/30 bg-green-500/5 rounded-xl p-4 transition-all hover:border-green-500/50"
+                  className="w-full text-left border border-[color:var(--success)] bg-[var(--success-bg)] rounded-[var(--radius-md)] p-4 transition-all hover:shadow-[var(--shadow-sm)]"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono text-zinc-500">
+                    <span className="text-xs font-mono text-muted">
                       {formatMs(pm.start_ms)} – {formatMs(pm.end_ms)}
                     </span>
-                    <span className="text-xs font-medium text-green-400">{pm.score}/100</span>
-                    <span className="text-xs uppercase tracking-wide text-green-500">peak engagement</span>
+                    <span className="text-xs font-medium text-[color:var(--success)]">{pm.score}/100</span>
+                    <span className="text-xs uppercase tracking-wide text-[color:var(--success)]">peak engagement</span>
                   </div>
-                  <p className="text-zinc-400 text-sm mt-1">
+                  <p className="text-muted text-sm mt-1">
                     High neural engagement across auditory, language, and attention networks during this segment.
                   </p>
                 </button>
@@ -436,11 +437,12 @@ export default function AnalysisPage() {
 
           {/* Transcript */}
           {analysis.transcript && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <div className="card p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-medium text-zinc-300">Transcript</h2>
+                <h2 className="text-sm font-medium text-body">Transcript</h2>
                 <button onClick={() => downloadExport('transcript')}
-                  className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1">
+                  className="text-xs font-semibold transition-colors flex items-center gap-1"
+                  style={{ color: 'var(--text-link)' }}>
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -448,7 +450,7 @@ export default function AnalysisPage() {
                   Export .txt
                 </button>
               </div>
-              <p className="text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap">
+              <p className="text-body text-sm leading-relaxed whitespace-pre-wrap">
                 {analysis.transcript}
               </p>
             </div>
@@ -456,9 +458,9 @@ export default function AnalysisPage() {
 
           {/* Word Neural Response */}
           {analysis.word_responses && analysis.word_responses.length > 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-              <h2 className="text-sm font-medium text-zinc-300 mb-1">Word Neural Response</h2>
-              <p className="text-zinc-600 text-xs mb-4">Each word coloured by predicted neural activation. Green = high engagement, red = low.</p>
+            <div className="card p-4">
+              <h2 className="text-sm font-medium text-body mb-1">Word Neural Response</h2>
+              <p className="text-muted text-xs mb-4">Each word coloured by predicted neural activation. Green = high engagement, red = low.</p>
               <div className="flex flex-wrap gap-1.5">
                 {analysis.word_responses.map((w: WordResponse, i: number) => {
                   const avg = Math.round((w.score + w.emotional + w.memory) / 3);
@@ -479,7 +481,7 @@ export default function AnalysisPage() {
               </div>
               <div className="flex items-center gap-2 mt-3">
                 <div className="h-1.5 flex-1 rounded-full" style={{ background: 'linear-gradient(to right, rgb(255,0,80), rgb(255,255,80), rgb(0,255,80))' }} />
-                <span className="text-[10px] text-zinc-600">low → high activation</span>
+                <span className="text-[10px] text-muted">low → high activation</span>
               </div>
             </div>
           )}
@@ -488,12 +490,13 @@ export default function AnalysisPage() {
           {feedback_points.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium text-zinc-300">
+                <h2 className="text-sm font-medium text-body">
                   {feedback_points.length} Engagement Drop{feedback_points.length !== 1 ? 's' : ''} Detected
                 </h2>
                 <div className="flex gap-2">
                   <button onClick={() => downloadExport('feedback')}
-                    className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1">
+                    className="text-xs font-semibold transition-colors flex items-center gap-1"
+                    style={{ color: 'var(--text-link)' }}>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -501,7 +504,7 @@ export default function AnalysisPage() {
                     Export .csv
                   </button>
                   <button onClick={() => downloadExport('json')}
-                    className="text-xs text-zinc-500 hover:text-zinc-400 transition-colors flex items-center gap-1">
+                    className="text-xs text-muted hover:text-body transition-colors flex items-center gap-1">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -511,13 +514,13 @@ export default function AnalysisPage() {
                 </div>
               </div>
               {feedback_points.map((fp) => (
-                <div key={fp.id} className={`border rounded-xl transition-all ${severityColor(fp.severity)}`}>
+                <div key={fp.id} className={`border rounded-[var(--radius-md)] transition-all ${severityColor(fp.severity)}`}>
                   <button
                     onClick={() => setSeekToMs(fp.timecode_ms)}
-                    className="w-full text-left p-4 hover:bg-white/[0.02] rounded-t-xl transition-colors"
+                    className="w-full text-left p-4 hover:bg-[var(--surface-sunk)] rounded-t-[var(--radius-md)] transition-colors"
                   >
                     <div className="flex items-center gap-3 mb-2">
-                      <span className="text-xs font-mono text-zinc-500">
+                      <span className="text-xs font-mono text-muted">
                         {formatMs(fp.timecode_ms)} – {formatMs(fp.timecode_end_ms)}
                       </span>
                       <span className={`text-xs font-medium ${severityLabel(fp.severity)}`}>
@@ -527,12 +530,12 @@ export default function AnalysisPage() {
                         {fp.severity} drop
                       </span>
                     </div>
-                    <p className="text-white text-sm">{fp.feedback_text}</p>
-                    <p className="text-zinc-400 text-sm mt-1">→ {fp.improvement_suggestion}</p>
+                    <p className="text-strong text-sm">{fp.feedback_text}</p>
+                    <p className="text-muted text-sm mt-1">→ {fp.improvement_suggestion}</p>
                   </button>
                   {fp.brain_activations && (
-                    <div className="px-4 pb-4 border-t border-white/5 pt-3">
-                      <p className="text-xs text-zinc-600 mb-3">Brain activity at this moment</p>
+                    <div className="px-4 pb-4 border-t border-[var(--border-subtle)] pt-3">
+                      <p className="text-xs text-muted mb-3">Brain activity at this moment</p>
                       <BrainMap activations={fp.brain_activations} size={130} />
                     </div>
                   )}
@@ -542,9 +545,9 @@ export default function AnalysisPage() {
           )}
 
           {feedback_points.length === 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center">
-              <p className="text-green-400 font-medium">No significant engagement drops detected.</p>
-              <p className="text-zinc-500 text-sm mt-1">
+            <div className="card p-6 text-center">
+              <p className="text-[color:var(--success)] font-medium">No significant engagement drops detected.</p>
+              <p className="text-muted text-sm mt-1">
                 Neural engagement stayed above the 55/100 threshold throughout.
               </p>
             </div>
@@ -555,22 +558,22 @@ export default function AnalysisPage() {
 
       {/* Chat panel — shown for all completed analyses */}
       {analysis.status === 'complete' && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+        <div className="card p-4">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-purple-500 to-indigo-500 flex-shrink-0" />
-            <h2 className="text-sm font-medium text-zinc-300">Ask about your speech</h2>
+            <div className="w-5 h-5 rounded-md bg-signature flex-shrink-0" />
+            <h2 className="text-sm font-medium text-body">Ask about your speech</h2>
           </div>
 
           <div className="space-y-3 max-h-96 overflow-y-auto mb-3 pr-1">
             {chatMessages.length === 0 && (
               <div className="py-6 text-center space-y-2">
-                <p className="text-zinc-500 text-sm">Ask anything about your neural data.</p>
+                <p className="text-muted text-sm">Ask anything about your neural data.</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {['Why did my engagement drop?', 'What were my strongest moments?', 'How can I improve my prosody?'].map(q => (
                     <button
                       key={q}
                       onClick={() => setChatInput(q)}
-                      className="text-xs px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-full border border-zinc-700 transition-colors"
+                      className="text-xs px-3 py-1.5 bg-surface-sunk hover:bg-[var(--ink-200)] text-body rounded-full border border-[var(--border-subtle)] transition-colors"
                     >
                       {q}
                     </button>
@@ -580,10 +583,10 @@ export default function AnalysisPage() {
             )}
             {chatMessages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                <div className={`max-w-[85%] rounded-[var(--radius-sm)] px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
                   msg.role === 'user'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-zinc-800 text-zinc-200'
+                    ? 'bg-signature text-on-signature'
+                    : 'bg-surface-sunk text-body'
                 }`}>
                   {msg.content || <span className="opacity-40 animate-pulse">Thinking…</span>}
                 </div>
@@ -598,12 +601,12 @@ export default function AnalysisPage() {
               onChange={e => setChatInput(e.target.value)}
               placeholder="Ask anything about your data…"
               disabled={chatLoading}
-              className="flex-1 bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-purple-500 placeholder-zinc-600 disabled:opacity-50"
+              className="input flex-1 text-sm disabled:opacity-50"
             />
             <button
               type="submit"
               disabled={chatLoading || !chatInput.trim()}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors flex-shrink-0"
+              className="btn-primary text-sm !py-2 !px-4 flex-shrink-0"
             >
               {chatLoading ? '…' : 'Send'}
             </button>
