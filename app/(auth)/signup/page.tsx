@@ -39,7 +39,7 @@ export default function SignupPage() {
       router.push('/onboarding');
       router.refresh();
     } else {
-      router.push('/verify-email');
+      router.push(`/verify-email?email=${encodeURIComponent(email)}`);
     }
   }
 
