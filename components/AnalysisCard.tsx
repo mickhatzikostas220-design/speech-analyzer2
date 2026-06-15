@@ -4,10 +4,10 @@ import type { Analysis } from '@/types';
 
 function statusBadge(status: Analysis['status']) {
   const map: Record<Analysis['status'], { label: string; cls: string }> = {
-    pending: { label: 'Queued', cls: 'text-zinc-500 bg-zinc-800' },
-    processing: { label: 'Analyzing…', cls: 'text-purple-400 bg-purple-500/10 animate-pulse' },
+    pending: { label: 'Queued', cls: 'text-muted bg-[var(--surface-sunk)]' },
+    processing: { label: 'Analyzing…', cls: 'text-[color:var(--accent-2)] bg-[color:var(--accent-2)]/10 animate-pulse' },
     complete: { label: '', cls: '' },
-    error: { label: 'Error', cls: 'text-red-400 bg-red-500/10' },
+    error: { label: 'Error', cls: 'text-[color:var(--danger)] bg-[var(--danger-bg)]' },
   };
   return map[status];
 }
@@ -24,32 +24,30 @@ export function AnalysisCard({ analysis }: { analysis: Analysis }) {
   return (
     <Link
       href={`/analysis/${analysis.id}`}
-      className="flex items-center gap-4 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl px-4 py-3 transition-colors group"
+      className="card group flex items-center gap-4 px-4 py-3 transition-all hover:border-strong hover:shadow-hard"
     >
       {analysis.status === 'complete' && analysis.overall_score !== null ? (
         <ScoreRing score={analysis.overall_score} size={48} />
       ) : (
-        <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--surface-sunk)]">
           {analysis.status === 'processing' ? (
-            <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--ink-200)] border-t-[var(--signature)]" />
           ) : analysis.status === 'error' ? (
-            <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" style={{ color: 'var(--danger)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           ) : (
-            <div className="w-2 h-2 rounded-full bg-zinc-600" />
+            <div className="h-2 w-2 rounded-full bg-[var(--ink-400)]" />
           )}
         </div>
       )}
 
-      <div className="flex-1 min-w-0">
-        <p className="text-white text-sm font-medium truncate group-hover:text-purple-300 transition-colors">
-          {analysis.title}
-        </p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-zinc-600 text-xs">{formatDate(analysis.created_at)}</span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-strong">{analysis.title}</p>
+        <div className="mt-0.5 flex items-center gap-2">
+          <span className="text-xs text-muted">{formatDate(analysis.created_at)}</span>
           {analysis.file_type && (
-            <span className="text-zinc-700 text-xs uppercase">{analysis.file_type}</span>
+            <span className="text-xs uppercase text-faint">{analysis.file_type}</span>
           )}
         </div>
       </div>

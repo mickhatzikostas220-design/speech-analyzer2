@@ -8,8 +8,56 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      colors: {
+        // Brand tokens (per-user themeable via CSS variables)
+        signature: 'var(--signature)',
+        'signature-strong': 'var(--signature-strong)',
+        'on-signature': 'var(--on-signature)',
+        accent: 'var(--accent-2)',
+        ink: {
+          DEFAULT: 'var(--ink-900)',
+          900: 'var(--ink-900)',
+          800: 'var(--ink-800)',
+          600: 'var(--ink-600)',
+          500: 'var(--ink-500)',
+          400: 'var(--ink-400)',
+          300: 'var(--ink-300)',
+          200: 'var(--ink-200)',
+          100: 'var(--ink-100)',
+          50: 'var(--ink-50)',
+        },
+        paper: 'var(--paper)',
+        surface: {
+          page: 'var(--surface-page)',
+          card: 'var(--surface-card)',
+          sunk: 'var(--surface-sunk)',
+          ink: 'var(--surface-ink)',
+        },
+        strong: 'var(--border-strong)',
+      },
+      textColor: {
+        strong: 'var(--text-strong)',
+        body: 'var(--text-body)',
+        muted: 'var(--text-muted)',
+        faint: 'var(--text-faint)',
+      },
       fontFamily: {
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)'],
+        body: ['var(--font-body)'],
+        script: ['var(--font-script)'],
+        mono: ['var(--font-mono)'],
+        sans: ['var(--font-body)', 'system-ui', 'sans-serif'],
+      },
+      borderRadius: {
+        pill: 'var(--radius-pill)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
+      },
+      boxShadow: {
+        hard: 'var(--shadow-hard)',
+        'hard-lg': 'var(--shadow-hard-lg)',
+        soft: 'var(--shadow-md)',
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',

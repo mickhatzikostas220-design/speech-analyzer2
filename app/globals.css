@@ -1,51 +1,128 @@
+/* Brand fonts + design tokens must be imported before Tailwind. */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,600&family=Alex+Brush&family=Roboto+Mono:wght@400;500&display=swap');
+@import './brand-tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #09090b;
-  --foreground: #fafafa;
-}
-
+/* ============================================================
+   Brand base — placed after Tailwind preflight so it wins.
+   ============================================================ */
 body {
-  background-color: var(--background);
-  color: var(--foreground);
+  font-family: var(--font-body);
+  color: var(--text-body);
+  background-color: var(--surface-page);
   font-feature-settings: 'rlig' 1, 'calt' 1;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
 }
 
-/* Video player chrome reset */
-video {
-  outline: none;
+::selection {
+  background: var(--signature);
+  color: var(--on-signature);
 }
 
-/* Feedback overlay animation */
-.feedback-overlay-enter {
-  animation: feedbackSlide 0.25s ease-out;
-}
+/* Custom scrollbar (warm neutral) */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--ink-300); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-400); }
 
+video { outline: none; }
+
+/* Feedback overlay animation (unchanged) */
+.feedback-overlay-enter { animation: feedbackSlide 0.25s ease-out; }
 @keyframes feedbackSlide {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   Brand utility classes — used by the layout + brand screens.
+   ============================================================ */
+.eyebrow {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.script { font-family: var(--font-script); font-weight: 400; line-height: 1; }
+
+.display-h1 {
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-size: var(--text-h1);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  color: var(--text-strong);
+}
+.section-title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-extrabold);
+  font-size: var(--text-h4);
+  color: var(--text-strong);
+  margin-bottom: 0.25rem;
+}
+.field-label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
+  margin-bottom: 6px;
+}
+
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.input {
+  border: 2px solid var(--border-strong);
+  background: var(--surface-card);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  color: var(--text-strong);
+  outline: none;
+  transition: box-shadow var(--dur-fast) var(--ease-out);
+}
+.input::placeholder { color: var(--text-faint); }
+.input:focus { box-shadow: var(--focus-shadow); }
+
+.btn-primary, .btn-ink, .btn-outline, .btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 22px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--text-base);
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+.btn-primary { background: var(--signature); color: var(--on-signature); border: 2px solid var(--border-strong); }
+.btn-ink { background: var(--surface-ink); color: var(--text-on-dark); border: 2px solid var(--surface-ink); }
+.btn-outline { background: transparent; color: var(--text-strong); border: 2px solid var(--border-strong); }
+.btn-ghost { background: transparent; color: var(--text-body); border: 2px solid transparent; }
+
+.btn-primary:hover, .btn-ink:hover, .btn-outline:hover { box-shadow: var(--shadow-hard); transform: translateY(-1px); }
+.btn-ghost:hover { background: var(--surface-sunk); }
+.btn-primary:active, .btn-ink:active, .btn-outline:active { transform: translateY(1px); box-shadow: none; }
+.btn-primary:disabled, .btn-ink:disabled, .btn-outline:disabled, .btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }

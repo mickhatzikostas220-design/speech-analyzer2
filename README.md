@@ -32,11 +32,12 @@ npm install
 
 Go to [supabase.com](https://supabase.com), create a new project, then:
 
-**Run the database schema** — open SQL Editor in your Supabase dashboard and run both files:
+**Run the database schema** — open SQL Editor in your Supabase dashboard and run these files:
 
 ```
 supabase/schema.sql
 supabase/access_requests.sql
+supabase/brand.sql          # per-speaker branding (colors, logo, fonts, voice)
 ```
 
 **Create the storage bucket** — in the same SQL Editor, run:
@@ -140,6 +141,46 @@ Visit `/admin/requests` while signed in with your `ADMIN_EMAIL` account. From he
 To add additional admins, change `ADMIN_EMAIL` to the new admin's email, or modify the check in `app/admin/layout.tsx` to allow multiple emails.
 
 ---
+
+## Per-speaker branding (Speaker Hub)
+
+The hub is built on the **Hatzikostas — Speaker Hub** design system (ported into
+`app/brand-tokens.css` as CSS variables) and is **customized to each speaker's
+brand**. The Hatzikostas palette is just the default seed.
+
+**How it works**
+
+- On first sign-in, a speaker is sent to **`/onboarding`**, enters their website,
+  and we **auto-extract** their brand — signature + accent colors, logo / favicon,
+  web fonts, hero image, and an "about" blurb — straight from the page markup
+  (`lib/brand/extract.ts`, no third-party service).
+- The kit is saved to `profiles.brand` (jsonb) and turned into a small set of CSS
+  variable overrides (`lib/brand/theme.ts`) applied on the app shell, so the whole
+  token system re-skins to them with no flash.
+- Speakers can fine-tune everything later under **`/settings`** — colors, logo,
+  fonts, voice/tone, and hero image — or re-import from a different URL.
+
+**Key files**
+
+| Area | Path |
+|------|------|
+| Design tokens (defaults) | `app/brand-tokens.css` |
+| Brand kit type + defaults | `lib/brand/types.ts`, `lib/brand/defaults.ts` |
+| Website extraction | `lib/brand/extract.ts` |
+| Kit → CSS variables | `lib/brand/theme.ts` |
+| Onboarding / Settings UI | `components/brand/*`, `app/onboarding`, `app/(app)/settings` |
+| API | `app/api/brand/route.ts`, `app/api/brand/extract/route.ts` |
+| Migration | `supabase/brand.sql` |
+
+**Note on auto-extraction:** it makes a server-side `fetch` to the speaker's site,
+so it depends on your deployment's outbound-network policy. Some sites sit behind
+bot protection (Cloudflare/Akamai) and may refuse the request — onboarding falls
+back to the default look, and the speaker can adjust colors/logo/fonts in Settings.
+
+> The re-skin in this pass is focused on the **layout/shell** (ink top bar, auth,
+> onboarding, settings, dashboard). Deeper tool screens (analysis detail, editor,
+> timeline, compare, admin) keep their original dark canvas for now and are
+> wrapped so the light brand never bleeds in — they're the next surfaces to re-skin.
 
 ## Analysis export
 

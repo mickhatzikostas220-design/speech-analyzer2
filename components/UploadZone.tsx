@@ -112,10 +112,10 @@ export function UploadZone({ onAnalysisCreated }: Props) {
       <div
         {...getRootProps()}
         className={[
-          'border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-200 select-none',
+          'cursor-pointer select-none rounded-[var(--radius-lg)] border-2 border-dashed p-10 text-center transition-all duration-200',
           isDragActive
-            ? 'border-purple-500 bg-purple-500/8'
-            : 'border-zinc-800 hover:border-zinc-600 bg-zinc-900',
+            ? 'border-[var(--signature)] bg-[color:var(--signature)]/10'
+            : 'border-[var(--border-default)] bg-surface-card hover:border-strong',
           uploading ? 'pointer-events-none opacity-60' : '',
         ].join(' ')}
       >
@@ -123,35 +123,32 @@ export function UploadZone({ onAnalysisCreated }: Props) {
 
         {uploading ? (
           <div className="space-y-4 py-2">
-            <div className="w-10 h-10 mx-auto border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-zinc-400 text-sm">Uploading… {progress}%</p>
-            <div className="w-40 mx-auto bg-zinc-800 rounded-full h-1">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-[var(--ink-200)] border-t-[var(--signature)]" />
+            <p className="text-sm text-muted">Uploading… {progress}%</p>
+            <div className="mx-auto h-1.5 w-40 rounded-full bg-[var(--surface-sunk)]">
               <div
-                className="bg-purple-500 h-1 rounded-full transition-all duration-500"
+                className="h-1.5 rounded-full bg-[var(--signature)] transition-all duration-500"
                 style={{ width: `${progress}%` }}
               />
             </div>
           </div>
         ) : (
           <div className="space-y-4 py-2">
-            <div className="w-14 h-14 mx-auto rounded-xl bg-zinc-800 flex items-center justify-center">
-              <svg className="w-7 h-7 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[var(--radius-md)] bg-[var(--signature)]">
+              <svg className="h-7 w-7" style={{ color: 'var(--on-signature)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
                   d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
               </svg>
             </div>
             <div>
-              <p className="text-white text-sm font-medium">
-                {isDragActive ? 'Drop to upload' : 'Drop your speech or presentation here'}
+              <p className="text-sm font-semibold text-strong">
+                {isDragActive ? 'Drop to upload' : 'Drop your talk here'}
               </p>
-              <p className="text-zinc-600 text-xs mt-1">
+              <p className="mt-1 text-xs text-muted">
                 MP4, MOV, AVI, WebM, MP3, WAV, FLAC — up to 500 MB
               </p>
             </div>
-            <button
-              type="button"
-              className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white text-xs rounded-lg transition-colors"
-            >
+            <button type="button" className="btn-outline" style={{ padding: '8px 18px', fontSize: 'var(--text-sm)' }}>
               Choose file
             </button>
           </div>
@@ -159,7 +156,7 @@ export function UploadZone({ onAnalysisCreated }: Props) {
       </div>
 
       {(error || rejectionMsg) && (
-        <p className="mt-2 text-xs text-red-400 text-center">{error ?? rejectionMsg}</p>
+        <p className="mt-2 text-center text-xs" style={{ color: 'var(--danger)' }}>{error ?? rejectionMsg}</p>
       )}
     </div>
   );

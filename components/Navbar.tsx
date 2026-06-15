@@ -3,8 +3,10 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { Logo } from '@/components/brand/Logo';
+import type { BrandKit } from '@/lib/brand/types';
 
-export function Navbar() {
+export function Navbar({ brand }: { brand: BrandKit }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -15,45 +17,53 @@ export function Navbar() {
     router.refresh();
   }
 
-  const link = (href: string, label: string) => (
-    <Link
-      href={href}
-      className={`text-sm transition-colors ${
-        pathname.startsWith(href)
-          ? 'text-white'
-          : 'text-zinc-500 hover:text-zinc-300'
-      }`}
-    >
-      {label}
-    </Link>
-  );
+  const link = (href: string, label: string) => {
+    const active = pathname.startsWith(href);
+    return (
+      <Link
+        href={href}
+        className={`border-b-2 pb-0.5 text-sm font-semibold transition-colors ${
+          active
+            ? 'border-signature text-white'
+            : 'border-transparent text-white/60 hover:text-white'
+        }`}
+      >
+        {label}
+      </Link>
+    );
+  };
 
   return (
-    <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-40">
-      <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
-              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-            </div>
-            <span className="text-sm font-semibold text-white">ACA</span>
+    <header className="sticky top-0 z-40 bg-[color:var(--surface-ink)]">
+      <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
+        <div className="flex items-center gap-7">
+          <Link href="/dashboard" className="flex items-center">
+            <Logo brand={brand} color="paper" size={20} />
           </Link>
-          <nav className="flex items-center gap-4">
-            {link('/dashboard', 'Dashboard')}
+          <nav className="hidden items-center gap-5 sm:flex">
+            {link('/dashboard', 'Hub')}
             {link('/history', 'History')}
             {link('/compare', 'Compare')}
             {link('/editor', 'Editor')}
           </nav>
         </div>
 
-        <button
-          onClick={handleSignOut}
-          className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
-        >
-          Sign out
-        </button>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/settings"
+            className={`text-sm font-semibold transition-colors ${
+              pathname.startsWith('/settings') ? 'text-white' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            Settings
+          </Link>
+          <button
+            onClick={handleSignOut}
+            className="text-xs font-medium text-white/50 transition-colors hover:text-white"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
     </header>
   );

@@ -1,0 +1,197 @@
+/* ============================================================
+   BRAND TOKENS  (variables only — element defaults live in
+   globals.css so they win over Tailwind's preflight)
+
+   Ported from the "Erin Hatzikostas — Speaker Hub" design system.
+   The values below are the DEFAULT brand (the Hatzikostas seed).
+   Each signed-up speaker overrides a small set of these tokens
+   at runtime via an inline style on the app shell, so the whole
+   token system re-skins to their brand. See lib/brand/theme.ts.
+   ============================================================ */
+
+:root {
+  /* ---- Brand core ---- */
+  --yellow:      #F8E337;
+  --red:         #F34E1E;
+  --blue:        #01B0DD;
+  --pink:        #FFE5D6;
+  --ink:         #333333;
+  --paper:       #FFFFFF;
+
+  /* ---- Yellow ramp ---- */
+  --yellow-100:  #FEFBD9;
+  --yellow-200:  #FCF4A0;
+  --yellow-300:  #FAEC66;
+  --yellow-400:  #F8E337;
+  --yellow-500:  #EBD200;
+  --yellow-600:  #C7B000;
+
+  /* ---- Red ramp ---- */
+  --red-100:     #FDE2D9;
+  --red-300:     #F89377;
+  --red-500:     #F34E1E;
+  --red-600:     #D63E10;
+  --red-700:     #AE300A;
+
+  /* ---- Blue ramp ---- */
+  --blue-100:    #D2F1FA;
+  --blue-300:    #6FD4ED;
+  --blue-500:    #01B0DD;
+  --blue-600:    #0090B6;
+  --blue-700:    #006E8C;
+
+  /* ---- Pink / peach ramp ---- */
+  --pink-100:    #FFF4EE;
+  --pink-200:    #FFE5D6;
+  --pink-300:    #FFD2BC;
+
+  /* ---- Neutral / ink ramp (warm-leaning greys) ---- */
+  --ink-900:     #1A1A1A;
+  --ink-800:     #333333;
+  --ink-600:     #595959;
+  --ink-500:     #767676;
+  --ink-400:     #9B9B9B;
+  --ink-300:     #C7C7C7;
+  --ink-200:     #E4E4E4;
+  --ink-100:     #F1F1F0;
+  --ink-50:      #F8F8F6;
+
+  /* ============================================================
+     PER-SPEAKER BRAND HOOKS
+     These are the tokens overridden per user. Defaults point at
+     the Hatzikostas palette so an un-themed app still looks right.
+     ============================================================ */
+  --signature:        var(--yellow);     /* the loud signature color   */
+  --signature-strong: var(--yellow-500); /* pressed / hover signature  */
+  --on-signature:     var(--ink-900);    /* text that sits on signature*/
+  --accent-2:         var(--blue);       /* secondary accent           */
+
+  /* ---- Semantic text ---- */
+  --text-strong:   var(--ink-900);
+  --text-body:     var(--ink-800);
+  --text-muted:    var(--ink-500);
+  --text-faint:    var(--ink-400);
+  --text-on-dark:  var(--paper);
+  --text-on-brand: var(--on-signature);
+  --text-link:     var(--blue-600);
+
+  /* ---- Surfaces ---- */
+  --surface-page:    var(--ink-50);
+  --surface-card:    var(--paper);
+  --surface-sunk:    var(--ink-100);
+  --surface-warm:    var(--pink-100);
+  --surface-warm-2:  var(--pink-200);
+  --surface-ink:     var(--ink-900);
+  --surface-brand:   var(--signature);
+
+  /* ---- Lines ---- */
+  --border-subtle:  var(--ink-200);
+  --border-default: var(--ink-300);
+  --border-strong:  var(--ink-900);
+
+  /* ---- Accents (functional) ---- */
+  --accent:          var(--signature);
+  --accent-strong:   var(--signature-strong);
+  --focus-ring:      var(--blue-500);
+
+  /* ---- Status ---- */
+  --success:       #1F9D55;
+  --success-bg:    #E4F4EC;
+  --warning:       var(--yellow-500);
+  --warning-bg:    var(--yellow-100);
+  --danger:        var(--red-500);
+  --danger-bg:     var(--red-100);
+  --info:          var(--blue-500);
+  --info-bg:       var(--blue-100);
+
+  /* ---- Engagement scale (Orator) ---- */
+  --score-high:    #1F9D55;
+  --score-mid:     var(--yellow-500);
+  --score-low:     var(--red-500);
+
+  /* ============================================================
+     TYPOGRAPHY
+     ============================================================ */
+  --font-display: 'Montserrat', 'Gotham', var(--font-inter), system-ui, sans-serif;
+  --font-body:    'Montserrat', 'Gotham', var(--font-inter), system-ui, sans-serif;
+  --font-script:  'Alex Brush', cursive;
+  --font-mono:    'Roboto Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  --fw-regular:   400;
+  --fw-medium:    500;
+  --fw-semibold:  600;
+  --fw-bold:      700;
+  --fw-extrabold: 800;
+  --fw-black:     900;
+
+  --text-display:  clamp(2.75rem, 6vw, 5rem);
+  --text-h1:       clamp(2.25rem, 4.6vw, 3.5rem);
+  --text-h2:       clamp(1.75rem, 3.2vw, 2.5rem);
+  --text-h3:       1.5rem;
+  --text-h4:       1.25rem;
+  --text-lg:       1.125rem;
+  --text-base:     1rem;
+  --text-sm:       0.875rem;
+  --text-xs:       0.75rem;
+  --text-2xs:      0.6875rem;
+
+  --leading-tight:   1.05;
+  --leading-snug:    1.2;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.65;
+
+  --tracking-wordmark: 0.42em;
+  --tracking-eyebrow:  0.16em;
+  --tracking-tight:   -0.02em;
+  --tracking-normal:   0em;
+
+  /* ============================================================
+     SPACING / RADII / LAYOUT
+     ============================================================ */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.5rem;
+  --space-6:  2rem;
+  --space-7:  2.5rem;
+  --space-8:  3rem;
+  --space-9:  4rem;
+  --space-10: 6rem;
+
+  --radius-xs:   6px;
+  --radius-sm:   10px;
+  --radius-md:   16px;
+  --radius-lg:   24px;
+  --radius-xl:   32px;
+  --radius-pill: 999px;
+
+  --container-sm: 640px;
+  --container-md: 880px;
+  --container-lg: 1120px;
+  --container-xl: 1280px;
+
+  --border-hair: 1px;
+  --border-bold: 2px;
+  --border-chunk: 3px;
+
+  /* ============================================================
+     EFFECTS — shadows / motion / focus
+     ============================================================ */
+  --shadow-sm:  0 1px 2px rgba(51, 51, 51, 0.06);
+  --shadow-md:  0 4px 16px rgba(51, 51, 51, 0.08);
+  --shadow-lg:  0 12px 32px rgba(51, 51, 51, 0.12);
+
+  --shadow-hard:        4px 4px 0 var(--ink-900);
+  --shadow-hard-lg:     6px 6px 0 var(--ink-900);
+  --shadow-hard-signature: 5px 5px 0 var(--signature);
+  --shadow-hard-red:    5px 5px 0 var(--red);
+
+  --focus-shadow: 0 0 0 3px rgba(1, 176, 221, 0.45);
+
+  --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast:    120ms;
+  --dur-base:    200ms;
+  --dur-slow:    320ms;
+}

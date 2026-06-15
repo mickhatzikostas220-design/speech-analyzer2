@@ -29,7 +29,7 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isAuthPath = path.startsWith('/login') || path.startsWith('/signup') || path.startsWith('/verify-email');
-  const isAppPath = path.startsWith('/dashboard') || path.startsWith('/analysis') || path.startsWith('/history') || path.startsWith('/admin') || path.startsWith('/editor');
+  const isAppPath = path.startsWith('/dashboard') || path.startsWith('/analysis') || path.startsWith('/history') || path.startsWith('/admin') || path.startsWith('/editor') || path.startsWith('/compare') || path.startsWith('/onboarding') || path.startsWith('/settings');
 
   if (!user && isAppPath) {
     return NextResponse.redirect(new URL('/login', request.url));
