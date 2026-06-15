@@ -38,6 +38,7 @@ Go to [supabase.com](https://supabase.com), create a new project, then:
 supabase/schema.sql
 supabase/access_requests.sql
 supabase/brand.sql          # per-speaker branding (colors, logo, fonts, voice)
+supabase/gigs.sql           # speaking gigs + connected calendar feed
 ```
 
 **Create the storage bucket** — in the same SQL Editor, run:
@@ -181,6 +182,24 @@ back to the default look, and the speaker can adjust colors/logo/fonts in Settin
 > onboarding, settings, dashboard). Deeper tool screens (analysis detail, editor,
 > timeline, compare, admin) keep their original dark canvas for now and are
 > wrapped so the light brand never bleeds in — they're the next surfaces to re-skin.
+
+## Hub home
+
+`/dashboard` is the **Speaker Hub command center**, laid out to follow the design
+system's hub kit:
+
+- **Hero** greeting in the speaker's voice + a **New talk** button (→ `/analyze`,
+  which hosts the upload flow).
+- **Tool grid** of the real, working tools — Speech Analyzer, Script Studio,
+  Talk Editor, Compare, Talk Library, and Brand Kit.
+- **Recent activity** and **season stats** (talks analyzed, average & best score)
+  derived from real analysis data.
+- **Upcoming gigs** — add gigs by hand, or **connect a calendar app** by pasting
+  its iCal/ICS link (Google, Outlook, and Apple all expose one). Events are merged
+  with manual gigs and shown by date. Parser: `lib/gigs/ics.ts`; data: `supabase/gigs.sql`.
+
+> Connecting a calendar does a server-side `fetch` of the ICS URL, so (like brand
+> extraction) it depends on your deployment's outbound-network policy.
 
 ## Analysis export
 
