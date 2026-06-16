@@ -153,6 +153,7 @@ export function VideoPlayer({ fileUrl, fileType, activeFeedback, onTimeUpdate, s
         <div className="flex items-center gap-4">
           <button
             onClick={togglePlay}
+            aria-label={playing ? 'Pause' : 'Play'}
             className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-zinc-200 transition-colors"
           >
             {playing ? (

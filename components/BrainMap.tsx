@@ -39,7 +39,7 @@ export function BrainMap({ activations: a, size = 180 }: Props) {
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <svg width={size} height={h} viewBox="0 0 200 220">
+      <svg width={size} height={h} viewBox="0 0 200 220" role="img" aria-label="Brain activation map showing engagement across neural regions">
         <defs>
           <clipPath id={clipId}>
             {/* Brain silhouette (dorsal / top-down view) */}
