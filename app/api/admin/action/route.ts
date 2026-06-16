@@ -53,7 +53,8 @@ export async function GET(request: NextRequest) {
     const signupUrl = linkData.properties?.action_link;
     if (!signupUrl) return htmlPage('Error', 'Failed to generate invite link.', '#ef4444');
 
-    try { await sendApprovalEmail(req.email, req.name, signupUrl); } catch {}
+    try { await sendApprovalEmail(req.email, req.name, signupUrl); }
+    catch (err) { console.error('Approval email failed:', err); }
 
     await adminSupabase.from('access_requests').update({ status: 'approved' }).eq('id', payload.id);
 
@@ -61,7 +62,8 @@ export async function GET(request: NextRequest) {
   }
 
   if (payload.action === 'deny') {
-    try { await sendRejectionEmail(req.email, req.name); } catch {}
+    try { await sendRejectionEmail(req.email, req.name); }
+    catch (err) { console.error('Rejection email failed:', err); }
     await adminSupabase.from('access_requests').update({ status: 'denied' }).eq('id', payload.id);
     return htmlPage('Denied', `${req.name}'s request has been denied.`, '#3f3f46');
   }

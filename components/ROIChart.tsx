@@ -51,6 +51,8 @@ export function ROIChart({ timeline, durationMs, onSeek, currentTimeMs }: Props)
         ref={svgRef}
         viewBox={`0 0 100 ${HEIGHT}`}
         preserveAspectRatio="none"
+        role="img"
+        aria-label="Neural engagement timeline. Click the chart to seek to that moment in the speech."
         className="w-full cursor-crosshair"
         style={{ height: HEIGHT }}
         onClick={handleClick}
