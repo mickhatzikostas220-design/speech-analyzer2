@@ -607,10 +607,10 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
-        <div className="h-8 w-64 bg-zinc-800 rounded animate-pulse" />
+        <div className="h-8 w-64 bg-[var(--surface-sunk)] rounded animate-pulse" />
         <div className="grid grid-cols-5 gap-6">
-          <div className="col-span-2 bg-zinc-900 rounded-xl h-80 animate-pulse" />
-          <div className="col-span-3 bg-zinc-900 rounded-xl h-80 animate-pulse" />
+          <div className="col-span-2 bg-[var(--surface-sunk)] rounded-xl h-80 animate-pulse" />
+          <div className="col-span-3 bg-[var(--surface-sunk)] rounded-xl h-80 animate-pulse" />
         </div>
       </div>
     );
@@ -632,16 +632,16 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => router.push('/editor')} className="text-zinc-500 hover:text-white transition-colors">
+        <button onClick={() => router.push('/editor')} className="text-muted hover:text-strong transition-colors">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h1 className="text-lg font-semibold text-white">{project.title}</h1>
+        <h1 className="text-lg font-semibold text-strong">{project.title}</h1>
         <span className={`text-xs px-2 py-0.5 rounded-full ${
-          project.status === 'ready' ? 'bg-green-900/40 text-green-400'
-          : project.status === 'error' ? 'bg-red-900/40 text-red-400'
-          : 'bg-zinc-800 text-zinc-500'
+          project.status === 'ready' ? 'bg-[var(--success)]/15 text-[var(--success)]'
+          : project.status === 'error' ? 'bg-[var(--danger-bg)] text-[var(--danger)]'
+          : 'bg-[var(--surface-sunk)] text-muted'
         }`}>
           {project.status}
         </span>
@@ -649,7 +649,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
 
       {/* Error banner */}
       {error && (
-        <div className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-sm text-red-300 flex items-start gap-2">
+        <div className="bg-[var(--danger-bg)] border border-[var(--danger)] rounded-xl px-4 py-3 text-sm text-[var(--danger)] flex items-start gap-2">
           <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -660,13 +660,13 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
       {/* 2-column grid */}
       <div className="grid grid-cols-5 gap-6">
         {/* LEFT — Clips panel */}
-        <div className="col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-4">
+        <div className="col-span-2 bg-surface-card border border-[var(--border-subtle)] rounded-[var(--radius-md)] p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-white">Video Clips</p>
+            <p className="text-sm font-medium text-strong">Video Clips</p>
             <button
               onClick={() => uploadInputRef.current?.click()}
               disabled={!!uploadMsg}
-              className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 px-3 py-1.5 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 text-xs btn-outline disabled:opacity-50 px-3 py-1.5"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -684,7 +684,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
           </div>
 
           {uploadMsg && (
-            <div className="flex items-center gap-2 text-xs text-amber-400">
+            <div className="flex items-center gap-2 text-xs text-[var(--score-mid)]">
               <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
@@ -695,24 +695,24 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
 
           {clips.length === 0 ? (
             <div className="text-center py-8">
-              <svg className="w-8 h-8 mx-auto mb-2 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-8 h-8 mx-auto mb-2 text-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
-              <p className="text-xs text-zinc-600">No clips yet — add video files above.</p>
+              <p className="text-xs text-faint">No clips yet — add video files above.</p>
             </div>
           ) : (
             <div className="space-y-2">
               {clips.map((clip) => (
-                <div key={clip.id} className="bg-zinc-800/60 border border-zinc-700/50 rounded-lg p-3 space-y-2">
+                <div key={clip.id} className="bg-surface-sunk border border-[var(--border-subtle)] rounded-lg p-3 space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm text-white truncate" title={clip.name}>{clip.name}</p>
-                      {clip.duration !== null && <p className="text-xs text-zinc-500 mt-0.5">{fmtTime(clip.duration)}</p>}
+                      <p className="text-sm text-strong truncate" title={clip.name}>{clip.name}</p>
+                      {clip.duration !== null && <p className="text-xs text-muted mt-0.5">{fmtTime(clip.duration)}</p>}
                     </div>
                     <button
                       onClick={() => handleDeleteClip(clip.id)}
                       disabled={isTranscribing}
-                      className="text-zinc-600 hover:text-red-400 disabled:opacity-40 transition-colors flex-shrink-0"
+                      className="text-faint hover:text-[var(--danger)] disabled:opacity-40 transition-colors flex-shrink-0"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -722,14 +722,14 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
 
                   <div className="flex items-center justify-between">
                     {clip.transcribed ? (
-                      <span className="flex items-center gap-1 text-xs text-green-400">
+                      <span className="flex items-center gap-1 text-xs text-[var(--success)]">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                         </svg>
                         Transcribed
                       </span>
                     ) : transcribingId === clip.id ? (
-                      <span className="flex items-center gap-1.5 text-xs text-amber-400">
+                      <span className="flex items-center gap-1.5 text-xs text-[var(--score-mid)]">
                         <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
@@ -737,13 +737,13 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                         Transcribing...
                       </span>
                     ) : (
-                      <span className="text-xs text-zinc-500">Not transcribed</span>
+                      <span className="text-xs text-muted">Not transcribed</span>
                     )}
                     {!clip.transcribed && transcribingId !== clip.id && (
                       <button
                         onClick={() => handleTranscribeClip(clip)}
                         disabled={isTranscribing}
-                        className="text-xs bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-white px-2.5 py-1 rounded-md transition-colors"
+                        className="text-xs btn-outline disabled:opacity-40 px-2.5 py-1"
                       >
                         Transcribe
                       </button>
@@ -758,7 +758,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
             <button
               onClick={handleTranscribeAll}
               disabled={isTranscribing}
-              className="w-full flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+              className="w-full flex items-center justify-center gap-2 btn-outline disabled:opacity-50 text-sm font-medium px-4 py-2.5"
             >
               {isTranscribing ? (
                 <>
@@ -774,25 +774,25 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
         </div>
 
         {/* RIGHT — Script panel */}
-        <div className="col-span-3 bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col gap-4">
+        <div className="col-span-3 bg-surface-card border border-[var(--border-subtle)] rounded-[var(--radius-md)] p-4 flex flex-col gap-4">
           <div>
-            <p className="text-sm font-medium text-white">Script</p>
-            <p className="text-xs text-zinc-500 mt-0.5">Each line will be matched to clip(s)</p>
+            <p className="text-sm font-medium text-strong">Script</p>
+            <p className="text-xs text-muted mt-0.5">Each line will be matched to clip(s)</p>
           </div>
 
           <textarea
             value={script}
             onChange={(e) => handleScriptChange(e.target.value)}
             placeholder="Paste your script here..."
-            className="flex-1 min-h-64 w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500 resize-none transition-colors"
+            className="input flex-1 min-h-64 w-full resize-none"
           />
 
-          <p className="text-xs text-zinc-500">{scriptLines} {scriptLines === 1 ? 'line' : 'lines'}</p>
+          <p className="text-xs text-muted">{scriptLines} {scriptLines === 1 ? 'line' : 'lines'}</p>
 
           <button
             onClick={handleMatch}
             disabled={!canMatch}
-            className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+            className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 text-sm font-medium px-4 py-2.5"
           >
             {matching ? (
               <>
@@ -818,8 +818,8 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
       {segments.length > 0 && (
         <div className="space-y-4">
           <div>
-            <h2 className="text-base font-semibold text-white">Script Assembly</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <h2 className="text-base font-semibold text-strong">Script Assembly</h2>
+            <p className="text-xs text-muted mt-0.5">
               {validSegmentCount}/{segments.length} lines matched &middot; Total: {fmtTime(totalAssembledDuration)}
             </p>
           </div>
@@ -832,16 +832,16 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
               const filledDots = seg.confidence === 1 ? dots : Math.round(seg.confidence * dots);
 
               return (
-                <div key={seg.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                <div key={seg.id} className="bg-surface-card border border-[var(--border-subtle)] rounded-[var(--radius-md)] overflow-hidden">
                   {/* Main row */}
                   <div className="px-4 py-3 flex items-start gap-4">
-                    <span className="text-xs text-zinc-600 w-5 text-right flex-shrink-0 mt-0.5">{i + 1}</span>
+                    <span className="text-xs text-faint w-5 text-right flex-shrink-0 mt-0.5">{i + 1}</span>
 
-                    <p className="text-sm text-white flex-1 min-w-0 truncate mt-0.5" title={seg.scriptLine}>
+                    <p className="text-sm text-strong flex-1 min-w-0 truncate mt-0.5" title={seg.scriptLine}>
                       {seg.scriptLine}
                     </p>
 
-                    <svg className="w-4 h-4 text-zinc-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-faint flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                     </svg>
 
@@ -851,15 +851,15 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                         seg.clips.map((sc, ci) => (
                           <span
                             key={ci}
-                            className="flex items-center gap-1 text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2 py-0.5 rounded-md"
+                            className="flex items-center gap-1 text-xs bg-surface-sunk border border-[var(--border-subtle)] text-body px-2 py-0.5 rounded-md"
                           >
-                            <span className="text-zinc-500 truncate max-w-[5rem]" title={sc.clipName}>
+                            <span className="text-muted truncate max-w-[5rem]" title={sc.clipName}>
                               {sc.clipName.split('.')[0]}
                             </span>
-                            <span className="text-zinc-600">{fmtTime(sc.start)}–{fmtTime(sc.end)}</span>
+                            <span className="text-faint">{fmtTime(sc.start)}–{fmtTime(sc.end)}</span>
                             <button
                               onClick={() => handleRemoveSegmentClip(seg.id, ci)}
-                              className="text-zinc-600 hover:text-red-400 transition-colors ml-0.5 leading-none"
+                              className="text-faint hover:text-[var(--danger)] transition-colors ml-0.5 leading-none"
                               title="Remove"
                             >
                               ×
@@ -867,7 +867,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                           </span>
                         ))
                       ) : (
-                        <span className="text-xs text-amber-400 flex items-center gap-1">
+                        <span className="text-xs text-[var(--score-mid)] flex items-center gap-1">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                           </svg>
@@ -878,7 +878,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
 
                     <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
                       {Array.from({ length: dots }).map((_, d) => (
-                        <div key={d} className={`w-1.5 h-1.5 rounded-full ${d < filledDots ? 'bg-purple-500' : 'bg-zinc-700'}`} />
+                        <div key={d} className={`w-1.5 h-1.5 rounded-full ${d < filledDots ? 'bg-signature' : 'bg-[var(--ink-200)]'}`} />
                       ))}
                     </div>
 
@@ -886,8 +886,8 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                       onClick={() => setPickingForSegId(isPicking ? null : seg.id)}
                       className={`flex-shrink-0 text-xs px-2.5 py-1 rounded-md transition-colors ${
                         isPicking
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white'
+                          ? 'bg-signature text-on-signature'
+                          : 'text-muted hover:text-strong hover:bg-[var(--surface-sunk)]'
                       }`}
                     >
                       {isPicking ? 'Done' : hasMatch ? '+ Add' : 'Pick'}
@@ -896,12 +896,12 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
 
                   {/* Manual picker */}
                   {isPicking && (
-                    <div className="border-t border-zinc-800 px-4 py-3 space-y-2">
-                      <p className="text-xs text-zinc-500 mb-2">
+                    <div className="border-t border-[var(--border-subtle)] px-4 py-3 space-y-2">
+                      <p className="text-xs text-muted mb-2">
                         Add a speech segment — picked clips play in order for this line:
                       </p>
                       {clips.filter((c) => c.transcribed && c.speechSegments?.length > 0).length === 0 ? (
-                        <p className="text-xs text-zinc-600">No speech segments detected yet — transcribe a clip first.</p>
+                        <p className="text-xs text-faint">No speech segments detected yet — transcribe a clip first.</p>
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {clips.filter((c) => c.transcribed).map((clip) =>
@@ -911,24 +911,24 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                               return (
                                 <div
                                   key={pk}
-                                  className="flex items-center rounded-lg overflow-hidden border border-zinc-700 hover:border-zinc-600 transition-colors"
+                                  className="flex items-center rounded-lg overflow-hidden border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors"
                                 >
                                   <button
                                     onClick={() => handlePreview(clip, sp, pk)}
                                     title={isPlaying ? 'Pause' : 'Preview'}
                                     className={`text-xs px-2.5 py-1.5 transition-colors ${
                                       isPlaying
-                                        ? 'bg-purple-600 text-white'
-                                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white'
+                                        ? 'bg-signature text-on-signature'
+                                        : 'bg-surface-sunk text-muted hover:text-strong hover:bg-[var(--ink-200)]'
                                     }`}
                                   >
                                     {isPlaying ? '⏸' : '▶'}
                                   </button>
                                   <button
                                     onClick={() => handleAddSegmentClip(seg.id, clip, sp.start, sp.end)}
-                                    className="text-xs bg-zinc-800 hover:bg-purple-700 text-zinc-300 hover:text-white px-3 py-1.5 transition-colors whitespace-nowrap border-l border-zinc-700"
+                                    className="text-xs bg-surface-sunk hover:bg-signature text-body hover:text-on-signature px-3 py-1.5 transition-colors whitespace-nowrap border-l border-[var(--border-subtle)]"
                                   >
-                                    <span className="text-zinc-500 mr-1">{clip.name.split('.')[0]}</span>
+                                    <span className="text-muted mr-1">{clip.name.split('.')[0]}</span>
                                     {fmtTime(sp.start)}–{fmtTime(sp.end)}
                                   </button>
                                 </div>
@@ -945,11 +945,11 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
           </div>
 
           {/* Bring to Editor */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
+          <div className="bg-surface-card border border-[var(--border-subtle)] rounded-[var(--radius-md)] p-4 space-y-3">
             <button
               onClick={handleBringToEditor}
               disabled={bringing || validSegmentCount === 0}
-              className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+              className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 text-sm font-medium px-4 py-2.5"
             >
               {bringing ? (
                 <>
@@ -968,7 +968,7 @@ export default function ScriptEditorPage({ params }: { params: { id: string } })
                 </>
               )}
             </button>
-            <p className="text-xs text-zinc-600 text-center">
+            <p className="text-xs text-faint text-center">
               Add captions, reorder segments, trim, and adjust volume
             </p>
           </div>

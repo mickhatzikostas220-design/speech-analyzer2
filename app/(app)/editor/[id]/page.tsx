@@ -62,7 +62,7 @@ function UploadZone({ onFile }: { onFile: (f: File) => void }) {
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
       className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-        dragging ? 'border-purple-500 bg-purple-950/30' : 'border-zinc-700 hover:border-zinc-500'
+        dragging ? 'border-[var(--signature)] bg-[var(--surface-sunk)]' : 'border-[var(--border-default)] hover:border-[var(--border-strong)]'
       }`}
     >
       <input
@@ -72,11 +72,11 @@ function UploadZone({ onFile }: { onFile: (f: File) => void }) {
         className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
       />
-      <svg className="w-8 h-8 mx-auto mb-2 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-8 h-8 mx-auto mb-2 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
       </svg>
-      <p className="text-sm text-zinc-400">Drop a video file or click to browse</p>
-      <p className="text-xs text-zinc-600 mt-1">MP4, MOV, WebM, AVI, MKV</p>
+      <p className="text-sm text-body">Drop a video file or click to browse</p>
+      <p className="text-xs text-faint mt-1">MP4, MOV, WebM, AVI, MKV</p>
     </div>
   );
 }
@@ -97,10 +97,10 @@ function Timeline({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-zinc-500">Timeline — click a segment to toggle</span>
-        <span className="text-xs text-zinc-600">{fmtShort(duration)}</span>
+        <span className="text-xs text-muted">Timeline — click a segment to toggle</span>
+        <span className="text-xs text-faint">{fmtShort(duration)}</span>
       </div>
-      <div className="relative h-10 bg-zinc-800 rounded-lg overflow-hidden">
+      <div className="relative h-10 bg-[var(--ink-200)] rounded-lg overflow-hidden">
         {clips.map((clip) => {
           const left = (clip.start / duration) * 100;
           const width = ((clip.end - clip.start) / duration) * 100;
@@ -110,18 +110,18 @@ function Timeline({
               title={`${fmt(clip.start)} – ${fmt(clip.end)}`}
               onClick={() => onToggle(clip.id)}
               style={{ left: `${left}%`, width: `${width}%` }}
-              className={`absolute top-0 h-full border-r border-zinc-900 transition-colors ${
-                clip.selected ? 'bg-purple-600 hover:bg-purple-500' : 'bg-zinc-700 hover:bg-zinc-600'
+              className={`absolute top-0 h-full border-r border-[var(--border-subtle)] transition-colors ${
+                clip.selected ? 'bg-[var(--signature)] hover:opacity-90' : 'bg-[var(--ink-300)] hover:opacity-80'
               }`}
             />
           );
         })}
         <div
-          className="absolute top-0 h-full w-0.5 bg-white/60 pointer-events-none"
+          className="absolute top-0 h-full w-0.5 bg-[var(--ink-900)] pointer-events-none"
           style={{ left: `${(currentTime / duration) * 100}%` }}
         />
       </div>
-      <div className="flex justify-between text-xs text-zinc-700">
+      <div className="flex justify-between text-xs text-faint">
         <span>0:00</span>
         <span>{fmtShort(duration / 2)}</span>
         <span>{fmtShort(duration)}</span>
@@ -432,11 +432,11 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-10">
-        <div className="h-8 w-48 bg-zinc-800 rounded animate-pulse mb-8" />
+        <div className="h-8 w-48 bg-[var(--surface-sunk)] rounded animate-pulse mb-8" />
         <div className="grid grid-cols-5 gap-6">
-          <div className="col-span-3 aspect-video bg-zinc-900 rounded-xl animate-pulse" />
+          <div className="col-span-3 aspect-video bg-[var(--surface-sunk)] rounded-xl animate-pulse" />
           <div className="col-span-2 space-y-3">
-            {[0, 1, 2].map((i) => <div key={i} className="h-12 bg-zinc-900 rounded-lg animate-pulse" />)}
+            {[0, 1, 2].map((i) => <div key={i} className="h-12 bg-[var(--surface-sunk)] rounded-lg animate-pulse" />)}
           </div>
         </div>
       </div>
@@ -453,23 +453,31 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => router.push('/editor')} className="text-zinc-500 hover:text-white transition-colors">
+        <button onClick={() => router.push('/editor')} className="text-muted hover:text-strong transition-colors">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h1 className="text-lg font-semibold text-white">{project.title}</h1>
-        <span className={`text-xs px-2 py-0.5 rounded-full ${
-          project.status === 'ready' ? 'bg-green-900/40 text-green-400' :
-          project.status === 'error' ? 'bg-red-900/40 text-red-400' :
-          'bg-zinc-800 text-zinc-500'
-        }`}>
+        <h1 className="text-lg font-semibold text-strong">{project.title}</h1>
+        <span
+          className="text-xs px-2 py-0.5 rounded-full"
+          style={
+            project.status === 'ready'
+              ? { backgroundColor: 'var(--success-bg)', color: 'var(--success)' }
+              : project.status === 'error'
+              ? { backgroundColor: 'var(--danger-bg)', color: 'var(--danger)' }
+              : { backgroundColor: 'var(--surface-sunk)', color: 'var(--text-muted)' }
+          }
+        >
           {project.status}
         </span>
       </div>
 
       {error && (
-        <div className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-sm text-red-300">
+        <div
+          className="border rounded-xl px-4 py-3 text-sm"
+          style={{ backgroundColor: 'var(--danger-bg)', borderColor: 'var(--danger)', color: 'var(--danger)' }}
+        >
           {error}
         </div>
       )}
@@ -478,7 +486,7 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
       <div className="grid grid-cols-5 gap-6">
         {/* Video player */}
         <div className="col-span-3 space-y-4">
-          <div className="bg-zinc-900 rounded-xl overflow-hidden aspect-video flex items-center justify-center">
+          <div className="bg-black rounded-xl overflow-hidden aspect-video flex items-center justify-center">
             {videoUrl ? (
               <video
                 ref={videoRef}
@@ -489,7 +497,7 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
                 onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime ?? 0)}
               />
             ) : (
-              <div className="text-center text-zinc-600">
+              <div className="text-center text-white/50">
                 <svg className="w-12 h-12 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
@@ -499,7 +507,7 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
           </div>
 
           {clips.length > 0 && duration > 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <div className="card p-4">
               <Timeline clips={clips} duration={duration} onToggle={toggleClip} currentTime={currentTime} />
             </div>
           )}
@@ -509,25 +517,25 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
         <div className="col-span-2 space-y-4">
           {/* Upload */}
           {!project.video_path ? (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
-              <p className="text-sm font-medium text-white">Upload Video</p>
+            <div className="card p-4 space-y-3">
+              <p className="text-sm font-medium text-strong">Upload Video</p>
               {uploading ? (
                 <div className="flex items-center gap-3 py-4">
-                  <svg className="w-5 h-5 animate-spin text-purple-400" fill="none" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 animate-spin" style={{ color: 'var(--signature)' }} fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
-                  <span className="text-sm text-zinc-400">Uploading…</span>
+                  <span className="text-sm text-body">Uploading…</span>
                 </div>
               ) : (
                 <UploadZone onFile={handleUpload} />
               )}
             </div>
           ) : (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-1">
-              <p className="text-xs text-zinc-500">Source file</p>
-              <p className="text-sm text-white truncate">{project.video_name}</p>
-              {duration > 0 && <p className="text-xs text-zinc-500">Duration: {fmtShort(duration)}</p>}
+            <div className="card p-4 space-y-1">
+              <p className="text-xs text-muted">Source file</p>
+              <p className="text-sm text-strong truncate">{project.video_name}</p>
+              {duration > 0 && <p className="text-xs text-muted">Duration: {fmtShort(duration)}</p>}
               <button
                 onClick={() => {
                   videoInFFmpeg.current = false;
@@ -535,7 +543,10 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
                   setClips([]);
                   setVideoUrl(null);
                 }}
-                className="text-xs text-zinc-600 hover:text-red-400 transition-colors mt-1"
+                className="text-xs text-muted transition-colors mt-1"
+                style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--danger)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
               >
                 Replace video
               </button>
@@ -544,21 +555,21 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
 
           {/* Process */}
           {project.video_path && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
+            <div className="card p-4 space-y-3">
               <div>
-                <p className="text-sm font-medium text-white">Detect Silences</p>
-                <p className="text-xs text-zinc-500 mt-0.5">
+                <p className="text-sm font-medium text-strong">Detect Silences</p>
+                <p className="text-xs text-muted mt-0.5">
                   Finds speech segments by removing silent gaps.
                   {!ffmpegRef.current && ' First run downloads ~10 MB.'}
                 </p>
               </div>
               {processingMsg && !exporting && (
-                <p className="text-xs text-amber-400">{processingMsg}</p>
+                <p className="text-xs" style={{ color: 'var(--score-mid)' }}>{processingMsg}</p>
               )}
               <button
                 onClick={detectSilences}
                 disabled={processing || exporting}
-                className="w-full flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+                className="btn-outline w-full flex items-center justify-center gap-2 disabled:opacity-50 text-sm font-medium px-4 py-2.5 transition-colors"
               >
                 {processing ? (
                   <>
@@ -582,37 +593,37 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
 
           {/* Export */}
           {clips.length > 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
+            <div className="card p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-white">
+                <p className="text-sm font-medium text-strong">
                   {selectedCount}/{clips.length} clips selected
                 </p>
                 <div className="flex gap-2">
-                  <button onClick={() => selectAll(true)} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">All</button>
-                  <span className="text-zinc-700">·</span>
-                  <button onClick={() => selectAll(false)} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">None</button>
+                  <button onClick={() => selectAll(true)} className="text-xs text-muted hover:text-strong transition-colors">All</button>
+                  <span className="text-faint">·</span>
+                  <button onClick={() => selectAll(false)} className="text-xs text-muted hover:text-strong transition-colors">None</button>
                 </div>
               </div>
               {selectedCount > 0 && (
-                <p className="text-xs text-zinc-500">Output: ~{fmtShort(selectedDuration)}</p>
+                <p className="text-xs text-muted">Output: ~{fmtShort(selectedDuration)}</p>
               )}
 
               {exporting && (
                 <div className="space-y-1">
-                  <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-[var(--ink-200)] rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-purple-600 transition-all duration-300"
+                      className="h-full bg-[var(--signature)] transition-all duration-300"
                       style={{ width: `${exportProgress}%` }}
                     />
                   </div>
-                  <p className="text-xs text-zinc-500 text-center">{processingMsg || `${exportProgress}%`}</p>
+                  <p className="text-xs text-muted text-center">{processingMsg || `${exportProgress}%`}</p>
                 </div>
               )}
 
               <button
                 onClick={exportVideo}
                 disabled={exporting || processing || selectedCount === 0}
-                className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 text-sm font-medium px-4 py-2.5 transition-colors"
               >
                 {exporting ? (
                   <>
@@ -638,17 +649,18 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
 
       {/* Clip list */}
       {clips.length > 0 && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-zinc-800">
-            <p className="text-sm font-medium text-white">Speech Segments</p>
+        <div className="card overflow-hidden p-0">
+          <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+            <p className="text-sm font-medium text-strong">Speech Segments</p>
           </div>
-          <div className="divide-y divide-zinc-800">
+          <div className="divide-y divide-[var(--border-subtle)]">
             {clips.map((clip, i) => (
               <div
                 key={clip.id}
-                className={`flex items-center gap-4 px-4 py-3 ${clip.selected ? 'bg-zinc-900' : 'bg-zinc-950/50'}`}
+                className="flex items-center gap-4 px-4 py-3"
+                style={{ backgroundColor: clip.selected ? 'var(--surface-card)' : 'var(--surface-sunk)' }}
               >
-                <span className="text-xs text-zinc-600 w-5 text-right">{i + 1}</span>
+                <span className="text-xs text-faint w-5 text-right">{i + 1}</span>
 
                 <button
                   onClick={() => {
@@ -657,7 +669,10 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
                       videoRef.current.play();
                     }
                   }}
-                  className="text-zinc-500 hover:text-purple-400 transition-colors"
+                  className="text-muted transition-colors"
+                  style={{ color: 'var(--text-muted)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--signature)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
                   title="Preview"
                 >
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -667,16 +682,19 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3">
-                    <span className="text-sm text-white tabular-nums">
+                    <span className="text-sm text-strong tabular-nums">
                       {fmt(clip.start)} – {fmt(clip.end)}
                     </span>
-                    <span className="text-xs text-zinc-500">{(clip.end - clip.start).toFixed(1)}s</span>
+                    <span className="text-xs text-muted">{(clip.end - clip.start).toFixed(1)}s</span>
                   </div>
                   {duration > 0 && (
-                    <div className="mt-1 h-1 bg-zinc-800 rounded-full overflow-hidden max-w-xs">
+                    <div className="mt-1 h-1 bg-[var(--ink-200)] rounded-full overflow-hidden max-w-xs">
                       <div
-                        className={`h-full rounded-full ${clip.selected ? 'bg-purple-600' : 'bg-zinc-600'}`}
-                        style={{ width: `${((clip.end - clip.start) / duration) * 100}%` }}
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${((clip.end - clip.start) / duration) * 100}%`,
+                          backgroundColor: clip.selected ? 'var(--signature)' : 'var(--ink-300)',
+                        }}
                       />
                     </div>
                   )}
@@ -684,11 +702,12 @@ export default function EditorProjectPage({ params }: { params: { id: string } }
 
                 <button
                   onClick={() => toggleClip(clip.id)}
-                  className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                  style={
                     clip.selected
-                      ? 'bg-purple-900/50 text-purple-300 hover:bg-purple-900/80'
-                      : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700'
-                  }`}
+                      ? { backgroundColor: 'var(--signature)', color: 'var(--on-signature)' }
+                      : { backgroundColor: 'var(--surface-sunk)', color: 'var(--text-muted)' }
+                  }
                 >
                   {clip.selected ? (
                     <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>Include</>

@@ -483,14 +483,14 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
   // ── Render ───────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex flex-col bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden" style={{ minHeight: '82vh' }}>
-        <div className="h-11 border-b border-zinc-800 bg-zinc-900 animate-pulse flex-shrink-0" />
+      <div className="flex flex-col bg-surface-card border border-[var(--border-subtle)] rounded-xl overflow-hidden" style={{ minHeight: '82vh' }}>
+        <div className="h-11 border-b border-[var(--border-subtle)] bg-[var(--surface-sunk)] animate-pulse flex-shrink-0" />
         <div className="flex flex-1 min-h-0">
           <div className="flex-1 flex flex-col">
             <div className="aspect-video bg-black animate-pulse" />
-            <div className="h-28 border-t border-zinc-800 bg-zinc-900 animate-pulse" />
+            <div className="h-28 border-t border-[var(--border-subtle)] bg-[var(--surface-sunk)] animate-pulse" />
           </div>
-          <div className="w-72 border-l border-zinc-800 bg-zinc-900 animate-pulse" />
+          <div className="w-72 border-l border-[var(--border-subtle)] bg-[var(--surface-sunk)] animate-pulse" />
         </div>
       </div>
     );
@@ -505,39 +505,39 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
   const selLast = sel ? sel.clips[sel.clips.length - 1] : undefined;
 
   return (
-    <div className="flex flex-col bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden" style={{ minHeight: '82vh' }}>
+    <div className="flex flex-col bg-surface-card border border-[var(--border-subtle)] rounded-xl overflow-hidden" style={{ minHeight: '82vh' }}>
 
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-4 h-11 border-b border-zinc-800 flex-shrink-0">
+      <div className="flex items-center gap-3 px-4 h-11 border-b border-[var(--border-subtle)] flex-shrink-0">
         <button
           onClick={() => router.push('/editor')}
-          className="text-zinc-500 hover:text-white transition-colors"
+          className="text-muted hover:text-strong transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
 
-        <h1 className="text-sm font-medium text-white truncate">{project.title}</h1>
-        <span className="text-xs text-zinc-600 flex-shrink-0 tabular-nums">
+        <h1 className="text-sm font-medium text-strong truncate">{project.title}</h1>
+        <span className="text-xs text-faint flex-shrink-0 tabular-nums">
           {segments.length} seg{segments.length !== 1 ? 's' : ''} · {fmtTime(totalSeconds)}
         </span>
 
         {error && (
-          <span className="text-xs text-red-400 truncate flex-1">{error}</span>
+          <span className="text-xs text-[var(--danger)] truncate flex-1">{error}</span>
         )}
 
         <div className="ml-auto flex items-center gap-2 flex-shrink-0">
           <button
             onClick={handleAutoTrimAll}
-            className="text-xs text-zinc-400 hover:text-white px-2.5 py-1.5 rounded hover:bg-zinc-800 transition-colors"
+            className="text-xs text-muted hover:text-strong px-2.5 py-1.5 rounded hover:bg-[var(--surface-sunk)] transition-colors"
           >
             Auto-trim all
           </button>
           <button
             onClick={handleExport}
             disabled={exporting || segments.length === 0}
-            className="flex items-center gap-1.5 text-xs bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-md transition-colors font-medium"
+            className="flex items-center gap-1.5 text-xs bg-signature hover:opacity-90 disabled:opacity-50 text-on-signature px-3 py-1.5 rounded-md transition-colors font-medium"
           >
             {exporting ? (
               <>
@@ -584,16 +584,16 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
           </div>
 
           {/* Timeline strip */}
-          <div className="border-t border-zinc-800 flex-shrink-0 flex flex-col" style={{ minHeight: '7rem' }}>
-            <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800/60">
-              <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">Timeline</span>
-              <span className="text-[10px] text-zinc-700 tabular-nums">{fmtTime(totalSeconds)}</span>
+          <div className="border-t border-[var(--border-subtle)] bg-[var(--surface-sunk)] flex-shrink-0 flex flex-col" style={{ minHeight: '7rem' }}>
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--border-subtle)]">
+              <span className="text-[10px] font-semibold text-muted uppercase tracking-widest">Timeline</span>
+              <span className="text-[10px] text-faint tabular-nums">{fmtTime(totalSeconds)}</span>
             </div>
 
             <div className="flex items-stretch gap-1 px-2 py-2 overflow-x-auto flex-1">
               {segments.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center">
-                  <p className="text-xs text-zinc-700">No segments — bring a project from the Script Editor</p>
+                  <p className="text-xs text-muted">No segments — bring a project from the Script Editor</p>
                 </div>
               ) : (
                 segments.map((seg, i) => {
@@ -606,21 +606,21 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       style={{ flexGrow: Math.max(dur, 0.5), flexBasis: 0, minWidth: 72 }}
                       className={`relative flex flex-col justify-between text-left rounded-md px-2 py-1.5 overflow-hidden transition-all border ${
                         isSelected
-                          ? 'bg-purple-600/20 border-purple-500 ring-1 ring-inset ring-purple-500/60'
-                          : 'bg-zinc-800/70 border-zinc-700/60 hover:border-zinc-500'
+                          ? 'bg-surface-card border-[var(--signature)] ring-1 ring-inset ring-[var(--signature)]'
+                          : 'bg-surface-card border-[var(--border-default)] hover:border-[var(--border-strong)]'
                       }`}
                     >
                       {/* Colour bar at top */}
-                      <div className={`absolute top-0 inset-x-0 h-0.5 ${isSelected ? 'bg-purple-400' : 'bg-zinc-600'}`} />
-                      <span className={`text-[11px] leading-tight line-clamp-2 mt-0.5 ${isSelected ? 'text-purple-100' : 'text-zinc-300'}`}>
+                      <div className={`absolute top-0 inset-x-0 h-0.5 ${isSelected ? 'bg-signature' : 'bg-[var(--ink-300)]'}`} />
+                      <span className={`text-[11px] leading-tight line-clamp-2 mt-0.5 ${isSelected ? 'text-strong' : 'text-body'}`}>
                         {seg.scriptLine}
                       </span>
                       <div className="flex items-center justify-between mt-1">
-                        <span className={`text-[10px] tabular-nums ${isSelected ? 'text-purple-400' : 'text-zinc-600'}`}>
+                        <span className={`text-[10px] tabular-nums ${isSelected ? 'text-[var(--signature)]' : 'text-muted'}`}>
                           {fmtTime(dur)}
                         </span>
                         {seg.clips[0] && (
-                          <span className={`text-[9px] truncate max-w-[55%] ${isSelected ? 'text-purple-400/70' : 'text-zinc-700'}`}>
+                          <span className={`text-[9px] truncate max-w-[55%] ${isSelected ? 'text-[var(--signature)]/70' : 'text-faint'}`}>
                             {seg.clips[0].clipName.split('.')[0]}
                           </span>
                         )}
@@ -634,23 +634,23 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
         </div>
 
         {/* Right: Inspector / Captions */}
-        <div className="w-72 border-l border-zinc-800 flex flex-col flex-shrink-0">
+        <div className="w-72 border-l border-[var(--border-subtle)] flex flex-col flex-shrink-0">
 
           {/* Tabs */}
-          <div className="flex border-b border-zinc-800 flex-shrink-0">
+          <div className="flex border-b border-[var(--border-subtle)] flex-shrink-0">
             {(['segment', 'captions'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setRightTab(tab)}
                 className={`flex-1 text-xs py-2.5 font-medium capitalize transition-colors ${
                   rightTab === tab
-                    ? 'text-white border-b-2 border-purple-500'
-                    : 'text-zinc-500 hover:text-zinc-300'
+                    ? 'text-strong border-b-2 border-[var(--signature)]'
+                    : 'text-muted hover:text-body'
                 }`}
               >
                 {tab}
                 {tab === 'captions' && captions.length > 0 && (
-                  <span className="ml-1 text-[10px] text-zinc-600">({captions.length})</span>
+                  <span className="ml-1 text-[10px] text-faint">({captions.length})</span>
                 )}
               </button>
             ))}
@@ -662,21 +662,21 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
             {/* ── Segment inspector ─────────────────────────── */}
             {rightTab === 'segment' && (
               sel && selectedIdx !== null ? (
-                <div className="divide-y divide-zinc-800/60">
+                <div className="divide-y divide-[var(--border-subtle)]">
 
                   {/* Script line */}
                   <div className="px-4 py-3">
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Script line</p>
-                    <p className="text-sm text-white leading-snug">{sel.scriptLine}</p>
+                    <p className="text-[10px] text-muted uppercase tracking-wider mb-1.5">Script line</p>
+                    <p className="text-sm text-strong leading-snug">{sel.scriptLine}</p>
                   </div>
 
                   {/* Source clips */}
                   {sel.clips.length > 0 && (
                     <div className="px-4 py-3">
-                      <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Source</p>
+                      <p className="text-[10px] text-muted uppercase tracking-wider mb-1.5">Source</p>
                       <div className="flex flex-wrap gap-1">
                         {sel.clips.map((clip, ci) => (
-                          <span key={ci} className="text-[10px] bg-zinc-800 border border-zinc-700 text-zinc-400 px-2 py-0.5 rounded">
+                          <span key={ci} className="text-[10px] bg-[var(--surface-sunk)] border border-[var(--border-subtle)] text-muted px-2 py-0.5 rounded">
                             {clip.clipName.split('.')[0]}
                           </span>
                         ))}
@@ -687,10 +687,10 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                   {/* Trim */}
                   <div className="px-4 py-3 space-y-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Trim</p>
+                      <p className="text-[10px] text-muted uppercase tracking-wider">Trim</p>
                       <button
                         onClick={() => handleAutoTrimSegment(selectedIdx)}
-                        className="text-[10px] text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-2 py-0.5 rounded transition-colors"
+                        className="text-[10px] text-muted hover:text-strong bg-[var(--surface-sunk)] hover:bg-[var(--surface-sunk)] border border-[var(--border-subtle)] px-2 py-0.5 rounded transition-colors"
                       >
                         Auto-trim
                       </button>
@@ -699,52 +699,52 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                     {/* Trim start */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-zinc-500">Cut in</span>
+                        <span className="text-xs text-muted">Cut in</span>
                         <div className="flex items-center gap-1">
                           <input
                             type="number" min={0} step={0.05} value={sel.trimStart}
                             onChange={e => patchSegment(selectedIdx, { trimStart: Math.max(0, parseFloat(e.target.value) || 0) })}
                             onBlur={() => persist(segments, captions)}
-                            className="w-16 text-right bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:border-purple-500"
+                            className="w-16 text-right bg-surface-card border border-[var(--border-strong)] rounded px-1.5 py-0.5 text-xs text-strong focus:outline-none focus:border-[var(--signature)]"
                           />
-                          <span className="text-[10px] text-zinc-600">s</span>
+                          <span className="text-[10px] text-faint">s</span>
                         </div>
                       </div>
                       {selPreview?.start ? (
-                        <div className="relative rounded overflow-hidden border border-zinc-700 aspect-video bg-zinc-900">
+                        <div className="relative rounded overflow-hidden border border-[var(--border-subtle)] aspect-video bg-[var(--surface-sunk)]">
                           <img src={selPreview.start} alt="" className="w-full h-full object-cover" />
-                          <div className="absolute bottom-0 inset-x-0 bg-black/70 text-[10px] text-zinc-300 px-1.5 py-0.5">
+                          <div className="absolute bottom-0 inset-x-0 bg-black/70 text-[10px] text-white px-1.5 py-0.5">
                             {fmtTime(selFirst ? selFirst.start + sel.trimStart : 0)}
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded bg-zinc-800 border border-zinc-700 aspect-video animate-pulse" />
+                        <div className="rounded bg-[var(--surface-sunk)] border border-[var(--border-subtle)] aspect-video animate-pulse" />
                       )}
                     </div>
 
                     {/* Trim end */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-zinc-500">Cut out</span>
+                        <span className="text-xs text-muted">Cut out</span>
                         <div className="flex items-center gap-1">
                           <input
                             type="number" min={0} step={0.05} value={sel.trimEnd}
                             onChange={e => patchSegment(selectedIdx, { trimEnd: Math.max(0, parseFloat(e.target.value) || 0) })}
                             onBlur={() => persist(segments, captions)}
-                            className="w-16 text-right bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:border-purple-500"
+                            className="w-16 text-right bg-surface-card border border-[var(--border-strong)] rounded px-1.5 py-0.5 text-xs text-strong focus:outline-none focus:border-[var(--signature)]"
                           />
-                          <span className="text-[10px] text-zinc-600">s</span>
+                          <span className="text-[10px] text-faint">s</span>
                         </div>
                       </div>
                       {selPreview?.end ? (
-                        <div className="relative rounded overflow-hidden border border-zinc-700 aspect-video bg-zinc-900">
+                        <div className="relative rounded overflow-hidden border border-[var(--border-subtle)] aspect-video bg-[var(--surface-sunk)]">
                           <img src={selPreview.end} alt="" className="w-full h-full object-cover" />
-                          <div className="absolute bottom-0 inset-x-0 bg-black/70 text-[10px] text-zinc-300 px-1.5 py-0.5">
+                          <div className="absolute bottom-0 inset-x-0 bg-black/70 text-[10px] text-white px-1.5 py-0.5">
                             {fmtTime(selLast ? selLast.end - sel.trimEnd : 0)}
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded bg-zinc-800 border border-zinc-700 aspect-video animate-pulse" />
+                        <div className="rounded bg-[var(--surface-sunk)] border border-[var(--border-subtle)] aspect-video animate-pulse" />
                       )}
                     </div>
                   </div>
@@ -752,27 +752,27 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                   {/* Volume */}
                   <div className="px-4 py-3">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Volume</p>
-                      <span className="text-xs text-zinc-400 tabular-nums">{Math.round(sel.volume * 100)}%</span>
+                      <p className="text-[10px] uppercase tracking-wider text-muted">Volume</p>
+                      <span className="text-xs tabular-nums text-muted">{Math.round(sel.volume * 100)}%</span>
                     </div>
                     <input
                       type="range" min={0} max={2} step={0.05} value={sel.volume}
                       onChange={e => patchSegment(selectedIdx, { volume: parseFloat(e.target.value) })}
                       onMouseUp={() => persist(segments, captions)}
                       onTouchEnd={() => persist(segments, captions)}
-                      className="w-full accent-purple-500"
+                      className="w-full accent-[color:var(--signature)]"
                     />
                   </div>
 
                   {/* Title overlay */}
                   <div className="px-4 py-3">
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Title overlay</p>
+                    <p className="mb-1.5 text-[10px] uppercase tracking-wider text-muted">Title overlay</p>
                     <input
                       type="text" placeholder="Optional…"
                       value={sel.title}
                       onChange={e => patchSegment(selectedIdx, { title: e.target.value })}
                       onBlur={() => persist(segments, captions)}
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500"
+                      className="w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-surface-card px-2.5 py-1.5 text-xs text-strong outline-none placeholder:text-faint focus:border-[var(--signature)]"
                     />
                   </div>
 
@@ -782,7 +782,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       onClick={() => moveSegment(selectedIdx, -1)}
                       disabled={selectedIdx === 0}
                       title="Move earlier"
-                      className="flex-1 text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 py-1.5 rounded transition-colors"
+                      className="flex-1 rounded-[var(--radius-sm)] bg-[var(--surface-sunk)] py-1.5 text-xs text-body transition-colors hover:bg-[var(--ink-200)] disabled:opacity-30"
                     >
                       ↑ Earlier
                     </button>
@@ -790,14 +790,14 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       onClick={() => moveSegment(selectedIdx, 1)}
                       disabled={selectedIdx === segments.length - 1}
                       title="Move later"
-                      className="flex-1 text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 py-1.5 rounded transition-colors"
+                      className="flex-1 rounded-[var(--radius-sm)] bg-[var(--surface-sunk)] py-1.5 text-xs text-body transition-colors hover:bg-[var(--ink-200)] disabled:opacity-30"
                     >
                       ↓ Later
                     </button>
                     <button
                       onClick={() => removeSegment(selectedIdx)}
                       title="Remove segment"
-                      className="px-2.5 py-1.5 text-zinc-600 hover:text-red-400 bg-zinc-800 hover:bg-zinc-700 rounded transition-colors"
+                      className="rounded-[var(--radius-sm)] bg-[var(--surface-sunk)] px-2.5 py-1.5 text-muted transition-colors hover:bg-[var(--ink-200)] hover:text-[color:var(--danger)]"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -807,12 +807,12 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full py-16 gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)]">
+                    <svg className="h-5 w-5 text-[var(--ink-300)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <p className="text-xs text-zinc-600 text-center leading-relaxed">
+                  <p className="text-center text-xs leading-relaxed text-faint">
                     Click a segment<br />in the timeline to edit it
                   </p>
                 </div>
@@ -822,14 +822,14 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
             {/* ── Captions panel ────────────────────────────── */}
             {rightTab === 'captions' && (
               <div className="flex flex-col h-full">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/60 flex-shrink-0">
-                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
+                <div className="flex flex-shrink-0 items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
+                  <span className="text-[10px] uppercase tracking-wider text-muted">
                     {captions.length > 0 ? `${captions.length} captions` : 'No captions'}
                   </span>
                   <button
                     onClick={handleGenerateCaptions}
                     disabled={generatingCaps}
-                    className="flex items-center gap-1 text-[10px] bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 px-2 py-1 rounded transition-colors"
+                    className="flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--surface-sunk)] px-2 py-1 text-[10px] text-body transition-colors hover:bg-[var(--ink-200)] disabled:opacity-50"
                   >
                     {generatingCaps && (
                       <svg className="w-2.5 h-2.5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -843,16 +843,16 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
 
                 {captions.length === 0 ? (
                   <div className="flex flex-col items-center justify-center flex-1 gap-2">
-                    <svg className="w-8 h-8 text-zinc-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-8 w-8 text-[var(--ink-300)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                     </svg>
-                    <p className="text-xs text-zinc-600 text-center">Generate captions from<br />transcription data</p>
+                    <p className="text-center text-xs text-faint">Generate captions from<br />transcription data</p>
                   </div>
                 ) : (
                   <div className="overflow-y-auto flex-1 p-3 space-y-1.5">
                     {captions.map(cap => (
                       <div key={cap.id} className="flex items-start gap-2">
-                        <span className="text-[10px] text-zinc-600 flex-shrink-0 mt-1.5 w-12 leading-tight tabular-nums">
+                        <span className="mt-1.5 w-12 flex-shrink-0 text-[10px] leading-tight tabular-nums text-faint">
                           {fmtTime(cap.start)}<br />{fmtTime(cap.end)}
                         </span>
                         <textarea
@@ -860,11 +860,11 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                           onChange={e => patchCaption(cap.id, e.target.value)}
                           onBlur={saveCaption}
                           rows={2}
-                          className="flex-1 text-xs bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-white resize-none focus:outline-none focus:border-purple-500"
+                          className="flex-1 resize-none rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-surface-card px-2 py-1 text-xs text-strong outline-none focus:border-[var(--signature)]"
                         />
                         <button
                           onClick={() => removeCaption(cap.id)}
-                          className="text-zinc-700 hover:text-red-400 transition-colors flex-shrink-0 mt-1.5"
+                          className="mt-1.5 flex-shrink-0 text-faint transition-colors hover:text-[color:var(--danger)]"
                         >
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
