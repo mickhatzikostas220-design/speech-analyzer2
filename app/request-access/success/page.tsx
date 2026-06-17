@@ -11,7 +11,7 @@ export default function RequestAccessSuccessPage() {
         </div>
         <h1 className="text-xl font-semibold text-white">Request submitted</h1>
         <p className="text-zinc-400 text-sm leading-relaxed max-w-sm mx-auto">
-          We'll review your request and send you an email with next steps. This usually takes 1–2 business days.
+          We&apos;ll review your request and send you an email with next steps. This usually takes 1–2 business days.
         </p>
         <Link
           href="/"
