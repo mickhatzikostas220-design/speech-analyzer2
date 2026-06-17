@@ -43,9 +43,9 @@ export function Navbar({ brand }: { brand: BrandKit }) {
           <nav className="hidden items-center gap-5 sm:flex">
             {link('/dashboard', 'Hub')}
             {link('/agent', 'Assistant')}
-            {link('/history', 'History')}
-            {link('/compare', 'Compare')}
-            {link('/editor', 'Editor')}
+            {link('/bookings', 'Bookings')}
+            {link('/history', 'Library')}
+            {link('/editor', 'Studio')}
           </nav>
         </div>
 

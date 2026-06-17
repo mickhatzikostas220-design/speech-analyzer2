@@ -7,6 +7,7 @@ import {
   Library,
   Sparkles,
   Bot,
+  Inbox,
   ArrowUpRight,
   type LucideIcon,
 } from 'lucide-react';
@@ -22,7 +23,7 @@ interface Tool {
 }
 
 /** Only tools that map to real, working features today. */
-export function ToolGrid({ analysisCount }: { analysisCount: number }) {
+export function ToolGrid({ analysisCount, bookingCount = 0 }: { analysisCount: number; bookingCount?: number }) {
   const tools: Tool[] = [
     {
       icon: Mic,
@@ -40,6 +41,15 @@ export function ToolGrid({ analysisCount }: { analysisCount: number }) {
       href: '/agent',
       bg: 'var(--accent-2)',
       fg: '#fff',
+    },
+    {
+      icon: Inbox,
+      name: 'Booking Inbox',
+      desc: 'Track speaking requests from first hello to a confirmed gig on your calendar.',
+      href: '/bookings',
+      bg: 'var(--success)',
+      fg: '#fff',
+      count: bookingCount > 0 ? `${bookingCount} new` : undefined,
     },
     {
       icon: PenLine,

@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { getUserBrandState } from '@/lib/brand/server';
 import { createClient } from '@/lib/supabase/server';
 import { getUpcomingGigs } from '@/lib/gigs/server';
+import { getBookings } from '@/lib/bookings/server';
 import { ToolGrid } from '@/components/hub/ToolGrid';
 import { RecentActivity } from '@/components/hub/RecentActivity';
 import { StatTiles, type Stat } from '@/components/hub/StatTiles';
@@ -49,6 +50,9 @@ export default async function HubPage() {
   const { gigs, calendarUrl } = userId
     ? await getUpcomingGigs(supabase, userId)
     : { gigs: [], calendarUrl: null };
+  const { newCount: newInquiries } = userId
+    ? await getBookings(supabase, userId)
+    : { newCount: 0 };
 
   const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
   const best = scores.length ? Math.max(...scores) : null;
@@ -86,7 +90,7 @@ export default async function HubPage() {
 
       {/* tools */}
       <h2 className="eyebrow mb-4 mt-9">Your tools</h2>
-      <ToolGrid analysisCount={totalTalks} />
+      <ToolGrid analysisCount={totalTalks} bookingCount={newInquiries} />
 
       {/* two columns */}
       <div className="mt-9 grid gap-6 lg:grid-cols-[1fr_360px]">
