@@ -35,7 +35,7 @@ function buildSystemPrompt(analysis: Record<string, unknown>, feedbackPoints: Re
     `${i + 1}. ${formatMs(p.start_ms)}–${formatMs(p.end_ms)} (score: ${p.score}/100)`
   ).join('\n');
 
-  return `You are ACA's speech analysis assistant. You have complete neural data for this speech, powered by Facebook's Tribe v2 fMRI brain encoding model. Help the speaker understand their results — be conversational, specific, and actionable.
+  return `You are Orator's speech analysis assistant. You have complete neural data for this speech, powered by Facebook's Tribe v2 fMRI brain encoding model. Help the speaker understand their results — be conversational, specific, and actionable.
 
 ## Speech: "${analysis.title}"
 Duration: ${analysis.duration_seconds}s
