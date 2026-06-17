@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
@@ -46,6 +44,8 @@ ${rows}
 Remember: for DMN, lower scores are better (less mind-wandering). For all others, higher is better.
 
 Write the report now.`;
+
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',

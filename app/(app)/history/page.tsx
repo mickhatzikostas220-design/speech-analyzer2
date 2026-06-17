@@ -91,7 +91,7 @@ export default function HistoryPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-zinc-500 text-sm">No results for "{query}"</p>
+          <p className="text-zinc-500 text-sm">No results for &ldquo;{query}&rdquo;</p>
         </div>
       ) : (
         <>

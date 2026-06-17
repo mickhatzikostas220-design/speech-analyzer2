@@ -11,7 +11,7 @@ export default function SignupPage() {
         </div>
         <h1 className="text-lg font-semibold text-white">Invite only</h1>
         <p className="text-zinc-400 text-sm leading-relaxed">
-          Access to Orator is by invitation. If you've been approved, check your email for a sign-up link.
+          Access to Orator is by invitation. If you&apos;ve been approved, check your email for a sign-up link.
         </p>
         <Link
           href="/request-access"
