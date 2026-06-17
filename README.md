@@ -39,6 +39,8 @@ supabase/schema.sql
 supabase/access_requests.sql
 supabase/brand.sql          # per-speaker branding (colors, logo, fonts, voice)
 supabase/gigs.sql           # speaking gigs + connected calendar feed
+supabase/bookings.sql       # booking inbox (incoming speaking inquiries)
+supabase/onesheet.sql       # public speaker one-sheet (URL slug)
 ```
 
 **Create the storage bucket** — in the same SQL Editor, run:
@@ -228,6 +230,21 @@ outside apps (starting with Gmail).
   recorded in the `agent_actions` audit log.
 - **Extensible.** Tools live in `lib/agent/tools/` and are assembled per request in
   `lib/agent/tools/registry.ts`.
+
+## Booking Inbox & public one-sheet
+
+Two speaker-business tools that work together:
+
+- **Booking Inbox** (`/bookings`) — a lightweight CRM pipeline for incoming
+  speaking inquiries (new → in discussion → confirmed → completed/declined). Add
+  inquiries by hand, track contact/fee/date, and push a confirmed booking onto the
+  gigs calendar with one click. Data: `supabase/bookings.sql`; API: `app/api/bookings/*`.
+- **Public one-sheet** (`/s/<slug>`) — a shareable, fully brand-themed speaker page
+  (headline, bio, signature talks, testimonials) with a “book me” form. Submissions
+  land straight in the speaker's Booking Inbox (`source = one_sheet`). Edit it under
+  **Settings → Public one-sheet**. Content lives in `profiles.brand.oneSheet`; the
+  URL slug is `profiles.slug` (`supabase/onesheet.sql`). Public capture endpoint:
+  `app/api/public/inquiry`.
 
 ## Analysis export
 

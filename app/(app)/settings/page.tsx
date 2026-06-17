@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { ArrowUpRight } from 'lucide-react';
 import { getUserBrandState } from '@/lib/brand/server';
 import { BrandSettings } from '@/components/brand/BrandSettings';
 
@@ -15,6 +17,20 @@ export default async function SettingsPage() {
       <p className="mb-8 text-muted">
         Make the hub feel like you. Changes apply across your whole hub.
       </p>
+
+      <Link
+        href="/settings/one-sheet"
+        className="card mb-8 flex items-center justify-between gap-4 p-4 transition hover:border-strong"
+      >
+        <div>
+          <p className="font-bold text-strong">Public one-sheet →</p>
+          <p className="text-sm text-muted">
+            Your shareable speaker page (bio, talks, testimonials) with a “book me” form.
+          </p>
+        </div>
+        <ArrowUpRight className="h-5 w-5 shrink-0 text-muted" />
+      </Link>
+
       <BrandSettings initialBrand={state.brand} />
     </div>
   );

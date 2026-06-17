@@ -14,6 +14,7 @@ export function mergeBrand(input: unknown): BrandKit {
   return {
     name: b.name || base.name,
     tagline: b.tagline ?? base.tagline,
+    oneSheet: b.oneSheet,
     colors: {
       signature: clean(b.colors?.signature) ?? base.colors.signature,
       accent: clean(b.colors?.accent) ?? base.colors.accent,

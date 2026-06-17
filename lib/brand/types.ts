@@ -60,10 +60,32 @@ export interface BrandHero {
   imageUrl?: string;
 }
 
+export interface OneSheetTopic {
+  title: string;
+  description?: string;
+}
+
+export interface OneSheetTestimonial {
+  quote: string;
+  author?: string;
+  role?: string;
+}
+
+/** Public one-sheet / media-kit content, rendered on /s/[slug]. */
+export interface OneSheet {
+  headline?: string;
+  bio?: string;
+  topics?: OneSheetTopic[];
+  testimonials?: OneSheetTestimonial[];
+  contactEmail?: string;
+}
+
 export interface BrandKit {
   /** Speaker / display name — drives the wordmark + greeting. */
   name: string;
   tagline?: string;
+  /** Public one-sheet content (bio, topics, testimonials). */
+  oneSheet?: OneSheet;
   colors: BrandColors;
   fonts: BrandFonts;
   logo: BrandLogo;
