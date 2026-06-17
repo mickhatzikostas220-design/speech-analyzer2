@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Bot } from 'lucide-react';
+import { Bot, Trash2 } from 'lucide-react';
 import type { AgentEvent, SideEffect } from '@/lib/agent/types';
 
 interface ToolCard {
@@ -70,6 +70,17 @@ export default function AgentPage() {
     setActiveId(null);
     setMessages([]);
     setError(null);
+  }
+
+  async function deleteConversation(id: string) {
+    if (!window.confirm('Delete this chat? This can’t be undone.')) return;
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    if (activeId === id) newChat();
+    try {
+      await fetch(`/api/agent/conversations/${id}`, { method: 'DELETE' });
+    } catch {
+      loadConversations();
+    }
   }
 
   // Apply a streamed event to the in-progress assistant message (always last).
@@ -178,17 +189,29 @@ export default function AgentPage() {
         </Link>
         <div className="mt-2 space-y-1 overflow-y-auto">
           {conversations.map((c) => (
-            <button
+            <div
               key={c.id}
-              onClick={() => openConversation(c.id)}
-              className={`w-full truncate rounded-[var(--radius-sm)] px-3 py-2 text-left text-sm transition-colors ${
-                activeId === c.id
-                  ? 'bg-[var(--surface-sunk)] font-semibold text-strong'
-                  : 'text-muted hover:bg-[var(--surface-sunk)]'
+              className={`group flex items-center gap-1 rounded-[var(--radius-sm)] pr-1 transition-colors ${
+                activeId === c.id ? 'bg-[var(--surface-sunk)]' : 'hover:bg-[var(--surface-sunk)]'
               }`}
             >
-              {c.title}
-            </button>
+              <button
+                onClick={() => openConversation(c.id)}
+                className={`min-w-0 flex-1 truncate px-3 py-2 text-left text-sm ${
+                  activeId === c.id ? 'font-semibold text-strong' : 'text-muted'
+                }`}
+              >
+                {c.title}
+              </button>
+              <button
+                onClick={() => deleteConversation(c.id)}
+                aria-label="Delete chat"
+                title="Delete chat"
+                className="shrink-0 rounded p-1 text-faint opacity-0 transition hover:text-[color:var(--danger)] focus:opacity-100 group-hover:opacity-100"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           ))}
         </div>
       </aside>
