@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 
-const ADMIN_EMAIL = 'mickhatzikostas220@gmail.com';
+// Keep this in sync with the /api/admin/* route handlers, which read the same env var.
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'mickhatzikostas220@gmail.com';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -24,9 +26,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <span className="text-sm font-semibold text-white">Orator</span>
             <span className="text-xs text-zinc-600 border border-zinc-800 rounded px-1.5 py-0.5">Admin</span>
           </div>
-          <a href="/dashboard" className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+          <Link href="/dashboard" className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
             ← Back to app
-          </a>
+          </Link>
         </div>
       </div>
       <main>{children}</main>

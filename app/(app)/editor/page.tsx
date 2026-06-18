@@ -134,7 +134,8 @@ export default function EditorPage() {
   }
 
   async function deleteProject(id: string) {
-    await fetch(`/api/editor/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/editor/${id}`, { method: 'DELETE' });
+    if (!res.ok) return;
     setProjects((p) => p.filter((proj) => proj.id !== id));
   }
 
@@ -163,12 +164,14 @@ export default function EditorPage() {
   }
 
   async function deleteScriptProject(id: string) {
-    await fetch(`/api/editor/script/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/editor/script/${id}`, { method: 'DELETE' });
+    if (!res.ok) return;
     setScriptProjects((p) => p.filter((proj) => proj.id !== id));
   }
 
   async function deleteTimelineProject(id: string) {
-    await fetch(`/api/editor/timeline/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/editor/timeline/${id}`, { method: 'DELETE' });
+    if (!res.ok) return;
     setTimelineProjects((p) => p.filter((proj) => proj.id !== id));
   }
 
@@ -235,6 +238,7 @@ export default function EditorPage() {
                 </button>
                 <button
                   onClick={() => deleteProject(p.id)}
+                  aria-label="Delete project"
                   className="ml-4 p-1 text-zinc-700 hover:text-red-400 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -305,6 +309,7 @@ export default function EditorPage() {
                 </button>
                 <button
                   onClick={() => deleteScriptProject(p.id)}
+                  aria-label="Delete script project"
                   className="ml-4 p-1 text-zinc-700 hover:text-red-400 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -357,6 +362,7 @@ export default function EditorPage() {
                 </button>
                 <button
                   onClick={() => deleteTimelineProject(p.id)}
+                  aria-label="Delete timeline project"
                   className="ml-4 p-1 text-zinc-700 hover:text-red-400 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

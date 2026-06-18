@@ -67,12 +67,22 @@ export default function AnalysisPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const fetchDetail = useCallback(async () => {
-    const res = await fetch(`/api/analyses/${id}`);
-    if (!res.ok) { setError('Analysis not found.'); return; }
-    const data: AnalysisDetail = await res.json();
-    setDetail(data);
-    if (data.analysis.status === 'complete' || data.analysis.status === 'error') {
-      if (pollRef.current) clearInterval(pollRef.current);
+    try {
+      const res = await fetch(`/api/analyses/${id}`);
+      if (!res.ok) { setError('Analysis not found.'); return; }
+      const data: AnalysisDetail = await res.json();
+      setDetail(data);
+      if (data.analysis.status === 'complete' || data.analysis.status === 'error') {
+        if (pollRef.current) clearInterval(pollRef.current);
+      }
+    } catch {
+      // Network error — surface it so the page doesn't hang on the spinner.
+      // Only block the whole view if we have nothing loaded yet; otherwise
+      // keep the existing data and let the next poll retry.
+      setDetail(prev => {
+        if (!prev) setError('Could not load this analysis. Check your connection and try again.');
+        return prev;
+      });
     }
   }, [id]);
 
@@ -91,13 +101,19 @@ export default function AnalysisPage() {
 
   async function handleRename() {
     if (!titleInput.trim() || !detail) return;
-    await fetch(`/api/analyses/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: titleInput.trim() }),
-    });
-    setDetail(d => d ? { ...d, analysis: { ...d.analysis, title: titleInput.trim() } } : d);
-    setEditingTitle(false);
+    const newTitle = titleInput.trim();
+    try {
+      const res = await fetch(`/api/analyses/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle }),
+      });
+      if (!res.ok) return;
+      setDetail(d => d ? { ...d, analysis: { ...d.analysis, title: newTitle } } : d);
+      setEditingTitle(false);
+    } catch {
+      // Leave the editor open so the user can retry.
+    }
   }
 
   async function handleRetry() {
@@ -225,7 +241,8 @@ export default function AnalysisPage() {
               <button
                 onClick={() => { setTitleInput(analysis.title); setEditingTitle(true); }}
                 className="opacity-0 group-hover:opacity-100 p-1 text-zinc-600 hover:text-zinc-300 transition-all"
-                title="Rename">
+                title="Rename"
+                aria-label="Rename analysis">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
@@ -240,7 +257,8 @@ export default function AnalysisPage() {
           )}
           <button onClick={() => setShowDeleteConfirm(true)}
             className="p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-            title="Delete analysis">
+            title="Delete analysis"
+            aria-label="Delete analysis">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

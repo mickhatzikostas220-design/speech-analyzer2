@@ -35,7 +35,7 @@ function buildSystemPrompt(analysis: Record<string, unknown>, feedbackPoints: Re
     `${i + 1}. ${formatMs(p.start_ms)}–${formatMs(p.end_ms)} (score: ${p.score}/100)`
   ).join('\n');
 
-  return `You are ACA's speech analysis assistant. You have complete neural data for this speech, powered by Facebook's Tribe v2 fMRI brain encoding model. Help the speaker understand their results — be conversational, specific, and actionable.
+  return `You are Orator's speech analysis assistant. You have complete neural data for this speech, powered by Facebook's Tribe v2 fMRI brain encoding model. Help the speaker understand their results — be conversational, specific, and actionable.
 
 ## Speech: "${analysis.title}"
 Duration: ${analysis.duration_seconds}s
@@ -78,8 +78,25 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new Response('Unauthorized', { status: 401 });
 
+  if (!process.env.OPENAI_API_KEY) {
+    return new Response('Chat is not configured on this server.', { status: 503 });
+  }
+
   const { messages } = await request.json();
   if (!Array.isArray(messages) || messages.length === 0) {
+    return new Response('Bad request', { status: 400 });
+  }
+
+  // Only forward user/assistant turns with string content — never let the
+  // client inject system messages or other roles into the model call.
+  const safeMessages = messages
+    .filter(
+      (m): m is { role: 'user' | 'assistant'; content: string } =>
+        m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string'
+    )
+    .slice(-20);
+
+  if (safeMessages.length === 0) {
     return new Response('Bad request', { status: 400 });
   }
 
@@ -100,7 +117,7 @@ export async function POST(
     max_tokens: 1024,
     messages: [
       { role: 'system', content: buildSystemPrompt(analysis, feedbackPoints ?? []) },
-      ...messages,
+      ...safeMessages,
     ],
     stream: true,
   });
@@ -108,11 +125,18 @@ export async function POST(
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
     async start(controller) {
-      for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content ?? '';
-        if (text) controller.enqueue(encoder.encode(text));
+      try {
+        for await (const chunk of stream) {
+          const text = chunk.choices[0]?.delta?.content ?? '';
+          if (text) controller.enqueue(encoder.encode(text));
+        }
+      } catch (err) {
+        // Surface a graceful message instead of leaving the stream hanging.
+        console.error('Chat stream error:', err);
+        controller.enqueue(encoder.encode('\n\n[The response was interrupted. Please try again.]'));
+      } finally {
+        controller.close();
       }
-      controller.close();
     },
   });
 
