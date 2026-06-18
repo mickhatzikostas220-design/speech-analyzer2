@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { UploadZone } from '@/components/UploadZone';
 import { AnalysisCard } from '@/components/AnalysisCard';
 import type { Analysis } from '@/types';
@@ -37,12 +38,12 @@ export default function DashboardPage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-semibold text-white">Recent</h2>
-            <a
+            <Link
               href="/history"
               className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
             >
               View all →
-            </a>
+            </Link>
           </div>
 
           {loading ? (

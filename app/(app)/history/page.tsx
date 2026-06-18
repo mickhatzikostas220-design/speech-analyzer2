@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { AnalysisCard } from '@/components/AnalysisCard';
 import type { Analysis } from '@/types';
 
@@ -85,9 +86,9 @@ export default function HistoryPage() {
       ) : analyses.length === 0 ? (
         <div className="text-center py-20">
           <p className="text-zinc-500 text-sm">No analyses yet.</p>
-          <a href="/dashboard" className="mt-3 inline-block text-sm text-purple-400 hover:text-purple-300 transition-colors">
+          <Link href="/dashboard" className="mt-3 inline-block text-sm text-purple-400 hover:text-purple-300 transition-colors">
             Upload your first speech →
-          </a>
+          </Link>
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
