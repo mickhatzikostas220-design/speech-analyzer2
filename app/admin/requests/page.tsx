@@ -34,10 +34,15 @@ export default function AdminRequestsPage() {
   useEffect(() => { fetchRequests(); }, []);
 
   async function fetchRequests() {
-    const res = await fetch('/api/admin/requests');
-    const data = await res.json();
-    setRequests(Array.isArray(data) ? data : []);
-    setLoading(false);
+    try {
+      const res = await fetch('/api/admin/requests');
+      const data = res.ok ? await res.json() : [];
+      setRequests(Array.isArray(data) ? data : []);
+    } catch {
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function showToast(msg: string) {
