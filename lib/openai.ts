@@ -1,6 +1,16 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let _openai: OpenAI | null = null;
+
+function getOpenAI(): OpenAI {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is not configured on this server.');
+  }
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return _openai;
+}
 
 export interface TranscriptWord {
   word: string;
@@ -14,7 +24,7 @@ export async function transcribeAudio(
 ): Promise<{ text: string; words: TranscriptWord[]; durationSeconds: number }> {
   const file = new File([blob], filename, { type: blob.type || 'audio/mpeg' });
 
-  const response = await openai.audio.transcriptions.create({
+  const response = await getOpenAI().audio.transcriptions.create({
     file,
     model: 'whisper-1',
     response_format: 'verbose_json',
@@ -45,7 +55,7 @@ export async function generateFeedback(params: {
   const seconds = Math.floor(startSeconds % 60);
   const timeLabel = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: 'gpt-4o',
     messages: [
       {

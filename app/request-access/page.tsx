@@ -60,9 +60,12 @@ export default function RequestAccessPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-zinc-400 text-xs font-medium">Full name</label>
+              <label htmlFor="name" className="text-zinc-400 text-xs font-medium">Full name</label>
               <input
+                id="name"
+                name="name"
                 type="text"
+                autoComplete="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -72,9 +75,12 @@ export default function RequestAccessPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-zinc-400 text-xs font-medium">Email address</label>
+              <label htmlFor="email" className="text-zinc-400 text-xs font-medium">Email address</label>
               <input
+                id="email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -84,8 +90,10 @@ export default function RequestAccessPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-zinc-400 text-xs font-medium">Why do you want access?</label>
+              <label htmlFor="reason" className="text-zinc-400 text-xs font-medium">Why do you want access?</label>
               <textarea
+                id="reason"
+                name="reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 required

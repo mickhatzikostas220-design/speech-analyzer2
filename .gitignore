@@ -8,3 +8,6 @@ data/editor/
 tribe-server/__pycache__/
 tribe-server/.venv/
 tribe-server/cache/
+
+# TypeScript incremental build info
+tsconfig.tsbuildinfo
