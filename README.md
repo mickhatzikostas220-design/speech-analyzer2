@@ -62,7 +62,7 @@ cp .env.local.example .env.local
 | `RESEND_API_KEY` | resend.com → API keys |
 | `ADMIN_EMAIL` | Your email — this address gets access to /admin |
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3002` for local dev |
-| `TRIBE_SERVER_URL` | Leave blank to use mock data (see GPU server section) |
+| `TRIBE_SERVER_URL` | The deployed Tribe v2 endpoint (see GPU server section). Required — processing errors without it. The server itself runs in mock mode when model weights are unavailable. |
 | `TRIBE_SERVER_SECRET` | Optional bearer token for your GPU server |
 
 ### 4. Run locally
@@ -87,7 +87,7 @@ App runs at `http://localhost:3002` (or check your `package.json` dev script).
 
 ## Deploying the Tribe v2 GPU server (Modal.com)
 
-The GPU server runs the actual neural engagement model. Without it, every analysis uses realistic mock data — useful for testing, but not real fMRI predictions.
+The GPU server runs the actual neural engagement model. `TRIBE_SERVER_URL` must point at a deployed endpoint — the app's processing step errors if it's unset. When the server can't load the model weights it automatically falls back to realistic mock data (useful for testing, but not real fMRI predictions), so you can deploy the server and exercise the full flow before sorting out model access.
 
 ### Prerequisites
 
