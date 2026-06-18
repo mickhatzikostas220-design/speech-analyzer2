@@ -447,8 +447,9 @@ export default function ComparePage() {
       {/* Selection */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex flex-col sm:flex-row gap-4 items-end">
         <div className="flex-1">
-          <label className="text-xs text-zinc-500 block mb-1.5">Speech A <span className="text-white">(solid line)</span></label>
+          <label htmlFor="speech-a" className="text-xs text-zinc-500 block mb-1.5">Speech A <span className="text-white">(solid line)</span></label>
           <select
+            id="speech-a"
             value={idA}
             onChange={e => setIdA(e.target.value)}
             className="w-full bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-purple-500"
@@ -460,8 +461,9 @@ export default function ComparePage() {
           </select>
         </div>
         <div className="flex-1">
-          <label className="text-xs text-zinc-500 block mb-1.5">Speech B <span className="text-zinc-400">(dashed line)</span></label>
+          <label htmlFor="speech-b" className="text-xs text-zinc-500 block mb-1.5">Speech B <span className="text-zinc-400">(dashed line)</span></label>
           <select
+            id="speech-b"
             value={idB}
             onChange={e => setIdB(e.target.value)}
             className="w-full bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-purple-500"

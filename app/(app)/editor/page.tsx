@@ -238,6 +238,7 @@ export default function EditorPage() {
                 </button>
                 <button
                   onClick={() => deleteProject(p.id)}
+                  aria-label="Delete project"
                   className="ml-4 p-1 text-zinc-700 hover:text-red-400 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -308,6 +309,7 @@ export default function EditorPage() {
                 </button>
                 <button
                   onClick={() => deleteScriptProject(p.id)}
+                  aria-label="Delete script project"
                   className="ml-4 p-1 text-zinc-700 hover:text-red-400 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -360,6 +362,7 @@ export default function EditorPage() {
                 </button>
                 <button
                   onClick={() => deleteTimelineProject(p.id)}
+                  aria-label="Delete timeline project"
                   className="ml-4 p-1 text-zinc-700 hover:text-red-400 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
