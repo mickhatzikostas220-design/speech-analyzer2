@@ -67,12 +67,22 @@ export default function AnalysisPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const fetchDetail = useCallback(async () => {
-    const res = await fetch(`/api/analyses/${id}`);
-    if (!res.ok) { setError('Analysis not found.'); return; }
-    const data: AnalysisDetail = await res.json();
-    setDetail(data);
-    if (data.analysis.status === 'complete' || data.analysis.status === 'error') {
-      if (pollRef.current) clearInterval(pollRef.current);
+    try {
+      const res = await fetch(`/api/analyses/${id}`);
+      if (!res.ok) { setError('Analysis not found.'); return; }
+      const data: AnalysisDetail = await res.json();
+      setDetail(data);
+      if (data.analysis.status === 'complete' || data.analysis.status === 'error') {
+        if (pollRef.current) clearInterval(pollRef.current);
+      }
+    } catch {
+      // Network error — surface it so the page doesn't hang on the spinner.
+      // Only block the whole view if we have nothing loaded yet; otherwise
+      // keep the existing data and let the next poll retry.
+      setDetail(prev => {
+        if (!prev) setError('Could not load this analysis. Check your connection and try again.');
+        return prev;
+      });
     }
   }, [id]);
 
@@ -91,13 +101,19 @@ export default function AnalysisPage() {
 
   async function handleRename() {
     if (!titleInput.trim() || !detail) return;
-    await fetch(`/api/analyses/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: titleInput.trim() }),
-    });
-    setDetail(d => d ? { ...d, analysis: { ...d.analysis, title: titleInput.trim() } } : d);
-    setEditingTitle(false);
+    const newTitle = titleInput.trim();
+    try {
+      const res = await fetch(`/api/analyses/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle }),
+      });
+      if (!res.ok) return;
+      setDetail(d => d ? { ...d, analysis: { ...d.analysis, title: newTitle } } : d);
+      setEditingTitle(false);
+    } catch {
+      // Leave the editor open so the user can retry.
+    }
   }
 
   async function handleRetry() {

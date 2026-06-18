@@ -400,8 +400,12 @@ export default function ComparePage() {
 
   useEffect(() => {
     fetch('/api/analyses')
-      .then(r => r.json())
-      .then((data: Analysis[]) => setAnalyses(data.filter(a => a.status === 'complete')));
+      .then(r => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list: Analysis[] = Array.isArray(data) ? data : [];
+        setAnalyses(list.filter(a => a.status === 'complete'));
+      })
+      .catch(() => setAnalyses([]));
   }, []);
 
   async function fetchDetail(id: string): Promise<ChartData | null> {

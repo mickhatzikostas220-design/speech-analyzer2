@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import type { FeedbackPoint } from '@/types';
 
 interface Props {
@@ -27,6 +27,18 @@ export function VideoPlayer({ fileUrl, fileType, activeFeedback, onTimeUpdate, s
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  // Stable decorative waveform — computed once so it doesn't flicker on every
+  // timeupdate (re-randomizing in render caused the bars to jitter ~4x/sec).
+  const waveform = useMemo(
+    () =>
+      Array.from({ length: 80 }, (_, i) => {
+        // Deterministic pseudo-random offset keeps the organic look without state.
+        const noise = (Math.sin(i * 12.9898) * 43758.5453) % 1;
+        return 20 + Math.sin(i * 0.4) * 15 + Math.abs(noise) * 20;
+      }),
+    []
+  );
 
   useEffect(() => {
     const el = mediaRef.current;
@@ -62,7 +74,12 @@ export function VideoPlayer({ fileUrl, fileType, activeFeedback, onTimeUpdate, s
 
   function togglePlay() {
     if (!mediaRef.current) return;
-    playing ? mediaRef.current.pause() : mediaRef.current.play();
+    if (playing) {
+      mediaRef.current.pause();
+    } else {
+      // play() rejects if interrupted (e.g. rapid toggling) — swallow it.
+      mediaRef.current.play().catch(() => {});
+    }
   }
 
   function seek(e: React.MouseEvent<HTMLDivElement>) {
@@ -105,12 +122,12 @@ export function VideoPlayer({ fileUrl, fileType, activeFeedback, onTimeUpdate, s
         /* Audio — show waveform placeholder and feedback card */
         <div className="relative bg-zinc-950 h-36 flex items-center justify-center">
           <div className="flex items-end gap-0.5 h-16 px-4">
-            {Array.from({ length: 80 }).map((_, i) => (
+            {waveform.map((h, i) => (
               <div
                 key={i}
                 className="w-1 rounded-sm bg-zinc-800"
                 style={{
-                  height: `${20 + Math.sin(i * 0.4) * 15 + Math.random() * 20}%`,
+                  height: `${h}%`,
                   opacity: (i / 80) < (progress / 100) ? 1 : 0.4,
                   background: (i / 80) < (progress / 100) ? '#a855f7' : undefined,
                 }}
@@ -153,6 +170,7 @@ export function VideoPlayer({ fileUrl, fileType, activeFeedback, onTimeUpdate, s
         <div className="flex items-center gap-4">
           <button
             onClick={togglePlay}
+            aria-label={playing ? 'Pause' : 'Play'}
             className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-zinc-200 transition-colors"
           >
             {playing ? (

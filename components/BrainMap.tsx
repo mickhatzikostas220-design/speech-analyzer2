@@ -17,7 +17,10 @@ function actColor(v: number): string {
     [255, 195, 0],    // yellow      (0.75)
     [255, 45,  0],    // red-orange  (1.00)
   ];
-  const raw = v * (stops.length - 1);
+  // Clamp to [0,1] — out-of-range activations would otherwise index `stops`
+  // out of bounds and throw.
+  const clamped = Math.max(0, Math.min(1, Number.isFinite(v) ? v : 0));
+  const raw = clamped * (stops.length - 1);
   const lo = Math.floor(Math.min(raw, stops.length - 2));
   const hi = lo + 1;
   const t = raw - lo;

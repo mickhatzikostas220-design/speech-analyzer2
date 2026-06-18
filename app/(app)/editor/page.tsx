@@ -134,7 +134,8 @@ export default function EditorPage() {
   }
 
   async function deleteProject(id: string) {
-    await fetch(`/api/editor/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/editor/${id}`, { method: 'DELETE' });
+    if (!res.ok) return;
     setProjects((p) => p.filter((proj) => proj.id !== id));
   }
 
@@ -163,12 +164,14 @@ export default function EditorPage() {
   }
 
   async function deleteScriptProject(id: string) {
-    await fetch(`/api/editor/script/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/editor/script/${id}`, { method: 'DELETE' });
+    if (!res.ok) return;
     setScriptProjects((p) => p.filter((proj) => proj.id !== id));
   }
 
   async function deleteTimelineProject(id: string) {
-    await fetch(`/api/editor/timeline/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/editor/timeline/${id}`, { method: 'DELETE' });
+    if (!res.ok) return;
     setTimelineProjects((p) => p.filter((proj) => proj.id !== id));
   }
 
