@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { verifyToken } from '@/lib/adminToken';
 import { sendApprovalEmail, sendRejectionEmail } from '@/lib/email';
+import { escapeHtml } from '@/lib/escapeHtml';
 import { NextRequest, NextResponse } from 'next/server';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3002';
@@ -33,10 +34,16 @@ export async function GET(request: NextRequest) {
     .single();
 
   if (!req) return htmlPage('Not Found', 'This access request no longer exists.', '#ef4444');
+
+  // req.name / req.email come from the public access-request form — escape
+  // before reflecting into this admin-facing HTML page to prevent XSS.
+  const safeName = escapeHtml(req.name);
+  const safeEmail = escapeHtml(req.email);
+
   if (req.status !== 'pending') {
     return htmlPage(
       'Already Reviewed',
-      `This request from ${req.name} was already ${req.status}.`,
+      `This request from ${safeName} was already ${escapeHtml(req.status)}.`,
       '#f59e0b'
     );
   }
@@ -57,13 +64,13 @@ export async function GET(request: NextRequest) {
 
     await adminSupabase.from('access_requests').update({ status: 'approved' }).eq('id', payload.id);
 
-    return htmlPage('Approved', `${req.name} (${req.email}) has been approved and sent an invite link.`, '#16a34a');
+    return htmlPage('Approved', `${safeName} (${safeEmail}) has been approved and sent an invite link.`, '#16a34a');
   }
 
   if (payload.action === 'deny') {
     try { await sendRejectionEmail(req.email, req.name); } catch {}
     await adminSupabase.from('access_requests').update({ status: 'denied' }).eq('id', payload.id);
-    return htmlPage('Denied', `${req.name}'s request has been denied.`, '#3f3f46');
+    return htmlPage('Denied', `${safeName}'s request has been denied.`, '#3f3f46');
   }
 
   return htmlPage('Invalid Action', 'Unknown action in token.', '#ef4444');
