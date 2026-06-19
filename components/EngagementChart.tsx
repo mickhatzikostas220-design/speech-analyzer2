@@ -18,12 +18,6 @@ function scoreToY(score: number) {
   return HEIGHT - (score / 100) * HEIGHT;
 }
 
-function scoreColor(score: number) {
-  if (score >= 70) return '#22c55e';
-  if (score >= THRESHOLD) return '#f59e0b';
-  return '#ef4444';
-}
-
 export function EngagementChart({ timeline, feedbackPoints, currentTimeMs, durationMs, onSeek }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 

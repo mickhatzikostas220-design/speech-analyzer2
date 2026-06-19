@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Analysis, AnalysisDetail, ROITimepoint } from '@/types';
 
 type MetricKey = 'engagement' | 'auditory' | 'language' | 'attention' | 'dmn' | 'prosody' | 'emotional' | 'memory';
@@ -17,14 +17,6 @@ const METRICS: { key: MetricKey; label: string; color: string }[] = [
 ];
 
 const CHART_H = 120;
-
-function getVal(
-  point: { score?: number } & Partial<ROITimepoint>,
-  key: MetricKey
-): number {
-  if (key === 'engagement') return point.score ?? 0;
-  return (point as ROITimepoint)[key] ?? 0;
-}
 
 interface ChartData {
   detail: AnalysisDetail;
@@ -76,8 +68,6 @@ interface CompareChartProps {
 
 function CompareChart({ dataA, dataB, activeMetrics, focusMetric, labelA, labelB }: CompareChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-
-  const maxMs = Math.max(dataA.maxMs, dataB.maxMs);
 
   function xPct(ms: number, maxMsDuration: number) {
     return (ms / maxMsDuration) * 100;
@@ -158,17 +148,6 @@ function CompareChart({ dataA, dataB, activeMetrics, focusMetric, labelA, labelB
     </div>
   );
 }
-
-const METRIC_DESCRIPTIONS: Record<MetricKey, { high: string; low: string }> = {
-  engagement: { high: 'consistently holding attention',       low: 'struggling to hold attention' },
-  auditory:   { high: 'strong vocal variety and clarity',    low: 'monotone or unclear delivery' },
-  language:   { high: 'ideas landing clearly',               low: 'language too complex or abstract' },
-  attention:  { high: 'keeping the audience focused',        low: 'audience focus drifting' },
-  dmn:        { high: 'high mind-wandering risk',            low: 'low mind-wandering risk' },
-  prosody:    { high: 'rich rhythm and intonation',          low: 'flat or robotic pacing' },
-  emotional:  { high: 'strong emotional resonance',          low: 'low emotional connection' },
-  memory:     { high: 'content likely to be remembered',     low: 'content unlikely to stick' },
-};
 
 function avgMetric(data: ChartData, key: MetricKey): number {
   if (key === 'engagement') {
@@ -395,7 +374,7 @@ export default function ComparePage() {
   const [dataA, setDataA] = useState<ChartData | null>(null);
   const [dataB, setDataB] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeMetrics, setActiveMetrics] = useState<Set<MetricKey>>(new Set(METRICS.map(m => m.key)));
+  const [activeMetrics] = useState<Set<MetricKey>>(new Set(METRICS.map(m => m.key)));
   const [focusMetric, setFocusMetric] = useState<MetricKey | null>(null);
 
   useEffect(() => {

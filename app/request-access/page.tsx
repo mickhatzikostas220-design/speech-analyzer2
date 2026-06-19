@@ -49,7 +49,7 @@ export default function RequestAccessPage() {
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 sm:p-8">
           <h1 className="text-xl font-semibold text-white mb-1">Request access</h1>
           <p className="text-zinc-500 text-sm mb-6">
-            Orator is currently invite-only. Tell us a bit about yourself and we'll review your request.
+            Orator is currently invite-only. Tell us a bit about yourself and we&apos;ll review your request.
           </p>
 
           {error && (
