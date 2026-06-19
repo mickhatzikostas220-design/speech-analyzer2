@@ -1,3 +1,6 @@
+// Auth pages depend on the Supabase client and must render dynamically.
+export const dynamic = 'force-dynamic';
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
