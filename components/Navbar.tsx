@@ -45,6 +45,7 @@ export function Navbar() {
             {link('/history', 'History')}
             {link('/compare', 'Compare')}
             {link('/editor', 'Editor')}
+            {link('/clipflow', 'ClipFlow')}
           </nav>
         </div>
 
