@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { mkdir, writeFile, rm } from 'fs/promises';
+import { mkdir, writeFile, rm, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -149,5 +149,72 @@ export async function renderClip(opts: RenderOptions): Promise<RenderResult> {
 export async function cleanup(workDir: string): Promise<void> {
   if (workDir && existsSync(workDir)) {
     await rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+export interface RenderedClip {
+  /** The final 9:16 MP4. */
+  video: Buffer;
+  /** A JPEG thumbnail from the middle of the clip, if one was produced. */
+  thumb: Buffer | null;
+}
+
+/**
+ * Render via a remote worker (tribe-server/clipflow-render-modal.py) that has
+ * ffmpeg + yt-dlp installed. Used when CLIPFLOW_RENDER_URL is set — this is what
+ * lets rendering work on Vercel, whose serverless functions ship neither tool.
+ */
+async function renderClipRemote(opts: RenderOptions): Promise<RenderedClip> {
+  const base = process.env.CLIPFLOW_RENDER_URL!.replace(/\/$/, '');
+  const res = await fetch(`${base}/render`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(process.env.CLIPFLOW_RENDER_SECRET
+        ? { Authorization: `Bearer ${process.env.CLIPFLOW_RENDER_SECRET}` }
+        : {}),
+    },
+    body: JSON.stringify({
+      youtube_id: opts.youtubeId,
+      start: opts.start,
+      end: opts.end,
+      caption_style: opts.captionStyle ?? 'opus',
+      burn_captions: opts.burnCaptions !== false,
+      cues: opts.burnCaptions !== false && opts.cues ? opts.cues : [],
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`Render worker failed (${res.status}): ${detail.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as { video_b64?: string; thumb_b64?: string | null };
+  if (!data.video_b64) throw new Error('Render worker returned no video.');
+  return {
+    video: Buffer.from(data.video_b64, 'base64'),
+    thumb: data.thumb_b64 ? Buffer.from(data.thumb_b64, 'base64') : null,
+  };
+}
+
+/**
+ * Render a clip and return the MP4 (+ thumbnail) as in-memory buffers, using the
+ * remote Modal worker when CLIPFLOW_RENDER_URL is set and falling back to local
+ * ffmpeg/yt-dlp otherwise. The caller just uploads the bytes.
+ */
+export async function renderClipBuffers(opts: RenderOptions): Promise<RenderedClip> {
+  if (process.env.CLIPFLOW_RENDER_URL) {
+    return renderClipRemote(opts);
+  }
+  const r = await renderClip(opts);
+  try {
+    const video = await readFile(r.videoFile);
+    let thumb: Buffer | null = null;
+    try {
+      thumb = await readFile(r.thumbFile);
+    } catch {
+      /* thumbnail is optional */
+    }
+    return { video, thumb };
+  } finally {
+    await cleanup(r.workDir);
   }
 }

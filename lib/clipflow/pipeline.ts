@@ -7,7 +7,7 @@ import {
   transcriptWindowText,
   type VideoMeta,
 } from './youtube';
-import { detectClips } from './claude';
+import { detectClips } from './ai';
 import type { ClipFlowProject, TranscriptCue } from './types';
 
 // Orchestrates a project from raw URL to a grid of captioned clip plans.
