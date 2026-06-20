@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { processProject } from './pipeline';
 import { publishClip } from './platforms';
+import { postizEnabled, publishViaPostiz } from './postiz';
 import { decryptToken } from './crypto';
 import type { Job } from './queue';
 import type { Platform, PlatformHashtags } from './types';
@@ -39,29 +40,45 @@ export async function publishOnePost(admin: SupabaseClient, postId: string): Pro
       throw new Error('Render the clip into a video before posting.');
     }
 
-    const { data: connection } = await admin
-      .from('clipflow_connections')
-      .select('*')
-      .eq('user_id', post.user_id)
-      .eq('platform', post.platform)
-      .single();
-    if (!connection?.encrypted_access_token) {
-      throw new Error(`Connect your ${post.platform} account before posting.`);
-    }
-
     const { data: signed } = await admin.storage
       .from('speeches')
       .createSignedUrl(clip.file_path, 60 * 60 * 24);
     if (!signed?.signedUrl) throw new Error('Could not create a video URL.');
 
-    const result = await publishClip(post.platform as Platform, {
-      accessToken: decryptToken(connection.encrypted_access_token),
-      accountId: connection.account_id,
-      videoUrl: signed.signedUrl,
-      title: clip.title ?? '',
-      description: clip.description ?? '',
-      hashtags: tagsForPlatform(clip.hashtags as PlatformHashtags, post.platform as Platform),
-    });
+    const platform = post.platform as Platform;
+    const hashtags = tagsForPlatform(clip.hashtags as PlatformHashtags, platform);
+
+    // Publish through Postiz when it's configured (Postiz owns the platform
+    // connections); otherwise fall back to the per-platform OAuth path.
+    let result: { externalId: string | null; externalUrl: string | null };
+    if (postizEnabled()) {
+      result = await publishViaPostiz(platform, {
+        videoUrl: signed.signedUrl,
+        cacheKey: clip.file_path,
+        title: clip.title ?? '',
+        description: clip.description ?? '',
+        hashtags,
+      });
+    } else {
+      const { data: connection } = await admin
+        .from('clipflow_connections')
+        .select('*')
+        .eq('user_id', post.user_id)
+        .eq('platform', post.platform)
+        .single();
+      if (!connection?.encrypted_access_token) {
+        throw new Error(`Connect your ${post.platform} account before posting.`);
+      }
+
+      result = await publishClip(platform, {
+        accessToken: decryptToken(connection.encrypted_access_token),
+        accountId: connection.account_id,
+        videoUrl: signed.signedUrl,
+        title: clip.title ?? '',
+        description: clip.description ?? '',
+        hashtags,
+      });
+    }
 
     await setStatus({
       status: 'posted',

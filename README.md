@@ -377,13 +377,47 @@ on as you add its credentials (see `.env.local.example`).
 | Video/channel lookup | `YOUTUBE_API_KEY` |
 | Rendering the 9:16 MP4 | `CLIPFLOW_RENDER_URL` (Modal worker) — or `ffmpeg` + `yt-dlp` on the host |
 | Token encryption | `CLIPFLOW_TOKEN_SECRET` (falls back to the service-role key) |
-| Posting to a platform | that platform's `*_OAUTH_CLIENT_ID/SECRET` (+ an approved app) |
+| Posting (recommended) | `POSTIZ_API_KEY` — publish through Postiz, no per-platform app needed |
+| Posting (direct) | that platform's `*_OAUTH_CLIENT_ID/SECRET` (+ an approved app) |
 | Scheduled posting | `CRON_SECRET` + a scheduled trigger hitting `/api/clipflow/jobs/run` |
 
 Until a platform's OAuth app is configured, its **Connect** button shows
 "Not configured" rather than failing. Until `ffmpeg`/`yt-dlp` are present, clip
 plans, captions, and copy still generate and preview (via the embedded YouTube
 player) — only the exported file step reports that the tools are needed.
+
+### Publishing via Postiz
+
+Standing up an approved developer app for Instagram, TikTok, YouTube, and X is
+the slowest part of going live. [Postiz](https://postiz.com) — an open-source
+social scheduler — already owns those connections, so ClipFlow can publish
+through it instead:
+
+1. In Postiz, connect the social accounts you want to post to.
+2. Generate an API key under **Postiz → Settings → Public API** (the same key
+   also powers the [Postiz MCP](https://postiz.com/mcp) server).
+3. Set `POSTIZ_API_KEY` (and, for a self-hosted Postiz, `POSTIZ_API_URL` =
+   `https://<your-instance>/public/v1`).
+
+With the key set, ClipFlow routes all publishing through the Postiz Public API:
+the **Connected platforms** panel reflects your Postiz channels, the rendered
+9:16 MP4 is uploaded to Postiz, and **Post now / Schedule** create the post on
+your behalf. The per-platform `*_OAUTH_CLIENT_ID/SECRET` apps are then optional —
+Postiz handles the OAuth, publishing quirks, and review-gated APIs for you.
+
+Implementation: `lib/clipflow/postiz.ts` (Public API client + publish), wired
+into the existing publish pipeline in `lib/clipflow/runner.ts`. It's fully
+additive — leave `POSTIZ_API_KEY` unset and the direct per-platform OAuth path
+below is used exactly as before.
+
+> **Notes.** Postiz publishes under a single workspace (one API key), so clips
+> post to the accounts connected in *that* workspace — per-speaker Postiz
+> accounts are a future step. The Public API is rate-limited to ~30 requests/hour;
+> ClipFlow caches the channel list and de-duplicates each clip's upload across
+> platforms to stay well under it. Some platforms (e.g. TikTok privacy, IG reel
+> vs. post) read their defaults from the channel's settings in Postiz; if a
+> platform needs a field ClipFlow didn't send, Postiz's error is shown verbatim
+> on the post.
 
 ### Rendering off Vercel
 

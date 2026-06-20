@@ -8,6 +8,8 @@ interface Connection {
   configured: boolean;
   connected: boolean;
   account_name: string | null;
+  provider?: 'oauth' | 'postiz';
+  manage_url?: string;
 }
 
 const PLATFORM_STYLE: Record<string, { dot: string; glyph: string }> = {
@@ -42,10 +44,32 @@ export function ConnectionsPanel() {
     load();
   }
 
+  // When Postiz is the provider it owns the platform connections — accounts are
+  // managed in the Postiz workspace, not via per-platform OAuth in this app.
+  const viaPostiz = connections.some((c) => c.provider === 'postiz');
+  const manageUrl = connections.find((c) => c.manage_url)?.manage_url ?? 'https://app.postiz.com';
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-semibold text-white">Connected platforms</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold text-white">Connected platforms</h2>
+          {viaPostiz && (
+            <span className="text-[10px] uppercase tracking-wide text-purple-300 bg-purple-950/50 border border-purple-800 rounded-full px-2 py-0.5">
+              via Postiz
+            </span>
+          )}
+        </div>
+        {viaPostiz && (
+          <a
+            href={manageUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+          >
+            Manage in Postiz ↗
+          </a>
+        )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -67,7 +91,22 @@ export function ConnectionsPanel() {
               </div>
               <span className="text-xs font-medium text-white leading-tight">{conn.label}</span>
 
-              {!conn.configured ? (
+              {conn.provider === 'postiz' ? (
+                conn.connected ? (
+                  <span className="text-[10px] text-green-400 truncate max-w-[90px]">
+                    {conn.account_name || 'Connected'}
+                  </span>
+                ) : (
+                  <a
+                    href={conn.manage_url || manageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
+                  >
+                    Add in Postiz →
+                  </a>
+                )
+              ) : !conn.configured ? (
                 <span className="text-[10px] text-zinc-600">Not configured</span>
               ) : conn.connected ? (
                 <div className="flex flex-col items-center gap-1">
