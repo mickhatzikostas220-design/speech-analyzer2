@@ -375,7 +375,7 @@ on as you add its credentials (see `.env.local.example`).
 |------------|-------|
 | Clip detection + AI copy | `OPENAI_API_KEY` (already set) |
 | Video/channel lookup | `YOUTUBE_API_KEY` |
-| Rendering the 9:16 MP4 | `ffmpeg` + `yt-dlp` on the server |
+| Rendering the 9:16 MP4 | `CLIPFLOW_RENDER_URL` (Modal worker) — or `ffmpeg` + `yt-dlp` on the host |
 | Token encryption | `CLIPFLOW_TOKEN_SECRET` (falls back to the service-role key) |
 | Posting to a platform | that platform's `*_OAUTH_CLIENT_ID/SECRET` (+ an approved app) |
 | Scheduled posting | `CRON_SECRET` + a scheduled trigger hitting `/api/clipflow/jobs/run` |
@@ -384,3 +384,23 @@ Until a platform's OAuth app is configured, its **Connect** button shows
 "Not configured" rather than failing. Until `ffmpeg`/`yt-dlp` are present, clip
 plans, captions, and copy still generate and preview (via the embedded YouTube
 player) — only the exported file step reports that the tools are needed.
+
+### Rendering off Vercel
+
+Vercel's serverless functions don't include `ffmpeg` or `yt-dlp`, so the MP4
+export step runs on a small **Modal worker** instead
+(`tribe-server/clipflow-render-modal.py`, CPU-only — no GPU). The render route
+uses it whenever `CLIPFLOW_RENDER_URL` is set and falls back to local rendering
+otherwise.
+
+```bash
+pip install modal && modal token new
+modal secret create clipflow-render-secret CLIPFLOW_RENDER_SECRET=$(openssl rand -hex 16)
+modal deploy tribe-server/clipflow-render-modal.py
+```
+
+Paste the printed URL into `CLIPFLOW_RENDER_URL` (and the same secret into
+`CLIPFLOW_RENDER_SECRET`). The worker downloads only the `[start,end]` section,
+reframes to 1080×1920, burns the captions, and returns the MP4 — identical
+output to the local path. If YouTube blocks the worker's datacenter IP, attach a
+cookies file (see the note in the Modal file).

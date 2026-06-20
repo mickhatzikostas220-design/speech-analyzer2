@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { readFile } from 'fs/promises';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { renderClip, cleanup, ClipperUnavailableError } from '@/lib/clipflow/clipper';
+import { renderClipBuffers, ClipperUnavailableError } from '@/lib/clipflow/clipper';
 import type { TranscriptCue } from '@/lib/clipflow/types';
 
 // Renders the actual vertical 9:16 video file for a single clip (FFmpeg +
@@ -36,9 +35,8 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
 
   await supabase.from('clipflow_clips').update({ status: 'rendering', error: null }).eq('id', clip.id);
 
-  let workDir = '';
   try {
-    const result = await renderClip({
+    const { video } = await renderClipBuffers({
       youtubeId: project.youtube_id,
       start: clip.start_seconds,
       end: clip.end_seconds,
@@ -46,14 +44,12 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
       captionStyle: clip.caption_style,
       burnCaptions: true,
     });
-    workDir = result.workDir;
 
     const admin = createAdminClient();
     const path = `${user.id}/clipflow/${clip.project_id}/${clip.id}.mp4`;
-    const bytes = await readFile(result.videoFile);
     const { error: upErr } = await admin.storage
       .from('speeches')
-      .upload(path, bytes, { upsert: true, contentType: 'video/mp4' });
+      .upload(path, video, { upsert: true, contentType: 'video/mp4' });
     if (upErr) throw new Error(upErr.message);
 
     await supabase
@@ -69,10 +65,8 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
       .from('clipflow_clips')
       .update({ status: 'error', error: msg, updated_at: new Date().toISOString() })
       .eq('id', clip.id);
-    // Tools-missing is an expected, recoverable condition — surface it as 422.
+    // Tools-missing (local render) is an expected, recoverable condition — 422.
     const status = err instanceof ClipperUnavailableError ? 422 : 500;
     return NextResponse.json({ error: msg }, { status });
-  } finally {
-    if (workDir) await cleanup(workDir);
   }
 }
