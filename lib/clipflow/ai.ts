@@ -1,10 +1,11 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import type { ClipCandidate, PlatformHashtags, TranscriptCue } from './types';
 
-// All ClipFlow text generation runs on Claude (claude-sonnet-4-6) via the
-// Anthropic SDK that already ships with this project.
+// All ClipFlow text generation runs on OpenAI GPT-4o via the `openai` SDK that
+// already powers Whisper transcription and coaching feedback elsewhere in this
+// project — so it reuses the existing OPENAI_API_KEY and needs no extra key.
 
-const MODEL = 'claude-sonnet-4-6';
+const MODEL = 'gpt-4o';
 
 // Minimal metadata shape the generator needs (structurally compatible with
 // youtube.ts's VideoMeta).
@@ -15,23 +16,16 @@ interface VideoMetaLike {
   durationSeconds: number;
 }
 
-export class ClaudeError extends Error {}
+export class ClipAIError extends Error {}
 
-function client(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+function client(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    throw new ClaudeError(
-      'AI generation is not configured. Set ANTHROPIC_API_KEY to enable clipping and captions.'
+    throw new ClipAIError(
+      'AI generation is not configured. Set OPENAI_API_KEY to enable clipping and captions.'
     );
   }
-  return new Anthropic({ apiKey });
-}
-
-function extractText(msg: Anthropic.Message): string {
-  return msg.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-    .map((b) => b.text)
-    .join('');
+  return new OpenAI({ apiKey });
 }
 
 function parseJson<T>(raw: string): T {
@@ -51,14 +45,16 @@ function parseJson<T>(raw: string): T {
 }
 
 async function callJson<T>(system: string, user: string, maxTokens = 3000, temperature = 0.7): Promise<T> {
-  const msg = await client().messages.create({
+  const res = await client().chat.completions.create({
     model: MODEL,
     max_tokens: maxTokens,
     temperature,
-    system,
-    messages: [{ role: 'user', content: user }],
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
   });
-  return parseJson<T>(extractText(msg));
+  return parseJson<T>(res.choices[0]?.message?.content ?? '');
 }
 
 function fmtTimestampedTranscript(cues: TranscriptCue[]): string {
@@ -143,7 +139,7 @@ function overlaps(a: RawClip, b: RawClip): boolean {
 
 /**
  * Detect 3–10 high-value clips across an entire video. Long videos are split
- * into a bounded number of windows so the number of Claude calls (and total
+ * into a bounded number of windows so the number of model calls (and total
  * latency) never grows without limit, no matter the runtime.
  */
 export async function detectClips(

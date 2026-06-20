@@ -322,7 +322,7 @@ set `min_containers=1` in the Modal file to eliminate cold starts (~$1/hr idle).
 ## ClipFlow
 
 ClipFlow turns long-form YouTube content into short-form vertical clips, writes
-the copy with Claude, and publishes to Instagram Reels, TikTok, YouTube Shorts,
+the copy with GPT-4o, and publishes to Instagram Reels, TikTok, YouTube Shorts,
 and X — all inside the existing app, design system, and Supabase database.
 
 Visit `/clipflow` while signed in.
@@ -333,7 +333,7 @@ Visit `/clipflow` while signed in.
    the channel's most recent upload. Metadata (title, description, duration,
    thumbnail) comes from the **YouTube Data API v3**; the transcript is fetched
    best-effort from YouTube's public caption tracks.
-2. **Auto-clipping** — **Claude (`claude-sonnet-4-6`)** scans the transcript for
+2. **Auto-clipping** — **OpenAI GPT-4o** scans the transcript for
    hooks, key points, emotional peaks, and quotable lines and proposes 3–10
    clips (15–90s each). Long videos are split into a bounded number of windows
    so cost and latency stay flat regardless of runtime.
@@ -373,7 +373,7 @@ on as you add its credentials (see `.env.local.example`).
 
 | Capability | Needs |
 |------------|-------|
-| Clip detection + AI copy | `ANTHROPIC_API_KEY` |
+| Clip detection + AI copy | `OPENAI_API_KEY` (already set) |
 | Video/channel lookup | `YOUTUBE_API_KEY` |
 | Rendering the 9:16 MP4 | `ffmpeg` + `yt-dlp` on the server |
 | Token encryption | `CLIPFLOW_TOKEN_SECRET` (falls back to the service-role key) |
