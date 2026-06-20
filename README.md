@@ -291,3 +291,96 @@ External Services
 - **Waveform visualization** for audio files uses a static placeholder, not real frequency data.
 - **No rate limiting** on API routes — consider adding Upstash or similar before opening to many users.
 - **Tribe v2 is CC-BY-NC-4.0** — non-commercial use only.
+
+---
+
+## Script-matcher transcription (Parakeet v3)
+
+The Studio script editor transcribes uploaded clips with self-hosted **NVIDIA
+`parakeet-tdt-0.6b-v3`** on Modal (GPU), falling back to **OpenAI Whisper**
+automatically when `PARAKEET_SERVER_URL` is unset. Parakeet's TDT decoder
+predicts token durations directly, giving tighter word-level timestamps — and
+since the matcher slices clips on `word.start` / `word.end`, that means cleaner
+cuts. Only the transcription step changes; the JS fuzzy-matching algorithm in
+`app/(app)/editor/script/[id]/page.tsx` is untouched and consumes the same
+`{ word, start, end }` array regardless of engine.
+
+Deploy:
+
+```bash
+pip install modal && modal token new
+modal secret create parakeet-secret PARAKEET_SERVER_SECRET=$(openssl rand -hex 16)
+modal deploy tribe-server/parakeet-modal.py
+```
+
+Then set the printed URL as `PARAKEET_SERVER_URL` (and the matching
+`PARAKEET_SERVER_SECRET`) in your environment. Runs on an A10G (24 GB VRAM);
+set `min_containers=1` in the Modal file to eliminate cold starts (~$1/hr idle).
+
+---
+
+## ClipFlow
+
+ClipFlow turns long-form YouTube content into short-form vertical clips, writes
+the copy with Claude, and publishes to Instagram Reels, TikTok, YouTube Shorts,
+and X — all inside the existing app, design system, and Supabase database.
+
+Visit `/clipflow` while signed in.
+
+### How it works
+
+1. **Input** — paste a YouTube **video** or **channel** URL. Channel URLs use
+   the channel's most recent upload. Metadata (title, description, duration,
+   thumbnail) comes from the **YouTube Data API v3**; the transcript is fetched
+   best-effort from YouTube's public caption tracks.
+2. **Auto-clipping** — **Claude (`claude-sonnet-4-6`)** scans the transcript for
+   hooks, key points, emotional peaks, and quotable lines and proposes 3–10
+   clips (15–90s each). Long videos are split into a bounded number of windows
+   so cost and latency stay flat regardless of runtime.
+3. **AI copy** — each clip gets a punchy title, an on-screen caption, a post
+   description, and per-platform hashtags. Edit or **Regenerate** any of it.
+4. **Render** — **FFmpeg + yt-dlp** download only the needed section, reframe to
+   9:16, and burn in captions (opus / karaoke / minimal). Downloading just the
+   `[start,end]` section is what lets 1-hour+ sources render without timing out.
+5. **Publish** — toggle platforms per clip and **Post now** or **Schedule**.
+   Post status (queued / scheduled / posting / posted / failed) is shown per
+   platform.
+
+### Data model
+
+Five additive tables (see `supabase/clipflow.sql`, all `IF NOT EXISTS` and
+RLS-protected): `clipflow_projects`, `clipflow_clips`, `clipflow_connections`,
+`clipflow_posts`, and `clipflow_jobs`. Run the file in the Supabase SQL editor.
+
+### Queue & scheduling
+
+`clipflow_jobs` is a Postgres-backed work queue (serverless-safe — no Redis).
+Scheduled posts are drained by `POST /api/clipflow/jobs/run`; wire it to a
+scheduled trigger (e.g. a Vercel Cron every minute) with the `CRON_SECRET`
+bearer token. The function signatures in `lib/clipflow/queue.ts` map 1:1 onto
+BullMQ if you later move to Redis.
+
+### Security
+
+OAuth access/refresh tokens are encrypted with AES-256-GCM (`lib/clipflow/crypto.ts`)
+before storage and are only ever decrypted server-side immediately before a
+platform API call — they are never selected into any browser response.
+
+### Configuration
+
+ClipFlow degrades gracefully: it always shows the UI, and each capability turns
+on as you add its credentials (see `.env.local.example`).
+
+| Capability | Needs |
+|------------|-------|
+| Clip detection + AI copy | `ANTHROPIC_API_KEY` |
+| Video/channel lookup | `YOUTUBE_API_KEY` |
+| Rendering the 9:16 MP4 | `ffmpeg` + `yt-dlp` on the server |
+| Token encryption | `CLIPFLOW_TOKEN_SECRET` (falls back to the service-role key) |
+| Posting to a platform | that platform's `*_OAUTH_CLIENT_ID/SECRET` (+ an approved app) |
+| Scheduled posting | `CRON_SECRET` + a scheduled trigger hitting `/api/clipflow/jobs/run` |
+
+Until a platform's OAuth app is configured, its **Connect** button shows
+"Not configured" rather than failing. Until `ffmpeg`/`yt-dlp` are present, clip
+plans, captions, and copy still generate and preview (via the embedded YouTube
+player) — only the exported file step reports that the tools are needed.
