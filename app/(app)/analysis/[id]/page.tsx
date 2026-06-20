@@ -107,6 +107,10 @@ export default function AnalysisPage() {
       if (pollRef.current) clearInterval(pollRef.current);
       await fetchDetail();
       pollRef.current = setInterval(fetchDetail, POLL_INTERVAL);
+    } else {
+      const d = await res.json().catch(() => ({}));
+      if (res.status === 402) window.location.href = d.upgradeUrl || '/settings/billing';
+      else alert(d.error || 'Could not start processing.');
     }
     setRetrying(false);
   }

@@ -256,6 +256,29 @@ On any completed analysis page, you can export:
 
 ---
 
+## Plans & limits (Stripe)
+
+Premium tools are metered. Free users get **3 uses per day of each tool**
+(Speech Analyzer, Compare, ClipFlow, Studio, Assistant); **Pro** is unlimited.
+
+- **Enforcement** is server-side in each tool's route via `enforceToolLimit()`
+  (`lib/limits.ts`), backed by an atomic Postgres function
+  (`consume_tool_credit`) so concurrent calls can't overshoot. A new day is a new
+  counter row — the limit resets daily with no cron.
+- **Pro status** lives in the `subscriptions` table, written **only** by the
+  Stripe webhook (service role). Users can read their own row but never set
+  themselves Pro. Run `supabase/billing.sql` in the SQL editor to create it.
+- **Upgrade flow**: `/settings/billing` → Stripe Checkout
+  (`/api/billing/checkout`); manage/cancel via the Stripe billing portal
+  (`/api/billing/portal`). Point a Stripe webhook at
+  `<NEXT_PUBLIC_APP_URL>/api/billing/webhook` for `checkout.session.completed`
+  and `customer.subscription.*` events.
+- **Config**: set `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, and
+  `STRIPE_WEBHOOK_SECRET` (see `.env.local.example`). Until then everyone stays
+  free and the limit gate fails open (allows) if the migration hasn't been run.
+
+---
+
 ## Architecture
 
 ```
@@ -289,7 +312,7 @@ External Services
 
 - **Tribe v2 ROI indices** in `tribe-server/main.py` are approximate fsaverage5 vertices. For production-accuracy, replace with Glasser 360-parcel atlas indices.
 - **Waveform visualization** for audio files uses a static placeholder, not real frequency data.
-- **No rate limiting** on API routes — consider adding Upstash or similar before opening to many users.
+- **No general rate limiting** on API routes — consider adding Upstash or similar before opening to many users. (Premium tools do enforce a per-user daily limit; see "Plans & limits".)
 - **Tribe v2 is CC-BY-NC-4.0** — non-commercial use only.
 
 ---

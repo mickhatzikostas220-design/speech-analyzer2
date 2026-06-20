@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { enforceToolLimit } from '@/lib/limits';
 
 export async function GET() {
   const supabase = createClient();
@@ -27,6 +28,9 @@ export async function POST(request: NextRequest) {
   if (!title || !file_path || !file_type) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
+
+  const limited = await enforceToolLimit(user.id, 'analyze');
+  if (limited) return limited;
 
   const { data, error } = await supabase
     .from('analyses')

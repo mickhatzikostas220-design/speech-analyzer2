@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getUserAndAdmin } from '@/lib/agent/server';
+import { enforceToolLimit } from '@/lib/limits';
 import { getApiKey, getSettings } from '@/lib/agent/store';
 import { buildTools } from '@/lib/agent/tools/registry';
 import { buildSystemPrompt } from '@/lib/agent/prompt';
@@ -32,6 +33,10 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  // Count this against the free daily limit only once we know it's a real run.
+  const limited = await enforceToolLimit(user.id, 'assistant');
+  if (limited) return limited;
 
   // Resolve or create the conversation.
   if (conversationId) {

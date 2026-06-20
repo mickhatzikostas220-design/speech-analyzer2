@@ -81,7 +81,10 @@ export function UploadZone({ onAnalysisCreated }: Props) {
         }),
       });
 
-      if (!createRes.ok) throw new Error('Failed to create analysis record.');
+      if (!createRes.ok) {
+        const d = await createRes.json().catch(() => ({}));
+        throw new Error(d.error || 'Failed to create analysis record.');
+      }
       const { id } = await createRes.json();
       setProgress(80);
 

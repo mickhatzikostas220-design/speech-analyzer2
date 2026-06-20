@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { enforceToolLimit } from '@/lib/limits';
 
 export const dynamic = 'force-dynamic';
 // Allow headroom for a Parakeet cold start (Vercel Pro honors up to 300s; Hobby
@@ -16,6 +17,9 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const audio = formData.get('audio') as Blob | null;
     if (!audio) return NextResponse.json({ error: 'No audio provided' }, { status: 400 });
+
+    const limited = await enforceToolLimit(user.id, 'studio');
+    if (limited) return limited;
 
     // Prefer the self-hosted Parakeet (parakeet-tdt-0.6b-v3) GPU server when
     // configured; otherwise fall back to OpenAI Whisper. Both return the same
