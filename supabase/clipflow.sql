@@ -16,6 +16,8 @@ create table if not exists clipflow_projects (
   duration_seconds float,
   thumbnail_url text,
   transcript jsonb,
+  -- User preferences for the kinds of clips to surface: { tone, length, notes }.
+  preferences jsonb,
   status text not null default 'queued'
     check (status in ('queued', 'fetching', 'transcribing', 'analyzing', 'clipping', 'ready', 'error')),
   progress integer not null default 0 check (progress between 0 and 100),
@@ -25,6 +27,9 @@ create table if not exists clipflow_projects (
 );
 
 create index if not exists clipflow_projects_user_idx on clipflow_projects (user_id, created_at desc);
+
+-- Backfill the preferences column on databases created before it existed.
+alter table clipflow_projects add column if not exists preferences jsonb;
 
 -- ── Clips: the short-form vertical clips generated from a project ────────────
 create table if not exists clipflow_clips (

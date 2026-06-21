@@ -4,6 +4,9 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ConnectionsPanel } from '@/components/clipflow/ConnectionsPanel';
 import { UploadPostPanel } from '@/components/clipflow/UploadPostPanel';
+import { CLIP_LENGTHS, CLIP_LENGTH_LABELS, type ClipLength } from '@/lib/clipflow/types';
+
+const TONE_SUGGESTIONS = ['Funny', 'Educational', 'Inspirational', 'High-energy', 'Storytelling', 'Controversial'];
 
 interface ProjectSummary {
   id: string;
@@ -76,6 +79,12 @@ export default function ClipFlowPage() {
   const [error, setError] = useState<string | null>(null);
   const [connRefresh, setConnRefresh] = useState(0);
 
+  // Clip preferences — what kind of clips the user is looking for.
+  const [showPrefs, setShowPrefs] = useState(false);
+  const [tone, setTone] = useState('');
+  const [length, setLength] = useState<ClipLength>('any');
+  const [notes, setNotes] = useState('');
+
   function load() {
     fetch('/api/clipflow')
       .then((r) => r.json())
@@ -94,10 +103,16 @@ export default function ClipFlowPage() {
     setSubmitting(true);
     setError(null);
     try {
+      const preferences = {
+        tone: tone.trim() || undefined,
+        length: length !== 'any' ? length : undefined,
+        notes: notes.trim() || undefined,
+      };
+      const hasPrefs = preferences.tone || preferences.length || preferences.notes;
       const res = await fetch('/api/clipflow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: url.trim(), ...(hasPrefs ? { preferences } : {}) }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -149,6 +164,101 @@ export default function ClipFlowPage() {
             {submitting ? 'Starting…' : 'Generate clips'}
           </button>
         </div>
+
+        {/* Clip preferences — tone, length, and free-form notes */}
+        <button
+          type="button"
+          onClick={() => setShowPrefs((v) => !v)}
+          className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+        >
+          <svg
+            className={`w-3.5 h-3.5 transition-transform ${showPrefs ? 'rotate-90' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          Preferences &amp; notes
+          {(tone.trim() || length !== 'any' || notes.trim()) && (
+            <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-purple-500" aria-hidden />
+          )}
+        </button>
+
+        {showPrefs && (
+          <div className="space-y-4 bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
+            <p className="text-xs text-zinc-500">
+              Tell ClipFlow what you&apos;re looking for. These guide which moments it picks and how long
+              the clips are.
+            </p>
+
+            {/* Length */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-300">Clip length</label>
+              <div className="flex flex-wrap gap-2">
+                {CLIP_LENGTHS.map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => setLength(l)}
+                    className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                      length === l
+                        ? 'bg-purple-600 border-purple-500 text-white'
+                        : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                    }`}
+                  >
+                    {CLIP_LENGTH_LABELS[l]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tone */}
+            <div className="space-y-1.5">
+              <label htmlFor="cf-tone" className="text-xs font-medium text-zinc-300">
+                Tone / style
+              </label>
+              <input
+                id="cf-tone"
+                type="text"
+                placeholder="e.g. funny, educational, inspirational…"
+                value={tone}
+                onChange={(e) => setTone(e.target.value)}
+                maxLength={200}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors"
+              />
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {TONE_SUGGESTIONS.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTone(t)}
+                    className="text-[11px] px-2 py-1 rounded-md bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-1.5">
+              <label htmlFor="cf-notes" className="text-xs font-medium text-zinc-300">
+                Notes
+              </label>
+              <textarea
+                id="cf-notes"
+                rows={3}
+                placeholder="Anything else? e.g. “focus on the startup advice, skip the intro, pull quotable one-liners.”"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                maxLength={600}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors resize-none"
+              />
+            </div>
+          </div>
+        )}
+
         {error && (
           <p className="text-xs text-red-400 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
             {error}
