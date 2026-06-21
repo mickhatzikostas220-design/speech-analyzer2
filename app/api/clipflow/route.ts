@@ -3,8 +3,29 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { parseSourceUrl, YouTubeError } from '@/lib/clipflow/youtube';
 import { enqueue } from '@/lib/clipflow/queue';
+import { CLIP_LENGTHS, type ClipLength, type ClipPreferences } from '@/lib/clipflow/types';
 
 export const dynamic = 'force-dynamic';
+
+// Coerce arbitrary request input into a safe ClipPreferences object. Returns
+// null when the user supplied nothing meaningful, so we store a clean NULL.
+function sanitizePreferences(input: unknown): ClipPreferences | null {
+  if (!input || typeof input !== 'object') return null;
+  const raw = input as Record<string, unknown>;
+  const prefs: ClipPreferences = {};
+
+  if (typeof raw.length === 'string' && CLIP_LENGTHS.includes(raw.length as ClipLength)) {
+    if (raw.length !== 'any') prefs.length = raw.length as ClipLength;
+  }
+  if (typeof raw.tone === 'string' && raw.tone.trim()) {
+    prefs.tone = raw.tone.trim().slice(0, 200);
+  }
+  if (typeof raw.notes === 'string' && raw.notes.trim()) {
+    prefs.notes = raw.notes.trim().slice(0, 600);
+  }
+
+  return Object.keys(prefs).length > 0 ? prefs : null;
+}
 
 export async function GET() {
   try {
@@ -33,10 +54,12 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const raw = (await request.text()).trim();
-    const { url } = raw ? JSON.parse(raw) : {};
+    const body = raw ? JSON.parse(raw) : {};
+    const { url } = body;
     if (!url || typeof url !== 'string') {
       return NextResponse.json({ error: 'Paste a YouTube video or channel URL.' }, { status: 400 });
     }
+    const preferences = sanitizePreferences(body.preferences);
 
     // Validate the URL up front so the user gets immediate feedback.
     let parsed;
@@ -54,6 +77,7 @@ export async function POST(request: NextRequest) {
         source_url: url.trim(),
         source_type: parsed.type,
         youtube_id: parsed.videoId ?? null,
+        preferences,
         status: 'queued',
         progress: 0,
       })
