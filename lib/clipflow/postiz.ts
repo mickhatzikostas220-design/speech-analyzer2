@@ -25,8 +25,8 @@ import { decryptToken } from './crypto';
 
 export class PostizError extends Error {}
 
-const DEFAULT_API_URL = 'https://api.postiz.com/public/v1';
-const DEFAULT_APP_URL = 'https://app.postiz.com';
+const DEFAULT_API_URL = 'https://api.upload-post.com/public/v1';
+const DEFAULT_APP_URL = 'https://app.upload-post.com';
 
 // ClipFlow platform -> Postiz provider identifier(s). Postiz reports the
 // provider in each integration's `identifier`; X is matched as both 'x' and
@@ -192,7 +192,7 @@ async function fetchIntegrations(creds: PostizCreds): Promise<PostizIntegration[
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     throw new PostizError(
-      `Postiz integrations request failed (${res.status}): ${stringify(data)}`
+      `Upload Post integrations request failed (${res.status}): ${stringify(data)}`
     );
   }
 
@@ -234,7 +234,7 @@ function uploadVideo(creds: PostizCreds, fileKey: string, videoUrl: string): Pro
 async function doUploadVideo(creds: PostizCreds, videoUrl: string): Promise<UploadedMedia> {
   const fileRes = await fetch(videoUrl);
   if (!fileRes.ok) {
-    throw new PostizError('Could not fetch the rendered clip to upload to Postiz.');
+    throw new PostizError('Could not fetch the rendered clip to upload to Upload Post.');
   }
   const buf = Buffer.from(await fileRes.arrayBuffer());
 
@@ -248,14 +248,14 @@ async function doUploadVideo(creds: PostizCreds, videoUrl: string): Promise<Uplo
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new PostizError(`Postiz upload failed (${res.status}): ${stringify(data)}`);
+    throw new PostizError(`Upload Post upload failed (${res.status}): ${stringify(data)}`);
   }
 
   const rec = (data ?? {}) as Record<string, unknown>;
   const id = rec.id ? String(rec.id) : '';
   const path = (rec.path as string) ?? (rec.url as string) ?? '';
   if (!id || !path) {
-    throw new PostizError(`Postiz upload returned an unexpected response: ${stringify(data)}`);
+    throw new PostizError(`Upload Post returned an unexpected response: ${stringify(data)}`);
   }
   return { id, path };
 }
@@ -317,7 +317,7 @@ export async function publishViaPostiz(
   const integration = integrationForPlatform(platform, integrations);
   if (!integration) {
     throw new PostizError(
-      `No connected ${PLATFORM_LABELS[platform]} channel in Postiz — connect it in Postiz first.`
+      `No connected ${PLATFORM_LABELS[platform]} channel in Upload Post — connect it at app.upload-post.com first.`
     );
   }
 
@@ -345,7 +345,7 @@ export async function publishViaPostiz(
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new PostizError(`Postiz publish failed (${res.status}): ${stringify(data)}`);
+    throw new PostizError(`Upload Post publish failed (${res.status}): ${stringify(data)}`);
   }
 
   return { externalId: extractPostId(data), externalUrl: null };

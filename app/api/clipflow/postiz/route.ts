@@ -74,9 +74,9 @@ export async function PUT(request: NextRequest) {
     try {
       channels = countChannels(await listIntegrations(creds, true));
     } catch (err) {
-      const detail = err instanceof PostizError ? err.message : 'Could not reach Postiz.';
+      const detail = err instanceof PostizError ? err.message : 'Could not reach Upload Post.';
       return NextResponse.json(
-        { error: `That Postiz API key didn't work. ${detail}` },
+        { error: `That Upload Post API key didn't work. ${detail}` },
         { status: 400 }
       );
     }

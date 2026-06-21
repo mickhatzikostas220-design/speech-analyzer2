@@ -10,7 +10,7 @@ interface Status {
   channels: number | null;
 }
 
-const DEFAULT_API_URL = 'https://api.postiz.com/public/v1';
+const DEFAULT_API_URL = 'https://api.upload-post.com/public/v1';
 
 function channelsLabel(n: number | null): string {
   if (typeof n !== 'number') return '';
@@ -48,7 +48,7 @@ export function PostizKeyPanel({ onChanged }: { onChanged?: () => void }) {
 
   async function save() {
     if (!apiKey.trim()) {
-      setError('Enter your Postiz API key.');
+      setError('Enter your Upload Post API key.');
       return;
     }
     setSaving(true);
@@ -100,10 +100,10 @@ export function PostizKeyPanel({ onChanged }: { onChanged?: () => void }) {
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h2 className="text-base font-semibold text-white">Publish with Postiz</h2>
+          <h2 className="text-base font-semibold text-white">Publish with Upload Post</h2>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Connect your own Postiz account to post clips to your social channels — no per-platform
-            app to set up.
+            Connect your own Upload Post account to post clips to your social channels — no
+            per-platform app to set up.
           </p>
         </div>
         {connectedAsUser && !editing && (
@@ -125,7 +125,7 @@ export function PostizKeyPanel({ onChanged }: { onChanged?: () => void }) {
               rel="noreferrer"
               className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
             >
-              Manage channels in Postiz ↗
+              Manage channels in Upload Post ↗
             </a>
           )}
           <button
@@ -148,7 +148,7 @@ export function PostizKeyPanel({ onChanged }: { onChanged?: () => void }) {
       ) : connectedAsEnv && !editing ? (
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs text-zinc-400">
-            Posting through the app&rsquo;s shared Postiz workspace.
+            Posting through the app&rsquo;s shared Upload Post workspace.
           </span>
           <button
             onClick={() => {
@@ -157,7 +157,7 @@ export function PostizKeyPanel({ onChanged }: { onChanged?: () => void }) {
             }}
             className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
           >
-            Use my own Postiz account →
+            Use my own Upload Post account →
           </button>
         </div>
       ) : null}
@@ -168,7 +168,7 @@ export function PostizKeyPanel({ onChanged }: { onChanged?: () => void }) {
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder="Postiz API key"
+            placeholder="Upload Post API key"
             autoComplete="off"
             className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500"
           />
@@ -178,7 +178,7 @@ export function PostizKeyPanel({ onChanged }: { onChanged?: () => void }) {
               type="text"
               value={apiUrl}
               onChange={(e) => setApiUrl(e.target.value)}
-              placeholder="Self-hosted Postiz URL (optional) — e.g. https://postiz.example.com"
+              placeholder="Self-hosted URL (optional) — e.g. https://upload-post.example.com"
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-purple-500"
             />
           )}
@@ -189,7 +189,7 @@ export function PostizKeyPanel({ onChanged }: { onChanged?: () => void }) {
               disabled={saving}
               className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
             >
-              {saving ? 'Connecting…' : 'Connect Postiz'}
+              {saving ? 'Connecting…' : 'Connect Upload Post'}
             </button>
             {(status?.connected || editing) && (
               <button
@@ -214,14 +214,14 @@ export function PostizKeyPanel({ onChanged }: { onChanged?: () => void }) {
           </div>
 
           <p className="text-[11px] text-zinc-600">
-            Get your key in{' '}
+            Get your key at{' '}
             <a
-              href="https://app.postiz.com/settings"
+              href="https://app.upload-post.com/api-keys"
               target="_blank"
               rel="noreferrer"
               className="text-purple-400 hover:text-purple-300"
             >
-              Postiz → Settings → Public API
+              app.upload-post.com/api-keys
             </a>
             . It&rsquo;s stored encrypted and never shown again.
           </p>
