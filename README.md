@@ -377,7 +377,7 @@ on as you add its credentials (see `.env.local.example`).
 | Video/channel lookup | `YOUTUBE_API_KEY` |
 | Rendering the 9:16 MP4 | `CLIPFLOW_RENDER_URL` (Modal worker) — or `ffmpeg` + `yt-dlp` on the host |
 | Token encryption | `CLIPFLOW_TOKEN_SECRET` (falls back to the service-role key) |
-| Posting (recommended) | `UPLOAD_POST_API_KEY` — each speaker connects their own socials via an Upload-Post hosted link |
+| Posting (recommended) | Each speaker pastes their own [Upload-Post](https://app.upload-post.com/api-keys) API key + connects their socials via a hosted link — or set a shared `UPLOAD_POST_API_KEY` fallback |
 | Posting (direct) | that platform's `*_OAUTH_CLIENT_ID/SECRET` (+ an approved app) |
 | Scheduled posting | `CRON_SECRET` + a scheduled trigger hitting `/api/clipflow/jobs/run` |
 
@@ -391,25 +391,34 @@ player) — only the exported file step reports that the tools are needed.
 Standing up an approved developer app for Instagram, TikTok, YouTube, and X is
 the slowest part of going live. [Upload-Post](https://upload-post.com) — a
 universal social publishing API — already owns those connections, so ClipFlow
-publishes through it instead, **per speaker**:
+publishes through it instead. Each speaker brings **their own** Upload-Post
+account so clips post to **their own** channels:
 
-1. Create an Upload-Post account and set `UPLOAD_POST_API_KEY` (dashboard → API
-   Keys). This single account/key covers every speaker; billing is on it.
-2. Each speaker, under **ClipFlow → "Publish accounts"**, clicks **Connect
-   accounts** and authorizes their own TikTok / Instagram / YouTube / X through
-   an Upload-Post hosted page — no API key for end users.
+1. Under **ClipFlow → "Publish accounts"**, the speaker pastes the API key from
+   [app.upload-post.com/api-keys](https://app.upload-post.com/api-keys). ClipFlow
+   validates it and stores it **encrypted** (AES-256-GCM); the browser only ever
+   sees a last-4 hint. Billing is on the speaker's own Upload-Post account.
+2. They click **Connect accounts** and authorize their own TikTok / Instagram /
+   YouTube / X through an Upload-Post hosted page.
 3. That speaker's clips publish to *their* connected accounts.
 
-Under the hood each speaker is an Upload-Post **profile** (named `orator_<id>`).
-The **Connected platforms** panel reflects that profile's linked accounts, and
-**Post now / Schedule** sends the rendered 9:16 MP4 to `POST /api/upload` with
-the speaker's profile and target platform. With `UPLOAD_POST_API_KEY` unset,
-ClipFlow falls back to the per-platform OAuth path below — fully additive.
+Under the hood each key maps to an Upload-Post **profile** — an existing profile
+on the account is adopted, otherwise a `clipflow` profile is created. The
+**Connected platforms** panel reflects that profile's linked accounts, and **Post
+now / Schedule** sends the rendered 9:16 MP4 to `POST /api/upload` with the
+profile and target platform.
+
+A shared, app-level `UPLOAD_POST_API_KEY` is **optional**: it's used as a fallback
+for users who haven't added their own key (those users post under a managed
+`orator_<id>` profile). With neither a user key nor the env key present, ClipFlow
+falls back to the per-platform OAuth path below — fully additive.
 
 Implementation: `lib/clipflow/uploadpost.ts` (API client: profiles, hosted
-connect link, publish), the `app/api/clipflow/uploadpost` route (status /
-connect / disconnect), and the existing publish pipeline in
-`lib/clipflow/runner.ts`.
+connect link, publish), `lib/clipflow/uploadpost-store.ts` (per-user encrypted
+key + env fallback resolution), the `app/api/clipflow/uploadpost` route (status /
+save key / remove key) and its `connect` sub-route (hosted link), and the publish
+pipeline in `lib/clipflow/runner.ts`. The `clipflow_uploadpost_keys` table holds
+each user's encrypted key (`supabase/clipflow.sql`).
 
 > **Notes.** Upload-Post bundles upload + post into one call, so a clip's bytes
 > are re-sent per platform; ClipFlow caches the download per clip so a multi-

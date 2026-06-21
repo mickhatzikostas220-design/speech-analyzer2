@@ -139,3 +139,23 @@ create policy "Users manage own clipflow posts" on clipflow_posts
 drop policy if exists "Users manage own clipflow jobs" on clipflow_jobs;
 create policy "Users manage own clipflow jobs" on clipflow_jobs
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ── Upload-Post keys: each user's own Upload-Post API key (bring-your-own) ───
+-- Lets a user connect their OWN Upload-Post account (https://app.upload-post.com/api-keys)
+-- so clips post to THEIR OWN linked social accounts. The key is encrypted at rest
+-- (AES-256-GCM, see lib/clipflow/crypto.ts) and only ever decrypted server-side;
+-- `profile` is the Upload-Post "user"/profile clips are posted under.
+create table if not exists clipflow_uploadpost_keys (
+  user_id uuid primary key references profiles(id) on delete cascade,
+  encrypted_api_key text not null,
+  profile text not null,
+  key_hint text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table clipflow_uploadpost_keys enable row level security;
+
+drop policy if exists "Users manage own clipflow uploadpost key" on clipflow_uploadpost_keys;
+create policy "Users manage own clipflow uploadpost key" on clipflow_uploadpost_keys
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

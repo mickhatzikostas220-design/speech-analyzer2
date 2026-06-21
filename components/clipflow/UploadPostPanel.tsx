@@ -6,6 +6,10 @@ type Platform = 'instagram' | 'tiktok' | 'youtube' | 'twitter';
 
 interface Status {
   configured: boolean;
+  hasOwnKey: boolean;
+  sharedKey: boolean;
+  keyHint: string | null;
+  profile: string | null;
   connected: Platform[];
   names: Partial<Record<Platform, string>>;
 }
@@ -17,14 +21,20 @@ const LABELS: Record<Platform, string> = {
   twitter: 'X',
 };
 
-// Lets each speaker connect their own social accounts to their Upload-Post
-// profile via a hosted link. The Upload-Post account/API key is app-level, so
-// end users never paste a key.
+const API_KEYS_URL = 'https://app.upload-post.com/api-keys';
+
+// Lets each speaker bring their OWN Upload-Post account: they paste the API key
+// from app.upload-post.com/api-keys, then connect their TikTok / Instagram /
+// YouTube / X accounts via a hosted link, and their clips post to those accounts.
+// The key is stored encrypted server-side; the browser only ever sees a last-4 hint.
 export function UploadPostPanel({ onChanged }: { onChanged?: () => void }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [keyInput, setKeyInput] = useState('');
+  const [showKeyForm, setShowKeyForm] = useState(false);
 
   async function load() {
     try {
@@ -41,11 +51,51 @@ export function UploadPostPanel({ onChanged }: { onChanged?: () => void }) {
     load();
   }, []);
 
+  async function saveKey() {
+    if (keyInput.trim().length < 8) {
+      setError('Enter your Upload-Post API key.');
+      return;
+    }
+    setWorking(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/clipflow/uploadpost', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: keyInput.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save that key.');
+      setKeyInput('');
+      setShowKeyForm(false);
+      await load();
+      onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save that key.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function removeKey() {
+    setWorking(true);
+    setError(null);
+    try {
+      await fetch('/api/clipflow/uploadpost', { method: 'DELETE' });
+      await load();
+      onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not remove the key.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function connect() {
     setWorking(true);
     setError(null);
     try {
-      const res = await fetch('/api/clipflow/uploadpost', { method: 'POST' });
+      const res = await fetch('/api/clipflow/uploadpost/connect', { method: 'POST' });
       const data = await res.json();
       if (!res.ok || !data.url) throw new Error(data.error || 'Could not start the connection.');
       // Hosted Upload-Post page; it redirects back to /clipflow when done.
@@ -56,25 +106,44 @@ export function UploadPostPanel({ onChanged }: { onChanged?: () => void }) {
     }
   }
 
-  async function disconnect() {
-    setWorking(true);
-    setError(null);
-    try {
-      await fetch('/api/clipflow/uploadpost', { method: 'DELETE' });
-      await load();
-      onChanged?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not disconnect.');
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  // When Upload-Post isn't configured for the app, this provider is off entirely
-  // (ClipFlow falls back to per-platform OAuth), so render nothing.
-  if (!loading && !status?.configured) return null;
-
   const connected = status?.connected ?? [];
+
+  // The API-key entry form, reused by the empty state and the "use your own key"
+  // toggle when a shared account is active.
+  const keyForm = (
+    <div className="space-y-2">
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          type="password"
+          autoComplete="off"
+          placeholder="Upload-Post API key"
+          value={keyInput}
+          onChange={(e) => setKeyInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && saveKey()}
+          className="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors"
+        />
+        <button
+          onClick={saveKey}
+          disabled={working}
+          className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
+        >
+          {working ? 'Saving…' : 'Save key'}
+        </button>
+      </div>
+      <p className="text-[11px] text-zinc-500">
+        Get your key from{' '}
+        <a
+          href={API_KEYS_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="text-purple-400 hover:text-purple-300 underline"
+        >
+          app.upload-post.com/api-keys
+        </a>
+        . Stored encrypted — we only keep a hint of the last 4 characters.
+      </p>
+    </div>
+  );
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
@@ -82,8 +151,8 @@ export function UploadPostPanel({ onChanged }: { onChanged?: () => void }) {
         <div>
           <h2 className="text-base font-semibold text-white">Publish accounts</h2>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Connect your TikTok, Instagram, YouTube, and X accounts to post clips — handled securely
-            through Upload-Post, no per-platform app to set up.
+            Connect your own TikTok, Instagram, YouTube, and X accounts to post clips — using your
+            own Upload-Post account, no per-platform app to set up.
           </p>
         </div>
         {!loading && connected.length > 0 && (
@@ -95,6 +164,9 @@ export function UploadPostPanel({ onChanged }: { onChanged?: () => void }) {
 
       {loading ? (
         <div className="h-9 bg-zinc-800/60 rounded-lg animate-pulse" />
+      ) : !status?.configured ? (
+        // No key yet (and no shared account) — prompt the user to add their own.
+        keyForm
       ) : (
         <>
           {connected.length > 0 && (
@@ -119,15 +191,49 @@ export function UploadPostPanel({ onChanged }: { onChanged?: () => void }) {
             >
               {working ? 'Opening…' : connected.length > 0 ? 'Add / manage accounts' : 'Connect accounts'}
             </button>
-            {connected.length > 0 && (
-              <button
-                onClick={disconnect}
-                disabled={working}
-                className="text-xs text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50"
-              >
-                Disconnect all
-              </button>
+          </div>
+
+          {/* Key management */}
+          <div className="pt-2 border-t border-zinc-800 space-y-2">
+            {status.hasOwnKey ? (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] text-zinc-400">
+                  Using your Upload-Post key
+                  {status.keyHint ? (
+                    <span className="text-zinc-500"> ····{status.keyHint}</span>
+                  ) : null}
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowKeyForm((v) => !v)}
+                    className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                  >
+                    Replace key
+                  </button>
+                  <button
+                    onClick={removeKey}
+                    disabled={working}
+                    className="text-[11px] text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50"
+                  >
+                    Remove key
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] text-zinc-500">
+                  Using the app&apos;s shared Upload-Post account.
+                </span>
+                <button
+                  onClick={() => setShowKeyForm((v) => !v)}
+                  className="text-[11px] text-purple-400 hover:text-purple-300 transition-colors"
+                >
+                  Use your own key
+                </button>
+              </div>
             )}
+
+            {showKeyForm && keyForm}
           </div>
         </>
       )}

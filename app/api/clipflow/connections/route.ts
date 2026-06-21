@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { PLATFORMS, PLATFORM_LABELS, type Platform } from '@/lib/clipflow/types';
 import { isConfigured } from '@/lib/clipflow/platforms';
-import { uploadPostEnabled, getUserConnection } from '@/lib/clipflow/uploadpost';
+import { getProfileConnection } from '@/lib/clipflow/uploadpost';
+import { resolveCreds } from '@/lib/clipflow/uploadpost-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,11 +19,12 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (uploadPostEnabled()) {
+    const creds = await resolveCreds(supabase, user.id);
+    if (creds) {
       let connected: Platform[] = [];
       let names: Partial<Record<Platform, string>> = {};
       try {
-        ({ connected, names } = await getUserConnection(user.id));
+        ({ connected, names } = await getProfileConnection(creds.apiKey, creds.profile));
       } catch {
         // Surface every platform as not-yet-connected if Upload-Post is unreachable.
       }
