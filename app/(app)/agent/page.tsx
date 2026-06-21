@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Bot, Trash2 } from 'lucide-react';
+import { Bot, Trash2, Paperclip, Download } from 'lucide-react';
 import type { AgentEvent, SideEffect } from '@/lib/agent/types';
 
 interface ToolCard {
@@ -36,7 +36,9 @@ export default function AgentPage() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadConversations = useCallback(async () => {
     const res = await fetch('/api/agent/conversations');
@@ -124,15 +126,55 @@ export default function AgentPage() {
     }
   }
 
+  async function handleFileAttach(e: React.ChangeEvent<HTMLInputElement>) {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+    const files: File[] = Array.from(fileList);
+    const results = await Promise.all(
+      files.map(
+        (f: File) =>
+          new Promise<{ name: string; content: string }>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () =>
+              resolve({ name: f.name, content: reader.result as string });
+            reader.onerror = reject;
+            reader.readAsText(f);
+          })
+      )
+    );
+    setAttachedFiles((prev) => [...prev, ...results]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function saveMessageToFile(content: string) {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `agent-response-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function send() {
     const text = input.trim();
-    if (!text || sending) return;
+    if ((!text && attachedFiles.length === 0) || sending) return;
+
+    let fullMessage = text;
+    if (attachedFiles.length > 0) {
+      const fileContext = attachedFiles
+        .map((f) => `--- File: ${f.name} ---\n${f.content.slice(0, 12000)}`)
+        .join('\n\n');
+      fullMessage = `${fileContext}${text ? `\n\n${text}` : ''}`;
+    }
+
     setInput('');
+    setAttachedFiles([]);
     setError(null);
     setSending(true);
     setMessages((prev) => [
       ...prev,
-      { role: 'user', content: text, tools: [] },
+      { role: 'user', content: text || `[${attachedFiles.map((f) => f.name).join(', ')}]`, tools: [] },
       { role: 'assistant', content: '', tools: [] },
     ]);
 
@@ -140,7 +182,7 @@ export default function AgentPage() {
       const res = await fetch('/api/agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId: activeId, message: text }),
+        body: JSON.stringify({ conversationId: activeId, message: fullMessage }),
       });
 
       if (!res.ok || !res.body) {
@@ -232,14 +274,23 @@ export default function AgentPage() {
           )}
 
           {messages.map((m, i) => (
-            <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
+            <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start group/msg'}>
               <div
-                className={`max-w-[85%] whitespace-pre-wrap break-words rounded-[var(--radius-lg)] px-4 py-2.5 text-sm ${
+                className={`relative max-w-[85%] whitespace-pre-wrap break-words rounded-[var(--radius-lg)] px-4 py-2.5 text-sm ${
                   m.role === 'user'
                     ? 'bg-[var(--signature)] text-[color:var(--on-signature)]'
                     : 'border border-[var(--border-subtle)] bg-surface-card text-body'
                 }`}
               >
+                {m.role === 'assistant' && m.content && (
+                  <button
+                    onClick={() => saveMessageToFile(m.content)}
+                    title="Save response to file"
+                    className="absolute right-2 top-2 rounded p-1 text-faint opacity-0 transition-opacity hover:text-muted group-hover/msg:opacity-100"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 {m.tools.map((t, ti) => {
                   const badge = effectBadge(t.sideEffect);
                   return (
@@ -276,7 +327,43 @@ export default function AgentPage() {
           </div>
         )}
 
+        {attachedFiles.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {attachedFiles.map((f, i) => (
+              <span
+                key={i}
+                className="flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunk)] px-2.5 py-1 text-xs text-muted"
+              >
+                <Paperclip className="h-3 w-3" />
+                {f.name}
+                <button
+                  onClick={() => setAttachedFiles((prev) => prev.filter((_, j) => j !== i))}
+                  className="ml-1 opacity-60 hover:opacity-100"
+                  aria-label="Remove"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
         <div className="mt-3 flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,.xml,.yaml,.yml,.sh,.sql,.env,.log"
+            className="hidden"
+            onChange={handleFileAttach}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach files from your computer"
+            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-surface-card text-muted transition-colors hover:text-body"
+          >
+            <Paperclip className="h-4 w-4" />
+          </button>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -290,7 +377,12 @@ export default function AgentPage() {
             placeholder="Message your assistant…"
             className="input max-h-40 flex-1 resize-none text-sm"
           />
-          <button onClick={send} disabled={sending || !input.trim()} className="btn-primary" style={{ padding: '12px 18px' }}>
+          <button
+            onClick={send}
+            disabled={sending || (!input.trim() && attachedFiles.length === 0)}
+            className="btn-primary"
+            style={{ padding: '12px 18px' }}
+          >
             {sending ? '…' : 'Send'}
           </button>
         </div>

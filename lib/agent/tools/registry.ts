@@ -1,19 +1,21 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Autonomy, SideEffect, ToolDef } from '../types';
-import { listConnections } from '../store';
+import { listConnections, listAppKeyHints } from '../store';
 import { analysesTools } from './analyses';
 import { gmailTools } from './gmail';
+import { googleCalendarTools, microsoftCalendarTools } from './calendar';
+import { microsoftMailTools } from './microsoft-mail';
+import { socialAnalyticsTools, SOCIAL_TOOL_APP_MAP } from './social-analytics';
+import { notionTools } from './notion';
+import { slackTools } from './slack';
+import { dropboxTools } from './dropbox';
 
-// Which side effects each autonomy level permits. "whatever the user allows" —
-// the user picks the level per connection.
 const ALLOWED_EFFECTS: Record<Autonomy, SideEffect[]> = {
   read_only: ['none'],
   draft_confirm: ['none', 'reversible'],
   act_directly: ['none', 'reversible', 'irreversible'],
 };
 
-// Assemble the tool set for a request: always the read-only speech-aware tools,
-// plus tools for each connected app gated by that connection's autonomy.
 export async function buildTools(
   supabase: SupabaseClient,
   userId: string
@@ -21,16 +23,67 @@ export async function buildTools(
   const tools: ToolDef[] = [...analysesTools];
   const notes: string[] = [];
 
-  const connections = await listConnections(supabase, userId);
+  const [connections, appKeyHints] = await Promise.all([
+    listConnections(supabase, userId),
+    listAppKeyHints(supabase, userId),
+  ]);
+
+  // ── OAuth-based connections (Google, Microsoft) ───────────────────────────
   for (const conn of connections) {
+    const allowed = ALLOWED_EFFECTS[conn.autonomy];
+    const label = conn.account_email ?? '(connected)';
+
     if (conn.provider === 'google') {
-      const allowed = ALLOWED_EFFECTS[conn.autonomy];
-      const usable = gmailTools(conn.id).filter((t) => allowed.includes(t.sideEffect));
-      tools.push(...usable);
+      const gmail = gmailTools(conn.id).filter((t) => allowed.includes(t.sideEffect));
+      tools.push(...gmail);
+      const cal = googleCalendarTools(conn.id).filter((t) => allowed.includes(t.sideEffect));
+      tools.push(...cal);
       notes.push(
-        `Gmail account ${conn.account_email ?? '(connected)'} — permission level: ${conn.autonomy.replace('_', ' ')}.`
+        `Google account ${label} — ${conn.autonomy.replace('_', ' ')} (Gmail + Calendar).`
       );
     }
+
+    if (conn.provider === 'microsoft') {
+      const mail = microsoftMailTools(conn.id).filter((t) => allowed.includes(t.sideEffect));
+      tools.push(...mail);
+      const cal = microsoftCalendarTools(conn.id).filter((t) => allowed.includes(t.sideEffect));
+      tools.push(...cal);
+      notes.push(
+        `Microsoft account ${label} — ${conn.autonomy.replace('_', ' ')} (Outlook + Calendar).`
+      );
+    }
+  }
+
+  // ── Social analytics (only for platforms that have a key stored) ──────────
+  const allSocial = socialAnalyticsTools();
+  const connectedSocial: string[] = [];
+  for (const tool of allSocial) {
+    const prefix = Object.keys(SOCIAL_TOOL_APP_MAP).find((p) => tool.name.startsWith(p));
+    if (prefix && appKeyHints[SOCIAL_TOOL_APP_MAP[prefix]]) {
+      tools.push(tool);
+      connectedSocial.push(SOCIAL_TOOL_APP_MAP[prefix]);
+    }
+  }
+  if (connectedSocial.length > 0) {
+    notes.push(`Social analytics: ${Array.from(new Set(connectedSocial)).join(', ')}.`);
+  }
+
+  // ── Notion ────────────────────────────────────────────────────────────────
+  if (appKeyHints['notion']) {
+    tools.push(...notionTools());
+    notes.push('Notion connected.');
+  }
+
+  // ── Slack ─────────────────────────────────────────────────────────────────
+  if (appKeyHints['slack']) {
+    tools.push(...slackTools());
+    notes.push('Slack connected.');
+  }
+
+  // ── Dropbox ───────────────────────────────────────────────────────────────
+  if (appKeyHints['dropbox']) {
+    tools.push(...dropboxTools());
+    notes.push('Dropbox connected.');
   }
 
   return { tools, notes };

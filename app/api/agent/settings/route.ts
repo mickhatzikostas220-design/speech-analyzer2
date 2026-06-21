@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserAndAdmin } from '@/lib/agent/server';
-import { getSettings, listConnections, listKeyHints, saveSettings } from '@/lib/agent/store';
+import { getSettings, listConnections, listKeyHints, listAppKeyHints, saveSettings } from '@/lib/agent/store';
 import { MODEL_OPTIONS, PROVIDER_LABEL, isProvider } from '@/lib/agent/models';
 import { isEncryptionConfigured } from '@/lib/crypto';
 import { googleConfigured } from '@/lib/agent/google';
+import { microsoftConfigured } from '@/lib/agent/microsoft';
 
 export const runtime = 'nodejs';
 
@@ -11,20 +12,23 @@ export async function GET() {
   const auth = await getUserAndAdmin();
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const [settings, keyHints, connections] = await Promise.all([
+  const [settings, keyHints, connections, appKeyHints] = await Promise.all([
     getSettings(auth.admin, auth.user.id),
     listKeyHints(auth.admin, auth.user.id),
     listConnections(auth.admin, auth.user.id),
+    listAppKeyHints(auth.admin, auth.user.id),
   ]);
 
   return NextResponse.json({
     settings,
     keyHints,
     connections,
+    appKeyHints,
     modelOptions: MODEL_OPTIONS,
     providerLabels: PROVIDER_LABEL,
     encryptionConfigured: isEncryptionConfigured(),
     googleConfigured: googleConfigured(),
+    microsoftConfigured: microsoftConfigured(),
   });
 }
 
