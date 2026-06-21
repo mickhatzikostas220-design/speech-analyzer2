@@ -125,6 +125,71 @@ export async function listConnections(
   return (data ?? []) as ConnectionRow[];
 }
 
+// ── Connected app keys (Twitter, Instagram, Notion, etc.) ──────────────────
+
+export async function getAppKey(
+  supabase: SupabaseClient,
+  userId: string,
+  appId: string
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('connected_app_keys')
+    .select('encrypted_key')
+    .eq('user_id', userId)
+    .eq('app_id', appId)
+    .maybeSingle();
+  if (!data) return null;
+  try {
+    return decrypt(data.encrypted_key as string);
+  } catch {
+    return null;
+  }
+}
+
+export async function saveAppKey(
+  supabase: SupabaseClient,
+  userId: string,
+  appId: string,
+  key: string
+): Promise<void> {
+  const hint = key.slice(-4);
+  await supabase.from('connected_app_keys').upsert(
+    {
+      user_id: userId,
+      app_id: appId,
+      encrypted_key: encrypt(key),
+      key_hint: hint,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,app_id' }
+  );
+}
+
+export async function deleteAppKey(
+  supabase: SupabaseClient,
+  userId: string,
+  appId: string
+): Promise<void> {
+  await supabase
+    .from('connected_app_keys')
+    .delete()
+    .eq('user_id', userId)
+    .eq('app_id', appId);
+}
+
+export async function listAppKeyHints(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<Record<string, string>> {
+  const { data } = await supabase
+    .from('connected_app_keys')
+    .select('app_id, key_hint')
+    .eq('user_id', userId);
+  const out: Record<string, string> = {};
+  for (const row of data ?? []) out[row.app_id as string] = row.key_hint as string;
+  return out;
+}
+
 export async function logAction(
   supabase: SupabaseClient,
   userId: string,
