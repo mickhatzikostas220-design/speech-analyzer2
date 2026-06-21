@@ -338,10 +338,303 @@ export function socialAnalyticsTools(): ToolDef[] {
           .join('\n');
       },
     },
+
+    // ── X / Twitter — post tweet ─────────────────────────────────────────────
+    // Requires an OAuth 2.0 user access token with tweet.write scope.
+    // A bearer token (app-only) cannot post — users must supply a user token.
+    {
+      name: 'twitter_post_tweet',
+      description:
+        "Post a tweet on X / Twitter. Requires an OAuth 2.0 USER access token with tweet.write scope (not a Bearer/app-only token). Get one at developer.twitter.com → OAuth 2.0 user context.",
+      sideEffect: 'irreversible',
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'Tweet text (max 280 characters).' },
+          reply_to_tweet_id: {
+            type: 'string',
+            description: 'Optional tweet ID to reply to.',
+          },
+        },
+        required: ['text'],
+      },
+      async execute(args, ctx) {
+        const token = await getAppKey(ctx.supabase, ctx.userId, 'twitter');
+        if (!token)
+          return 'X / Twitter is not connected. Add your OAuth 2.0 user access token in Agent → Connected Apps. Note: a Bearer (app-only) token cannot post — you need a user token with tweet.write scope.';
+
+        const body: Record<string, unknown> = { text: String(args.text).slice(0, 280) };
+        if (args.reply_to_tweet_id) {
+          body.reply = { in_reply_to_tweet_id: String(args.reply_to_tweet_id) };
+        }
+
+        const r = await fetch('https://api.twitter.com/2/tweets', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        });
+        if (!r.ok) {
+          const errText = await r.text();
+          if (errText.includes('Unauthorized') || r.status === 401) {
+            return 'Twitter posting failed: your stored token may be an app-only Bearer token. Post requires an OAuth 2.0 user access token with tweet.write scope.';
+          }
+          return `Twitter API error (${r.status}): ${errText}`;
+        }
+        const data = (await r.json()) as { data?: { id?: string; text?: string } };
+        return `Tweet posted! ID: ${data.data?.id ?? 'unknown'}\nText: ${data.data?.text ?? args.text}`;
+      },
+    },
+
+    // ── Instagram — create post ───────────────────────────────────────────────
+    // Two-step: create media container then publish it.
+    // Requires instagram_content_publish scope on the Graph API token.
+    {
+      name: 'instagram_create_post',
+      description:
+        "Post a photo or reel to an Instagram Business/Creator account. Requires a Graph API long-lived token with instagram_content_publish and pages_read_engagement scopes. Provide a publicly accessible image URL.",
+      sideEffect: 'irreversible',
+      parameters: {
+        type: 'object',
+        properties: {
+          ig_user_id: {
+            type: 'string',
+            description: 'Instagram Business account ID (numeric). Find via instagram_get_insights.',
+          },
+          image_url: {
+            type: 'string',
+            description: 'Publicly accessible URL of the image to post (JPEG or PNG).',
+          },
+          caption: { type: 'string', description: 'Post caption text.' },
+        },
+        required: ['ig_user_id', 'image_url'],
+      },
+      async execute(args, ctx) {
+        const token = await getAppKey(ctx.supabase, ctx.userId, 'instagram');
+        if (!token)
+          return 'Instagram is not connected. Add your Graph API access token in Agent → Connected Apps.';
+
+        const BASE = 'https://graph.facebook.com/v19.0';
+        const igUserId = encodeURIComponent(String(args.ig_user_id));
+
+        // Step 1: create media container
+        const containerParams = new URLSearchParams({
+          image_url: String(args.image_url),
+          caption: String(args.caption ?? ''),
+          access_token: token,
+        });
+        const containerRes = await fetch(`${BASE}/${igUserId}/media`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: containerParams.toString(),
+        });
+        if (!containerRes.ok) return `Instagram media container error: ${await containerRes.text()}`;
+        const containerData = (await containerRes.json()) as { id?: string };
+        if (!containerData.id) return 'Instagram: failed to create media container.';
+
+        // Step 2: publish the container
+        const publishParams = new URLSearchParams({
+          creation_id: containerData.id,
+          access_token: token,
+        });
+        const publishRes = await fetch(`${BASE}/${igUserId}/media_publish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: publishParams.toString(),
+        });
+        if (!publishRes.ok) return `Instagram publish error: ${await publishRes.text()}`;
+        const publishData = (await publishRes.json()) as { id?: string };
+        return `Instagram post published! Media ID: ${publishData.id ?? 'unknown'}`;
+      },
+    },
+
+    // ── Facebook Pages — create post ──────────────────────────────────────────
+    {
+      name: 'facebook_post_to_page',
+      description:
+        "Post a message (and optionally a link) to a Facebook Page. Requires a Page access token with pages_manage_posts scope.",
+      sideEffect: 'irreversible',
+      parameters: {
+        type: 'object',
+        properties: {
+          page_id: { type: 'string', description: 'Facebook Page ID or username.' },
+          message: { type: 'string', description: 'Text content of the post.' },
+          link: { type: 'string', description: 'Optional URL to attach to the post.' },
+        },
+        required: ['page_id', 'message'],
+      },
+      async execute(args, ctx) {
+        const token = await getAppKey(ctx.supabase, ctx.userId, 'facebook');
+        if (!token)
+          return 'Facebook is not connected. Add your Page access token in Agent → Connected Apps.';
+
+        const body: Record<string, string> = {
+          message: String(args.message),
+          access_token: token,
+        };
+        if (args.link) body.link = String(args.link);
+
+        const r = await fetch(
+          `https://graph.facebook.com/v19.0/${encodeURIComponent(String(args.page_id))}/feed`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          }
+        );
+        if (!r.ok) return `Facebook API error: ${await r.text()}`;
+        const data = (await r.json()) as { id?: string };
+        return `Facebook post published! Post ID: ${data.id ?? 'unknown'}`;
+      },
+    },
+
+    // ── LinkedIn — share post ─────────────────────────────────────────────────
+    // Uses the UGC Posts API. Token needs w_member_social scope.
+    {
+      name: 'linkedin_share_post',
+      description:
+        "Share a text post on LinkedIn (as yourself). Requires an OAuth access token with w_member_social scope. Get one at linkedin.com/developers with the Share on LinkedIn product enabled.",
+      sideEffect: 'irreversible',
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'Post text (up to 3000 characters).' },
+          article_url: {
+            type: 'string',
+            description: 'Optional URL of an article to share alongside the text.',
+          },
+          article_title: { type: 'string', description: 'Title for the shared article (if article_url provided).' },
+        },
+        required: ['text'],
+      },
+      async execute(args, ctx) {
+        const token = await getAppKey(ctx.supabase, ctx.userId, 'linkedin');
+        if (!token)
+          return 'LinkedIn is not connected. Add your OAuth access token (with w_member_social scope) in Agent → Connected Apps.';
+
+        // Get the member URN first
+        const meRes = await fetch('https://api.linkedin.com/v2/me', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'X-Restli-Protocol-Version': '2.0.0',
+          },
+        });
+        if (!meRes.ok) return `LinkedIn auth error: ${await meRes.text()}`;
+        const me = (await meRes.json()) as { id?: string };
+        if (!me.id) return 'LinkedIn: could not fetch your member ID.';
+
+        const shareContent: Record<string, unknown> = {
+          shareCommentary: { text: String(args.text).slice(0, 3000) },
+          shareMediaCategory: args.article_url ? 'ARTICLE' : 'NONE',
+        };
+
+        if (args.article_url) {
+          shareContent.media = [
+            {
+              status: 'READY',
+              originalUrl: String(args.article_url),
+              ...(args.article_title ? { title: { text: String(args.article_title) } } : {}),
+            },
+          ];
+        }
+
+        const body = {
+          author: `urn:li:person:${me.id}`,
+          lifecycleState: 'PUBLISHED',
+          specificContent: { 'com.linkedin.ugc.ShareContent': shareContent },
+          visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
+        };
+
+        const r = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'X-Restli-Protocol-Version': '2.0.0',
+          },
+          body: JSON.stringify(body),
+        });
+        if (!r.ok) {
+          const errText = await r.text();
+          if (errText.includes('UNAUTHORIZED') || r.status === 403) {
+            return 'LinkedIn posting failed: your token may be missing the w_member_social scope. Re-generate your token with that scope enabled.';
+          }
+          return `LinkedIn API error (${r.status}): ${errText}`;
+        }
+        const data = (await r.json()) as { id?: string };
+        return `LinkedIn post published! Post ID: ${data.id ?? 'unknown'}`;
+      },
+    },
+
+    // ── TikTok — post video ───────────────────────────────────────────────────
+    // Uses Content Posting API (pull from URL). Token needs video.publish scope.
+    {
+      name: 'tiktok_post_video',
+      description:
+        "Post a video to TikTok using a publicly accessible video URL. Requires an OAuth access token with video.publish scope. The video must be hosted at a public URL (e.g., cloud storage).",
+      sideEffect: 'irreversible',
+      parameters: {
+        type: 'object',
+        properties: {
+          video_url: { type: 'string', description: 'Publicly accessible URL of the video file (MP4).' },
+          title: { type: 'string', description: 'Post title/caption (up to 150 characters).' },
+          privacy_level: {
+            type: 'string',
+            enum: ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'],
+            description: 'Who can see the video (default: PUBLIC_TO_EVERYONE).',
+          },
+          disable_comment: { type: 'boolean', description: 'Disable comments (default: false).' },
+          disable_duet: { type: 'boolean', description: 'Disable duet (default: false).' },
+          disable_stitch: { type: 'boolean', description: 'Disable stitch (default: false).' },
+        },
+        required: ['video_url', 'title'],
+      },
+      async execute(args, ctx) {
+        const token = await getAppKey(ctx.supabase, ctx.userId, 'tiktok');
+        if (!token)
+          return 'TikTok is not connected. Add your OAuth access token (with video.publish scope) in Agent → Connected Apps.';
+
+        const body = {
+          post_info: {
+            title: String(args.title).slice(0, 150),
+            privacy_level: String(args.privacy_level ?? 'PUBLIC_TO_EVERYONE'),
+            disable_comment: Boolean(args.disable_comment ?? false),
+            disable_duet: Boolean(args.disable_duet ?? false),
+            disable_stitch: Boolean(args.disable_stitch ?? false),
+          },
+          source_info: {
+            source: 'PULL_FROM_URL',
+            video_url: String(args.video_url),
+          },
+        };
+
+        const r = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json; charset=UTF-8',
+          },
+          body: JSON.stringify(body),
+        });
+        if (!r.ok) {
+          const errText = await r.text();
+          if (r.status === 401 || errText.includes('access_token_invalid')) {
+            return 'TikTok posting failed: your token may be missing the video.publish scope or has expired. Re-generate at developers.tiktok.com.';
+          }
+          return `TikTok API error (${r.status}): ${errText}`;
+        }
+        const data = (await r.json()) as { data?: { publish_id?: string } };
+        return `TikTok video upload initiated! Publish ID: ${data.data?.publish_id ?? 'unknown'}. The video will be processed and published shortly.`;
+      },
+    },
   ];
 }
 
 // Map tool name prefix → app_id for enabling only connected tools.
+// Both analytics and posting tools share the same prefix, so adding a key
+// unlocks read AND write tools for that platform automatically.
 export const SOCIAL_TOOL_APP_MAP: Record<string, string> = {
   twitter_: 'twitter',
   instagram_: 'instagram',
