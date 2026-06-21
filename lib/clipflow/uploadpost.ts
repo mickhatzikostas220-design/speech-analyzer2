@@ -4,11 +4,12 @@ import { PLATFORM_LABELS } from './types';
 // Upload-Post publishing provider for ClipFlow.
 //
 // Upload-Post (https://upload-post.com) is a universal social publishing API.
-// The app holds ONE account API key (UPLOAD_POST_API_KEY); each speaker is a
-// "profile" (user) under that account and connects their own social channels via
-// an Upload-Post hosted link — so end users never handle an API key. Publishing
-// names the profile + target platforms and Upload-Post posts to that speaker's
-// connected accounts.
+// Each ClipFlow user brings their OWN Upload-Post API key
+// (https://app.upload-post.com/api-keys) so clips post to THEIR OWN connected
+// social accounts. (An app-level UPLOAD_POST_API_KEY can still act as a shared
+// fallback — see uploadpost-store.ts, which resolves the key for a user.) Under
+// an account each social bundle is a "profile"; publishing names the profile +
+// target platforms and Upload-Post posts to that profile's connected accounts.
 //
 // API: https://docs.upload-post.com
 //   Auth: Authorization: Apikey <key>     Base: https://api.upload-post.com
@@ -18,9 +19,9 @@ import { PLATFORM_LABELS } from './types';
 //   POST /api/uploadposts/users/generate-jwt  hosted connect link
 //   DELETE /api/uploadposts/users          remove a profile { username }
 //
-// Everything runs server-side only; the key never reaches the browser. Response
-// shapes for the user-management endpoints are parsed defensively and Upload-Post
-// errors are surfaced verbatim.
+// Every function takes the API key explicitly; the key never reaches the browser
+// and is never stored here. Response shapes for the user-management endpoints are
+// parsed defensively and Upload-Post errors are surfaced verbatim.
 
 export class UploadPostError extends Error {}
 
@@ -34,7 +35,7 @@ const PLATFORM_ID: Record<Platform, string> = {
   twitter: 'x',
 };
 
-const SUPPORTED_IDS = ['tiktok', 'instagram', 'youtube', 'x'];
+export const SUPPORTED_IDS = ['tiktok', 'instagram', 'youtube', 'x'];
 
 function platformForId(id: string): Platform | null {
   switch ((id || '').toLowerCase()) {
@@ -52,28 +53,18 @@ function platformForId(id: string): Platform | null {
   }
 }
 
-export function uploadPostEnabled(): boolean {
-  return Boolean(process.env.UPLOAD_POST_API_KEY);
-}
-
 function baseUrl(): string {
   return (process.env.UPLOAD_POST_API_URL || DEFAULT_API_URL).replace(/\/$/, '');
 }
 
-function authHeaders(): Record<string, string> {
-  const key = process.env.UPLOAD_POST_API_KEY;
-  if (!key) throw new UploadPostError('UPLOAD_POST_API_KEY is not set.');
-  return { Authorization: `Apikey ${key}` };
-}
-
-/** Stable Upload-Post profile name for a ClipFlow user (unique per account). */
-export function profileName(userId: string): string {
-  return `orator_${userId.replace(/[^a-zA-Z0-9]/g, '')}`;
+function authHeaders(apiKey: string): Record<string, string> {
+  if (!apiKey) throw new UploadPostError('Missing Upload-Post API key.');
+  return { Authorization: `Apikey ${apiKey}` };
 }
 
 // ── Profiles + connection status ────────────────────────────────────────────
-// The profile list is shared across all users (one account), so cache it briefly
-// to avoid hammering the API on every page load.
+// The profile list is per Upload-Post account, so cache it briefly per API key to
+// avoid hammering the API on every page load.
 
 interface RawProfile {
   username: string;
@@ -81,23 +72,22 @@ interface RawProfile {
   names: Partial<Record<Platform, string>>;
 }
 
-let profilesCache: { at: number; promise: Promise<RawProfile[]> } | null = null;
+const profilesCache = new Map<string, { at: number; promise: Promise<RawProfile[]> }>();
 const PROFILES_TTL_MS = 30_000;
 
-function listProfiles(force = false): Promise<RawProfile[]> {
-  if (!force && profilesCache && Date.now() - profilesCache.at < PROFILES_TTL_MS) {
-    return profilesCache.promise;
-  }
-  const promise = fetchProfiles();
-  profilesCache = { at: Date.now(), promise };
+function listProfiles(apiKey: string, force = false): Promise<RawProfile[]> {
+  const cached = profilesCache.get(apiKey);
+  if (!force && cached && Date.now() - cached.at < PROFILES_TTL_MS) return cached.promise;
+  const promise = fetchProfiles(apiKey);
+  profilesCache.set(apiKey, { at: Date.now(), promise });
   promise.catch(() => {
-    if (profilesCache?.promise === promise) profilesCache = null;
+    if (profilesCache.get(apiKey)?.promise === promise) profilesCache.delete(apiKey);
   });
   return promise;
 }
 
-async function fetchProfiles(): Promise<RawProfile[]> {
-  const res = await fetch(`${baseUrl()}/api/uploadposts/users`, { headers: authHeaders() });
+async function fetchProfiles(apiKey: string): Promise<RawProfile[]> {
+  const res = await fetch(`${baseUrl()}/api/uploadposts/users`, { headers: authHeaders(apiKey) });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     throw new UploadPostError(`Upload-Post profiles request failed (${res.status}): ${stringify(data)}`);
@@ -159,29 +149,52 @@ export interface UploadPostConnection {
   names: Partial<Record<Platform, string>>;
 }
 
-/** The platforms a given ClipFlow user has connected in Upload-Post. */
-export async function getUserConnection(
-  userId: string,
+export interface UploadPostProfileSummary {
+  username: string;
+  connected: Platform[];
+}
+
+/** List the profiles (social bundles) under an account. */
+export async function listAccountProfiles(
+  apiKey: string,
+  force = false
+): Promise<UploadPostProfileSummary[]> {
+  const profiles = await listProfiles(apiKey, force);
+  return profiles.map((p) => ({ username: p.username, connected: p.connected }));
+}
+
+/** The platforms a given profile has connected in Upload-Post. */
+export async function getProfileConnection(
+  apiKey: string,
+  profile: string,
   force = false
 ): Promise<UploadPostConnection> {
-  const target = profileName(userId);
-  const profiles = await listProfiles(force);
-  const profile = profiles.find((p) => p.username === target);
-  return { connected: profile?.connected ?? [], names: profile?.names ?? {} };
+  const profiles = await listProfiles(apiKey, force);
+  const found = profiles.find((p) => p.username === profile);
+  return { connected: found?.connected ?? [], names: found?.names ?? {} };
+}
+
+/**
+ * Validate an API key by listing its profiles. Throws UploadPostError when the
+ * key is rejected; returns the account's existing profiles (possibly empty) on
+ * success so the caller can adopt one.
+ */
+export async function validateApiKey(apiKey: string): Promise<UploadPostProfileSummary[]> {
+  const profiles = await fetchProfiles(apiKey); // bypass cache — actually hit the API
+  return profiles.map((p) => ({ username: p.username, connected: p.connected }));
 }
 
 // ── Profile creation + hosted connect link ──────────────────────────────────
 
-/** Create the user's Upload-Post profile if it doesn't already exist. */
-export async function ensureProfile(userId: string): Promise<void> {
-  const username = profileName(userId);
+/** Create a profile under the account if it doesn't already exist. */
+export async function ensureProfile(apiKey: string, username: string): Promise<void> {
   const res = await fetch(`${baseUrl()}/api/uploadposts/users`, {
     method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    headers: { ...authHeaders(apiKey), 'Content-Type': 'application/json' },
     body: JSON.stringify({ username }),
   });
   if (res.ok) {
-    profilesCache = null; // a new profile changes the list
+    profilesCache.delete(apiKey); // a new profile changes the list
     return;
   }
   // Treat "already exists" as success; surface anything else.
@@ -192,13 +205,17 @@ export async function ensureProfile(userId: string): Promise<void> {
 }
 
 /** Generate the hosted link a user opens to connect their social accounts. */
-export async function generateConnectLink(userId: string, redirectUrl: string): Promise<string> {
-  await ensureProfile(userId);
+export async function generateConnectLink(
+  apiKey: string,
+  username: string,
+  redirectUrl: string
+): Promise<string> {
+  await ensureProfile(apiKey, username);
   const res = await fetch(`${baseUrl()}/api/uploadposts/users/generate-jwt`, {
     method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    headers: { ...authHeaders(apiKey), 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      username: profileName(userId),
+      username,
       redirect_url: redirectUrl,
       platforms: SUPPORTED_IDS,
     }),
@@ -219,14 +236,14 @@ export async function generateConnectLink(userId: string, redirectUrl: string): 
   return url;
 }
 
-/** Remove the user's profile (disconnects all their accounts). Best-effort. */
-export async function deleteProfile(userId: string): Promise<void> {
+/** Remove a profile (disconnects all of its accounts). Best-effort. */
+export async function deleteProfile(apiKey: string, username: string): Promise<void> {
   const res = await fetch(`${baseUrl()}/api/uploadposts/users`, {
     method: 'DELETE',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: profileName(userId) }),
+    headers: { ...authHeaders(apiKey), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username }),
   });
-  profilesCache = null;
+  profilesCache.delete(apiKey);
   if (!res.ok && res.status !== 404) {
     const data = await res.json().catch(() => null);
     throw new UploadPostError(`Upload-Post disconnect failed (${res.status}): ${stringify(data)}`);
@@ -284,23 +301,24 @@ export interface UploadPostPublishResult {
   externalUrl: string | null;
 }
 
-/** Publish a rendered clip to one platform through the user's Upload-Post profile. */
+/** Publish a rendered clip to one platform through a profile on the given account. */
 export async function publishViaUploadPost(
-  userId: string,
+  apiKey: string,
+  profile: string,
   platform: Platform,
   input: UploadPostPublishInput
 ): Promise<UploadPostPublishResult> {
   const buf = await clipBytes(input.cacheKey, input.videoUrl);
 
   const form = new FormData();
-  form.append('user', profileName(userId));
+  form.append('user', profile);
   form.append('platform[]', PLATFORM_ID[platform]);
   form.append('title', buildTitle(input.title, input.description, input.hashtags) || 'Clip');
   form.append('video', new Blob([new Uint8Array(buf)], { type: 'video/mp4' }), 'clip.mp4');
 
   const res = await fetch(`${baseUrl()}/api/upload`, {
     method: 'POST',
-    headers: authHeaders(), // fetch sets the multipart Content-Type + boundary
+    headers: authHeaders(apiKey), // fetch sets the multipart Content-Type + boundary
     body: form,
   });
   const data = await res.json().catch(() => null);

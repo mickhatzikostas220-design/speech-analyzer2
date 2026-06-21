@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { processProject } from './pipeline';
 import { publishClip } from './platforms';
-import { uploadPostEnabled, publishViaUploadPost } from './uploadpost';
+import { publishViaUploadPost } from './uploadpost';
+import { resolveCreds } from './uploadpost-store';
 import { decryptToken } from './crypto';
 import type { Job } from './queue';
 import type { Platform, PlatformHashtags } from './types';
@@ -48,12 +49,14 @@ export async function publishOnePost(admin: SupabaseClient, postId: string): Pro
     const platform = post.platform as Platform;
     const hashtags = tagsForPlatform(clip.hashtags as PlatformHashtags, platform);
 
-    // Publish through Upload-Post when it's configured (it owns the platform
-    // connections via each user's profile); otherwise fall back to the
-    // per-platform OAuth path.
+    // Publish through Upload-Post when credentials resolve for this user — their
+    // own API key first, else the shared app-level key (it owns the platform
+    // connections via the user's profile). Otherwise fall back to per-platform
+    // OAuth.
     let result: { externalId: string | null; externalUrl: string | null };
-    if (uploadPostEnabled()) {
-      result = await publishViaUploadPost(post.user_id, platform, {
+    const creds = await resolveCreds(admin, post.user_id);
+    if (creds) {
+      result = await publishViaUploadPost(creds.apiKey, creds.profile, platform, {
         videoUrl: signed.signedUrl,
         cacheKey: clip.file_path,
         title: clip.title ?? '',

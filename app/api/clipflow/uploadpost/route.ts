@@ -1,66 +1,133 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getProfileConnection, validateApiKey, ensureProfile, UploadPostError } from '@/lib/clipflow/uploadpost';
 import {
-  uploadPostEnabled,
-  getUserConnection,
-  generateConnectLink,
-  deleteProfile,
-} from '@/lib/clipflow/uploadpost';
+  getStoredCreds,
+  resolveCreds,
+  saveStoredKey,
+  deleteStoredKey,
+  sharedKeyConfigured,
+} from '@/lib/clipflow/uploadpost-store';
 
-// Manage a user's Upload-Post connection. The account API key is app-level (env);
-// each user connects their own social channels via an Upload-Post hosted link.
+// Manage a user's Upload-Post connection.
+//
+// Each user brings their OWN Upload-Post API key (https://app.upload-post.com/api-keys)
+// so clips post to THEIR OWN connected accounts. A shared app-level key, if set,
+// is used only as a fallback. The key is encrypted at rest and never returned to
+// the browser — only a last-4 hint is exposed.
 export const dynamic = 'force-dynamic';
 
-// GET — connection status for the panel (no secrets).
+// Default profile name created when the user's account has none yet.
+const DEFAULT_PROFILE = 'clipflow';
+
+// GET — connection status for the panel (no secrets, only a last-4 hint).
 export async function GET() {
   try {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (!uploadPostEnabled()) {
-      return NextResponse.json({ configured: false, connected: [], names: {} });
+    const stored = await getStoredCreds(supabase, user.id);
+    const creds = await resolveCreds(supabase, user.id);
+
+    if (!creds) {
+      return NextResponse.json({
+        configured: false,
+        hasOwnKey: false,
+        sharedKey: sharedKeyConfigured(),
+        keyHint: null,
+        profile: null,
+        connected: [],
+        names: {},
+      });
     }
 
-    const { connected, names } = await getUserConnection(user.id, true);
-    return NextResponse.json({ configured: true, connected, names });
+    let connected: string[] = [];
+    let names: Record<string, string> = {};
+    try {
+      const conn = await getProfileConnection(creds.apiKey, creds.profile, true);
+      connected = conn.connected;
+      names = conn.names as Record<string, string>;
+    } catch {
+      // Leave as not-connected if Upload-Post is unreachable.
+    }
+
+    return NextResponse.json({
+      configured: true,
+      hasOwnKey: Boolean(stored),
+      sharedKey: sharedKeyConfigured(),
+      keyHint: stored?.hint ?? null,
+      profile: creds.profile,
+      connected,
+      names,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
-// POST — create the hosted link the user opens to connect their accounts.
+// POST — save the user's own Upload-Post API key (validated against the API).
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (!uploadPostEnabled()) {
+    const body = await request.json().catch(() => ({}));
+    const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
+    if (apiKey.length < 8) {
       return NextResponse.json(
-        { error: 'Upload-Post is not configured for this app.' },
+        { error: 'Enter your Upload-Post API key (app.upload-post.com/api-keys).' },
         { status: 400 }
       );
     }
 
-    const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || request.nextUrl.origin;
-    const url = await generateConnectLink(user.id, `${origin}/clipflow?connected=uploadpost`);
-    return NextResponse.json({ url });
+    // Validate the key and discover existing profiles in one call.
+    let profiles;
+    try {
+      profiles = await validateApiKey(apiKey);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      const rejected = /\b(401|403)\b/.test(raw) || /unauthor|invalid|forbidden/i.test(raw);
+      return NextResponse.json(
+        { error: rejected ? 'That API key was rejected by Upload-Post.' : `Could not verify the key: ${raw}` },
+        { status: 400 }
+      );
+    }
+
+    // Post under an existing profile when the account already has one (so accounts
+    // already linked in their Upload-Post dashboard work immediately); otherwise
+    // create a managed profile they can connect accounts to.
+    let profile = profiles[0]?.username;
+    if (!profile) {
+      profile = DEFAULT_PROFILE;
+      await ensureProfile(apiKey, profile);
+    }
+
+    await saveStoredKey(supabase, user.id, apiKey, profile);
+
+    return NextResponse.json({
+      ok: true,
+      hasOwnKey: true,
+      keyHint: apiKey.slice(-4),
+      profile,
+      connected: profiles[0]?.connected ?? [],
+    });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = err instanceof UploadPostError ? err.message : err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
-// DELETE — disconnect (removes the user's Upload-Post profile + its accounts).
+// DELETE — remove the user's own key (non-destructive to their Upload-Post account).
 export async function DELETE() {
   try {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (uploadPostEnabled()) await deleteProfile(user.id);
+    await deleteStoredKey(supabase, user.id);
     return new NextResponse(null, { status: 204 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
