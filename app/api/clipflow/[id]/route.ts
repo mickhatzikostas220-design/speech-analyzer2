@@ -12,7 +12,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 
     const { data: project, error } = await supabase
       .from('clipflow_projects')
-      .select('id, source_url, source_type, youtube_id, title, description, channel_title, duration_seconds, thumbnail_url, status, progress, error, created_at')
+      .select('id, source_url, source_type, youtube_id, title, description, channel_title, duration_seconds, thumbnail_url, preferences, status, progress, error, created_at')
       .eq('id', params.id)
       .eq('user_id', user.id)
       .single();
