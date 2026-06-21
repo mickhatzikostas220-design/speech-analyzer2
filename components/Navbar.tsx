@@ -52,6 +52,14 @@ export function Navbar({ brand }: { brand: BrandKit }) {
 
         <div className="flex items-center gap-4">
           <Link
+            href="/settings/billing"
+            className={`text-sm font-semibold transition-colors ${
+              pathname.startsWith('/settings/billing') ? 'text-white' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            Upgrade
+          </Link>
+          <Link
             href="/settings"
             className={`text-sm font-semibold transition-colors ${
               pathname.startsWith('/settings') ? 'text-white' : 'text-white/60 hover:text-white'

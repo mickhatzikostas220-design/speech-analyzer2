@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { parseSourceUrl, YouTubeError } from '@/lib/clipflow/youtube';
 import { enqueue } from '@/lib/clipflow/queue';
+import { enforceToolLimit } from '@/lib/limits';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +47,9 @@ export async function POST(request: NextRequest) {
       const msg = err instanceof YouTubeError ? err.message : 'Invalid URL';
       return NextResponse.json({ error: msg }, { status: 400 });
     }
+
+    const limited = await enforceToolLimit(user.id, 'clipflow');
+    if (limited) return limited;
 
     const { data: project, error } = await supabase
       .from('clipflow_projects')

@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { createClient } from '@/lib/supabase/server';
+import { enforceToolLimit } from '@/lib/limits';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const limited = await enforceToolLimit(user.id, 'compare');
+  if (limited) return limited;
+
   const body = await request.json();
   const { labelA, labelB, avgs, choices } = body;
 
