@@ -3,6 +3,8 @@ import type { Autonomy, SideEffect, ToolDef } from '../types';
 import { listConnections } from '../store';
 import { analysesTools } from './analyses';
 import { gmailTools } from './gmail';
+import { socialTools } from './social';
+import { PLATFORM_LABELS, type Platform } from '@/lib/clipflow/types';
 
 // Which side effects each autonomy level permits. "whatever the user allows" —
 // the user picks the level per connection.
@@ -18,7 +20,9 @@ export async function buildTools(
   supabase: SupabaseClient,
   userId: string
 ): Promise<{ tools: ToolDef[]; notes: string[] }> {
-  const tools: ToolDef[] = [...analysesTools];
+  // Read-only social analytics is always on — it reuses ClipFlow's connections
+  // and never writes, so it isn't gated by per-app autonomy.
+  const tools: ToolDef[] = [...analysesTools, ...socialTools];
   const notes: string[] = [];
 
   const connections = await listConnections(supabase, userId);
@@ -31,6 +35,18 @@ export async function buildTools(
         `Gmail account ${conn.account_email ?? '(connected)'} — permission level: ${conn.autonomy.replace('_', ' ')}.`
       );
     }
+  }
+
+  // Surface connected social accounts (from ClipFlow) so the agent knows it can
+  // pull their analytics with the social tools.
+  const { data: social } = await supabase
+    .from('clipflow_connections')
+    .select('platform, account_name')
+    .eq('user_id', userId);
+  for (const s of (social ?? []) as { platform: Platform; account_name: string | null }[]) {
+    notes.push(
+      `${PLATFORM_LABELS[s.platform]}${s.account_name ? ` (${s.account_name})` : ''} — read-only analytics available.`
+    );
   }
 
   return { tools, notes };
