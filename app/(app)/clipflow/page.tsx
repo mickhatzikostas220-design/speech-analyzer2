@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ConnectionsPanel } from '@/components/clipflow/ConnectionsPanel';
+import { PostizKeyPanel } from '@/components/clipflow/PostizKeyPanel';
 
 interface ProjectSummary {
   id: string;
@@ -73,6 +74,7 @@ export default function ClipFlowPage() {
   const [url, setUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connRefresh, setConnRefresh] = useState(0);
 
   function load() {
     fetch('/api/clipflow')
@@ -154,7 +156,9 @@ export default function ClipFlowPage() {
         )}
       </form>
 
-      <ConnectionsPanel />
+      <PostizKeyPanel onChanged={() => setConnRefresh((v) => v + 1)} />
+
+      <ConnectionsPanel refresh={connRefresh} />
 
       {/* Projects */}
       <div>
