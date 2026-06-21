@@ -60,6 +60,8 @@ export default function AnalysisPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState('');
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
@@ -91,22 +93,28 @@ export default function AnalysisPage() {
 
   async function handleRename() {
     if (!titleInput.trim() || !detail) return;
-    await fetch(`/api/analyses/${id}`, {
+    setRenameError(null);
+    const res = await fetch(`/api/analyses/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: titleInput.trim() }),
     });
+    if (!res.ok) { setRenameError('Failed to rename. Try again.'); return; }
     setDetail(d => d ? { ...d, analysis: { ...d.analysis, title: titleInput.trim() } } : d);
     setEditingTitle(false);
   }
 
   async function handleRetry() {
     setRetrying(true);
+    setRetryError(null);
     const res = await fetch(`/api/analyses/${id}/process`, { method: 'POST' });
     if (res.ok) {
       if (pollRef.current) clearInterval(pollRef.current);
       await fetchDetail();
       pollRef.current = setInterval(fetchDetail, POLL_INTERVAL);
+    } else {
+      const body = await res.json().catch(() => ({}));
+      setRetryError(body.error ?? 'Retry failed. Please try again.');
     }
     setRetrying(false);
   }
@@ -209,16 +217,19 @@ export default function AnalysisPage() {
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           {editingTitle ? (
-            <div className="flex items-center gap-2">
-              <input
-                autoFocus
-                value={titleInput}
-                onChange={e => setTitleInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setEditingTitle(false); }}
-                className="input text-xl font-semibold w-full"
-              />
-              <button onClick={handleRename} className="text-xs px-3 py-1.5 btn-primary !rounded-lg flex-shrink-0">Save</button>
-              <button onClick={() => setEditingTitle(false)} className="text-xs px-3 py-1.5 hover:bg-[var(--surface-sunk)] text-muted rounded-lg transition-colors flex-shrink-0 border border-[var(--border-default)]">Cancel</button>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={titleInput}
+                  onChange={e => { setTitleInput(e.target.value); setRenameError(null); }}
+                  onKeyDown={e => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') { setEditingTitle(false); setRenameError(null); } }}
+                  className="input text-xl font-semibold w-full"
+                />
+                <button onClick={handleRename} className="text-xs px-3 py-1.5 btn-primary !rounded-lg flex-shrink-0">Save</button>
+                <button onClick={() => { setEditingTitle(false); setRenameError(null); }} className="text-xs px-3 py-1.5 hover:bg-[var(--surface-sunk)] text-muted rounded-lg transition-colors flex-shrink-0 border border-[var(--border-default)]">Cancel</button>
+              </div>
+              {renameError && <p className="text-xs text-[color:var(--danger)]">{renameError}</p>}
             </div>
           ) : (
             <div className="flex items-center gap-2 group">
@@ -292,6 +303,7 @@ export default function AnalysisPage() {
             className="btn-outline text-sm !py-2 !px-4">
             {retrying ? 'Retrying…' : 'Retry analysis'}
           </button>
+          {retryError && <p className="text-xs text-[color:var(--danger)]">{retryError}</p>}
         </div>
       )}
 
@@ -399,10 +411,13 @@ export default function AnalysisPage() {
                   Re-run the analysis after deploying the latest Modal server to generate brain maps.
                 </p>
                 {!isError && (
-                  <button onClick={handleRetry} disabled={retrying}
-                    className="mt-3 btn-outline text-xs !py-1.5 !px-4">
-                    {retrying ? 'Retrying…' : 'Re-analyze'}
-                  </button>
+                  <>
+                    <button onClick={handleRetry} disabled={retrying}
+                      className="mt-3 btn-outline text-xs !py-1.5 !px-4">
+                      {retrying ? 'Retrying…' : 'Re-analyze'}
+                    </button>
+                    {retryError && <p className="text-xs text-[color:var(--danger)] mt-2">{retryError}</p>}
+                  </>
                 )}
               </div>
             )}

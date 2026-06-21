@@ -95,6 +95,9 @@ export default function EditorPage() {
   const [timelineProjects, setTimelineProjects] = useState<TimelineProject[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(true);
 
+  // ── Delete confirmation ────────────────────────────────────
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'editor' | 'script' | 'timeline'; id: string; title: string } | null>(null);
+
   useEffect(() => {
     fetch('/api/editor')
       .then(safeJson)
@@ -145,9 +148,20 @@ export default function EditorPage() {
     }
   }
 
-  async function deleteProject(id: string) {
-    await fetch(`/api/editor/${id}`, { method: 'DELETE' });
-    setProjects((p) => p.filter((proj) => proj.id !== id));
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const { type, id } = deleteTarget;
+    if (type === 'editor') {
+      await fetch(`/api/editor/${id}`, { method: 'DELETE' });
+      setProjects((p) => p.filter((proj) => proj.id !== id));
+    } else if (type === 'script') {
+      await fetch(`/api/editor/script/${id}`, { method: 'DELETE' });
+      setScriptProjects((p) => p.filter((proj) => proj.id !== id));
+    } else {
+      await fetch(`/api/editor/timeline/${id}`, { method: 'DELETE' });
+      setTimelineProjects((p) => p.filter((proj) => proj.id !== id));
+    }
+    setDeleteTarget(null);
   }
 
   async function createScriptProject(e: React.FormEvent) {
@@ -174,15 +188,6 @@ export default function EditorPage() {
     }
   }
 
-  async function deleteScriptProject(id: string) {
-    await fetch(`/api/editor/script/${id}`, { method: 'DELETE' });
-    setScriptProjects((p) => p.filter((proj) => proj.id !== id));
-  }
-
-  async function deleteTimelineProject(id: string) {
-    await fetch(`/api/editor/timeline/${id}`, { method: 'DELETE' });
-    setTimelineProjects((p) => p.filter((proj) => proj.id !== id));
-  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-12 px-4 py-10">
@@ -237,7 +242,7 @@ export default function EditorPage() {
                     )}
                   </div>
                 </button>
-                <button onClick={() => deleteProject(p.id)} className="ml-4 p-1 text-faint transition-colors hover:text-[color:var(--danger)]">
+                <button onClick={() => setDeleteTarget({ type: 'editor', id: p.id, title: p.title })} className="ml-4 p-1 text-faint transition-colors hover:text-[color:var(--danger)]">
                   <TrashIcon />
                 </button>
               </div>
@@ -295,7 +300,7 @@ export default function EditorPage() {
                     )}
                   </div>
                 </button>
-                <button onClick={() => deleteScriptProject(p.id)} className="ml-4 p-1 text-faint transition-colors hover:text-[color:var(--danger)]">
+                <button onClick={() => setDeleteTarget({ type: 'script', id: p.id, title: p.title })} className="ml-4 p-1 text-faint transition-colors hover:text-[color:var(--danger)]">
                   <TrashIcon />
                 </button>
               </div>
@@ -337,7 +342,7 @@ export default function EditorPage() {
                   </div>
                   <span className="text-xs text-faint">{timeAgo(p.created_at)}</span>
                 </button>
-                <button onClick={() => deleteTimelineProject(p.id)} className="ml-4 p-1 text-faint transition-colors hover:text-[color:var(--danger)]">
+                <button onClick={() => setDeleteTarget({ type: 'timeline', id: p.id, title: p.title })} className="ml-4 p-1 text-faint transition-colors hover:text-[color:var(--danger)]">
                   <TrashIcon />
                 </button>
               </div>
@@ -345,6 +350,26 @@ export default function EditorPage() {
           </div>
         )}
       </section>
+
+      {/* ── Delete Confirmation Modal ──────────────────────── */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="card p-6 max-w-sm w-full">
+            <h3 className="font-semibold text-strong mb-2">Delete project?</h3>
+            <p className="text-muted text-sm mb-5">
+              &ldquo;{deleteTarget.title}&rdquo; will be permanently deleted. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={confirmDelete} className="flex-1 py-2 bg-[color:var(--danger)] hover:opacity-90 text-white text-sm font-medium rounded-[var(--radius-sm)] transition-opacity">
+                Delete
+              </button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2 btn-outline text-sm">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── New Silence Project Modal ───────────────────────── */}
       {showModal && (

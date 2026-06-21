@@ -363,22 +363,22 @@ function CompareSummary({ dataA, dataB, labelA, labelB }: { dataA: ChartData; da
 }
 
 function StatCard({ label, valA, valB, unit = '' }: { label: string; valA: number | null; valB: number | null; unit?: string }) {
-  const a = valA ?? 0;
-  const b = valB ?? 0;
-  const diff = a - b;
+  const hasA = valA !== null;
+  const hasB = valB !== null;
+  const diff = hasA && hasB ? valA - valB : null;
   return (
     <div className="card p-4 flex-1">
       <p className="text-xs text-muted mb-2">{label}</p>
       <div className="flex items-end gap-3">
         <div>
-          <p className="text-xl font-bold text-strong">{a}{unit}</p>
+          <p className="text-xl font-bold text-strong">{hasA ? `${valA}${unit}` : '—'}</p>
           <p className="text-xs text-faint mt-0.5">Speech A</p>
         </div>
         <div>
-          <p className="text-xl font-bold text-muted">{b}{unit}</p>
+          <p className="text-xl font-bold text-muted">{hasB ? `${valB}${unit}` : '—'}</p>
           <p className="text-xs text-faint mt-0.5">Speech B</p>
         </div>
-        {valA !== null && valB !== null && (
+        {diff !== null && (
           <p className={`text-sm font-medium ml-auto ${diff > 0 ? 'text-[var(--success)]' : diff < 0 ? 'text-[var(--danger)]' : 'text-muted'}`}>
             {diff > 0 ? '+' : ''}{diff}
           </p>
@@ -395,8 +395,8 @@ export default function ComparePage() {
   const [dataA, setDataA] = useState<ChartData | null>(null);
   const [dataB, setDataB] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeMetrics, setActiveMetrics] = useState<Set<MetricKey>>(new Set(METRICS.map(m => m.key)));
   const [focusMetric, setFocusMetric] = useState<MetricKey | null>(null);
+  const [sameError, setSameError] = useState(false);
 
   useEffect(() => {
     fetch('/api/analyses')
@@ -413,6 +413,8 @@ export default function ComparePage() {
 
   async function handleCompare() {
     if (!idA || !idB) return;
+    if (idA === idB) { setSameError(true); return; }
+    setSameError(false);
     setLoading(true);
     const [a, b] = await Promise.all([fetchDetail(idA), fetchDetail(idB)]);
     setDataA(a);
@@ -446,7 +448,7 @@ export default function ComparePage() {
           <label className="text-xs text-muted block mb-1.5">Speech A <span className="text-strong">(solid line)</span></label>
           <select
             value={idA}
-            onChange={e => setIdA(e.target.value)}
+            onChange={e => { setIdA(e.target.value); setSameError(false); }}
             className="input w-full text-sm"
           >
             <option value="">Select a speech…</option>
@@ -459,7 +461,7 @@ export default function ComparePage() {
           <label className="text-xs text-muted block mb-1.5">Speech B <span className="text-muted">(dashed line)</span></label>
           <select
             value={idB}
-            onChange={e => setIdB(e.target.value)}
+            onChange={e => { setIdB(e.target.value); setSameError(false); }}
             className="input w-full text-sm"
           >
             <option value="">Select a speech…</option>
@@ -468,13 +470,16 @@ export default function ComparePage() {
             ))}
           </select>
         </div>
-        <button
-          onClick={handleCompare}
-          disabled={!idA || !idB || loading}
-          className="btn-primary"
-        >
-          {loading ? 'Loading…' : 'Compare'}
-        </button>
+        <div className="flex flex-col gap-1.5">
+          <button
+            onClick={handleCompare}
+            disabled={!idA || !idB || loading}
+            className="btn-primary"
+          >
+            {loading ? 'Loading…' : 'Compare'}
+          </button>
+          {sameError && <p className="text-xs text-[color:var(--danger)] text-center">Select two different speeches to compare.</p>}
+        </div>
       </div>
 
       {ready && (
@@ -517,7 +522,7 @@ export default function ComparePage() {
             <CompareChart
               dataA={dataA}
               dataB={dataB}
-              activeMetrics={activeMetrics}
+              activeMetrics={new Set(METRICS.map(m => m.key))}
               focusMetric={focusMetric}
               labelA={labelA}
               labelB={labelB}
