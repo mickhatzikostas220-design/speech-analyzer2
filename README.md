@@ -259,7 +259,8 @@ On any completed analysis page, you can export:
 ## Plans & limits (Stripe)
 
 Premium tools are metered. Free users get **3 uses per day of each tool**
-(Speech Analyzer, Compare, ClipFlow, Studio, Assistant); **Pro** is unlimited.
+(Speech Analyzer, Compare, ClipFlow, Studio); **Pro** is unlimited. (The
+Assistant is not metered — it runs on each user's own API key.)
 
 - **Enforcement** is server-side in each tool's route via `enforceToolLimit()`
   (`lib/limits.ts`), backed by an atomic Postgres function

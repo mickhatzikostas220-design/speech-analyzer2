@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 // Premium tools gated behind the free daily limit. Key = usage row; value = label.
+// Assistant is intentionally excluded — it runs on each user's own API key.
 export const TOOLS = {
   analyze: 'Speech Analyzer',
   compare: 'Compare',
   clipflow: 'ClipFlow',
   studio: 'Studio',
-  assistant: 'Assistant',
 } as const;
 export type Tool = keyof typeof TOOLS;
 
