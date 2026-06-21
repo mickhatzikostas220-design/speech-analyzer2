@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { processProject } from './pipeline';
 import { publishClip } from './platforms';
-import { postizEnabled, publishViaPostiz } from './postiz';
+import { resolvePostizCreds, publishViaPostiz } from './postiz';
 import { decryptToken } from './crypto';
 import type { Job } from './queue';
 import type { Platform, PlatformHashtags } from './types';
@@ -48,11 +48,13 @@ export async function publishOnePost(admin: SupabaseClient, postId: string): Pro
     const platform = post.platform as Platform;
     const hashtags = tagsForPlatform(clip.hashtags as PlatformHashtags, platform);
 
-    // Publish through Postiz when it's configured (Postiz owns the platform
-    // connections); otherwise fall back to the per-platform OAuth path.
+    // Publish through Postiz when this user has it configured (their own key, or
+    // the app-wide default) — Postiz owns the platform connections. Otherwise
+    // fall back to the per-platform OAuth path.
+    const postiz = await resolvePostizCreds(admin, post.user_id);
     let result: { externalId: string | null; externalUrl: string | null };
-    if (postizEnabled()) {
-      result = await publishViaPostiz(platform, {
+    if (postiz) {
+      result = await publishViaPostiz(postiz.creds, platform, {
         videoUrl: signed.signedUrl,
         cacheKey: clip.file_path,
         title: clip.title ?? '',

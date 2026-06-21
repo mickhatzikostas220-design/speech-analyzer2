@@ -19,7 +19,7 @@ const PLATFORM_STYLE: Record<string, { dot: string; glyph: string }> = {
   twitter: { dot: 'from-zinc-400 to-zinc-600', glyph: '𝕏' },
 };
 
-export function ConnectionsPanel() {
+export function ConnectionsPanel({ refresh = 0 }: { refresh?: number }) {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,9 +35,10 @@ export function ConnectionsPanel() {
     }
   }
 
+  // Reload when the Postiz key changes (the panel above bumps `refresh`).
   useEffect(() => {
     load();
-  }, []);
+  }, [refresh]);
 
   async function disconnect(platform: string) {
     await fetch(`/api/clipflow/connections/${platform}`, { method: 'DELETE' });

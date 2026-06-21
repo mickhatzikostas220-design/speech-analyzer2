@@ -1,17 +1,20 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Platform } from './types';
 import { PLATFORM_LABELS } from './types';
+import { decryptToken } from './crypto';
 
 // Postiz publishing provider for ClipFlow.
 //
 // Postiz (https://postiz.com) is a social-media scheduler that owns the OAuth
-// connections to every platform. When POSTIZ_API_KEY is set, ClipFlow publishes
+// connections to every platform. When Postiz is configured ClipFlow publishes
 // through the Postiz Public API instead of maintaining a separate OAuth app and
-// publishing implementation per platform — you connect your accounts once inside
-// Postiz and ClipFlow posts to them.
+// publishing implementation per platform.
 //
-// The same API key powers both this REST integration and the Postiz MCP server.
-// Generate it in Postiz → Settings → Public API. Everything here runs
-// server-side only; the key never reaches the browser.
+// Credentials are resolved per user (see resolvePostizCreds): each speaker can
+// bring their own Postiz API key so clips post to *their* connected channels;
+// if they haven't, an app-wide POSTIZ_API_KEY env var is used as the default.
+// The same key powers the Postiz MCP server. Everything here runs server-side
+// only; keys never reach the browser.
 //
 // Public API reference: https://docs.postiz.com/public-api
 //   Auth:    Authorization: <api-key>            (no "Bearer " prefix)
@@ -21,6 +24,9 @@ import { PLATFORM_LABELS } from './types';
 //   POST /posts         -> create/schedule a post
 
 export class PostizError extends Error {}
+
+const DEFAULT_API_URL = 'https://api.postiz.com/public/v1';
+const DEFAULT_APP_URL = 'https://app.postiz.com';
 
 // ClipFlow platform -> Postiz provider identifier(s). Postiz reports the
 // provider in each integration's `identifier`; X is matched as both 'x' and
@@ -32,23 +38,86 @@ const PLATFORM_PROVIDERS: Record<Platform, string[]> = {
   twitter: ['x', 'twitter'],
 };
 
-export function postizEnabled(): boolean {
+export interface PostizCreds {
+  apiKey: string;
+  apiUrl: string; // full API base, including /public/v1
+  appUrl: string; // Postiz web app, for "Manage in Postiz" links
+}
+
+/** Normalize a user/env-supplied API base to a full `/public/v1` URL. */
+export function normalizeApiUrl(raw?: string | null): string {
+  const base = (raw || '').trim().replace(/\/+$/, '');
+  if (!base) return DEFAULT_API_URL;
+  return /\/public\/v\d+$/.test(base) ? base : `${base}/public/v1`;
+}
+
+function appUrlFromApi(apiUrl: string): string {
+  if (apiUrl.startsWith(DEFAULT_API_URL)) return DEFAULT_APP_URL;
+  try {
+    return new URL(apiUrl).origin;
+  } catch {
+    return DEFAULT_APP_URL;
+  }
+}
+
+/** Build a full creds object from a raw API key (+ optional self-hosted base). */
+export function makePostizCreds(apiKey: string, apiUrl?: string | null): PostizCreds {
+  const normalized = normalizeApiUrl(apiUrl);
+  return { apiKey, apiUrl: normalized, appUrl: appUrlFromApi(normalized) };
+}
+
+/** True when an app-wide default Postiz key is configured via env. */
+export function envPostizConfigured(): boolean {
   return Boolean(process.env.POSTIZ_API_KEY);
 }
 
-/** Link target for the "Manage channels in Postiz" affordance. */
-export function postizAppUrl(): string {
-  return (process.env.POSTIZ_APP_URL || 'https://app.postiz.com').replace(/\/$/, '');
+function envPostizCreds(): PostizCreds | null {
+  const apiKey = process.env.POSTIZ_API_KEY;
+  if (!apiKey) return null;
+  const apiUrl = normalizeApiUrl(process.env.POSTIZ_API_URL);
+  return {
+    apiKey,
+    apiUrl,
+    appUrl: (process.env.POSTIZ_APP_URL || appUrlFromApi(apiUrl)).replace(/\/+$/, ''),
+  };
 }
 
-function baseUrl(): string {
-  return (process.env.POSTIZ_API_URL || 'https://api.postiz.com/public/v1').replace(/\/$/, '');
+/** Build creds from a user's stored (encrypted) Postiz key, if they have one. */
+export async function getUserPostizCreds(
+  db: SupabaseClient,
+  userId: string
+): Promise<PostizCreds | null> {
+  const { data } = await db
+    .from('clipflow_postiz_accounts')
+    .select('encrypted_api_key, api_url')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (!data?.encrypted_api_key) return null;
+  const apiUrl = normalizeApiUrl(data.api_url);
+  return { apiKey: decryptToken(data.encrypted_api_key), apiUrl, appUrl: appUrlFromApi(apiUrl) };
 }
 
-function authHeaders(): Record<string, string> {
-  const key = process.env.POSTIZ_API_KEY;
-  if (!key) throw new PostizError('POSTIZ_API_KEY is not set.');
-  return { Authorization: key };
+export type PostizSource = 'user' | 'env';
+
+/**
+ * Resolve the Postiz credentials to use for a user: their own key first, then
+ * the app-wide env default. Returns null when neither is configured (callers
+ * then fall back to the per-platform OAuth path).
+ */
+export async function resolvePostizCreds(
+  db: SupabaseClient,
+  userId: string
+): Promise<{ creds: PostizCreds; source: PostizSource } | null> {
+  const user = await getUserPostizCreds(db, userId);
+  if (user) return { creds: user, source: 'user' };
+  const env = envPostizCreds();
+  if (env) return { creds: env, source: 'env' };
+  return null;
+}
+
+function authHeaders(creds: PostizCreds): Record<string, string> {
+  return { Authorization: creds.apiKey };
 }
 
 export interface PostizIntegration {
@@ -83,12 +152,12 @@ function integrationForPlatform(
 // ── Rate-limit-friendly caching ─────────────────────────────────────────────
 // The Postiz Public API is capped at ~30 requests/hour, so we cache the channel
 // list briefly and de-duplicate the media upload when one clip is posted to
-// several platforms at once. The caches hold the in-flight *promise* (not just
-// the result) so the concurrent burst the post route fires — one publish call
-// per platform in parallel — shares a single integrations fetch and a single
-// upload rather than racing into N identical requests.
+// several platforms at once. Caches are keyed by API key (each user's workspace
+// is distinct) and hold the in-flight *promise* (not just the result) so the
+// concurrent burst the post route fires — one publish call per platform in
+// parallel — shares a single integrations fetch and a single upload.
 
-let integrationsCache: { at: number; promise: Promise<PostizIntegration[]> } | null = null;
+const integrationsCache = new Map<string, { at: number; promise: Promise<PostizIntegration[]> }>();
 const INTEGRATIONS_TTL_MS = 60_000;
 
 interface UploadedMedia {
@@ -99,22 +168,27 @@ interface UploadedMedia {
 const uploadCache = new Map<string, { at: number; promise: Promise<UploadedMedia> }>();
 const UPLOAD_TTL_MS = 5 * 60_000;
 
-/** List the channels connected in the Postiz workspace (cached ~60s). */
-export async function listIntegrations(force = false): Promise<PostizIntegration[]> {
-  if (!force && integrationsCache && Date.now() - integrationsCache.at < INTEGRATIONS_TTL_MS) {
-    return integrationsCache.promise;
+/** List the channels connected in a Postiz workspace (cached ~60s per key). */
+export async function listIntegrations(
+  creds: PostizCreds,
+  force = false
+): Promise<PostizIntegration[]> {
+  const cached = integrationsCache.get(creds.apiKey);
+  if (!force && cached && Date.now() - cached.at < INTEGRATIONS_TTL_MS) {
+    return cached.promise;
   }
-  const promise = fetchIntegrations();
-  integrationsCache = { at: Date.now(), promise };
+  const promise = fetchIntegrations(creds);
+  integrationsCache.set(creds.apiKey, { at: Date.now(), promise });
   // Drop a failed fetch from the cache so the next call retries.
   promise.catch(() => {
-    if (integrationsCache?.promise === promise) integrationsCache = null;
+    const current = integrationsCache.get(creds.apiKey);
+    if (current?.promise === promise) integrationsCache.delete(creds.apiKey);
   });
   return promise;
 }
 
-async function fetchIntegrations(): Promise<PostizIntegration[]> {
-  const res = await fetch(`${baseUrl()}/integrations`, { headers: authHeaders() });
+async function fetchIntegrations(creds: PostizCreds): Promise<PostizIntegration[]> {
+  const res = await fetch(`${creds.apiUrl}/integrations`, { headers: authHeaders(creds) });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     throw new PostizError(
@@ -142,11 +216,12 @@ async function fetchIntegrations(): Promise<PostizIntegration[]> {
 }
 
 /** Upload the rendered MP4 to Postiz (de-duplicated per clip across platforms). */
-function uploadVideo(cacheKey: string, videoUrl: string): Promise<UploadedMedia> {
+function uploadVideo(creds: PostizCreds, fileKey: string, videoUrl: string): Promise<UploadedMedia> {
+  const cacheKey = `${creds.apiKey}|${fileKey}`;
   const cached = uploadCache.get(cacheKey);
   if (cached && Date.now() - cached.at < UPLOAD_TTL_MS) return cached.promise;
 
-  const promise = doUploadVideo(videoUrl);
+  const promise = doUploadVideo(creds, videoUrl);
   pruneUploadCache();
   uploadCache.set(cacheKey, { at: Date.now(), promise });
   promise.catch(() => {
@@ -156,7 +231,7 @@ function uploadVideo(cacheKey: string, videoUrl: string): Promise<UploadedMedia>
   return promise;
 }
 
-async function doUploadVideo(videoUrl: string): Promise<UploadedMedia> {
+async function doUploadVideo(creds: PostizCreds, videoUrl: string): Promise<UploadedMedia> {
   const fileRes = await fetch(videoUrl);
   if (!fileRes.ok) {
     throw new PostizError('Could not fetch the rendered clip to upload to Postiz.');
@@ -166,9 +241,9 @@ async function doUploadVideo(videoUrl: string): Promise<UploadedMedia> {
   const form = new FormData();
   form.append('file', new Blob([buf], { type: 'video/mp4' }), 'clip.mp4');
 
-  const res = await fetch(`${baseUrl()}/upload`, {
+  const res = await fetch(`${creds.apiUrl}/upload`, {
     method: 'POST',
-    headers: authHeaders(), // let fetch set the multipart Content-Type + boundary
+    headers: authHeaders(creds), // let fetch set the multipart Content-Type + boundary
     body: form,
   });
   const data = await res.json().catch(() => null);
@@ -234,10 +309,11 @@ export interface PostizPublishResult {
  * handles scheduling, so this always posts immediately.
  */
 export async function publishViaPostiz(
+  creds: PostizCreds,
   platform: Platform,
   input: PostizPublishInput
 ): Promise<PostizPublishResult> {
-  const integrations = await listIntegrations();
+  const integrations = await listIntegrations(creds);
   const integration = integrationForPlatform(platform, integrations);
   if (!integration) {
     throw new PostizError(
@@ -245,7 +321,7 @@ export async function publishViaPostiz(
     );
   }
 
-  const media = await uploadVideo(input.cacheKey, input.videoUrl);
+  const media = await uploadVideo(creds, input.cacheKey, input.videoUrl);
   const content = buildContent(input.title, input.description, input.hashtags);
 
   const body = {
@@ -262,9 +338,9 @@ export async function publishViaPostiz(
     ],
   };
 
-  const res = await fetch(`${baseUrl()}/posts`, {
+  const res = await fetch(`${creds.apiUrl}/posts`, {
     method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    headers: { ...authHeaders(creds), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => null);
