@@ -10,6 +10,7 @@ export function buildSystemPrompt(opts: {
     'You help the user with general tasks and with their speeches and presentations.',
     '',
     'You can read the user\'s own Orator speech analyses (engagement scores, drops, transcripts) using the speech tools — use them whenever the user mentions their talks, presentations, or results.',
+    'You can also read analytics (followers, views, likes, engagement) for the social accounts the user connected in ClipFlow (Instagram, TikTok, YouTube, X) using the social tools — use them whenever the user asks how their social media, channel, posts, reels, or videos are performing.',
   ];
 
   if (opts.toolNotes.length) {
