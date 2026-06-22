@@ -6,6 +6,8 @@
  * Best-effort: returns [] on any fetch/parse failure so the hub never
  * breaks on a bad feed.
  */
+import { safeFetch } from '@/lib/security/ssrf';
+
 export interface IcsEvent {
   title: string;
   location?: string;
@@ -84,7 +86,9 @@ export async function fetchIcsEvents(url: string): Promise<IcsEvent[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9000);
   try {
-    const res = await fetch(httpUrl, {
+    // SSRF guard: blocks loopback / private / link-local / metadata addresses,
+    // re-validating each redirect hop. Returns [] on a blocked URL (caught below).
+    const res = await safeFetch(httpUrl, {
       signal: controller.signal,
       headers: {
         'User-Agent':

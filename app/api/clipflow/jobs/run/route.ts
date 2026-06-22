@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { claimDueJobs, completeJob, failJob } from '@/lib/clipflow/queue';
 import { runJob } from '@/lib/clipflow/runner';
+
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
 
 // Drains the ClipFlow job queue: processing pipelines and scheduled posts that
 // are now due. Wire this to a scheduled trigger (e.g. a Vercel Cron hitting
@@ -15,7 +23,7 @@ export async function POST(request: NextRequest) {
   // Auth: either a valid cron secret, or a signed-in user.
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = request.headers.get('authorization');
-  const cronAuthorized = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  const cronAuthorized = !!cronSecret && !!authHeader && safeEqual(authHeader, `Bearer ${cronSecret}`);
 
   if (!cronAuthorized) {
     const supabase = createClient();

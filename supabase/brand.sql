@@ -14,25 +14,27 @@ insert into storage.buckets (id, name, public)
 values ('brand-assets', 'brand-assets', true)
 on conflict (id) do nothing;
 
--- Public read (assets are referenced by <img src>), owner-scoped writes.
+-- Writes are owner-scoped. Reads are NOT given a broad SELECT policy: because
+-- the bucket is public, objects are served via their public object URL
+-- (/storage/v1/object/public/brand-assets/...) without needing an RLS SELECT
+-- policy. Adding `for select using (bucket_id = 'brand-assets')` would let any
+-- client LIST every file in the bucket (Supabase advisor 0025), so it is omitted.
 drop policy if exists "Public read brand assets" on storage.objects;
-create policy "Public read brand assets" on storage.objects
-  for select using (bucket_id = 'brand-assets');
 
 drop policy if exists "Users upload own brand assets" on storage.objects;
 create policy "Users upload own brand assets" on storage.objects
   for insert with check (
-    bucket_id = 'brand-assets' and auth.uid()::text = (storage.foldername(name))[1]
+    bucket_id = 'brand-assets' and (select auth.uid())::text = (storage.foldername(name))[1]
   );
 
 drop policy if exists "Users update own brand assets" on storage.objects;
 create policy "Users update own brand assets" on storage.objects
   for update using (
-    bucket_id = 'brand-assets' and auth.uid()::text = (storage.foldername(name))[1]
+    bucket_id = 'brand-assets' and (select auth.uid())::text = (storage.foldername(name))[1]
   );
 
 drop policy if exists "Users delete own brand assets" on storage.objects;
 create policy "Users delete own brand assets" on storage.objects
   for delete using (
-    bucket_id = 'brand-assets' and auth.uid()::text = (storage.foldername(name))[1]
+    bucket_id = 'brand-assets' and (select auth.uid())::text = (storage.foldername(name))[1]
   );
