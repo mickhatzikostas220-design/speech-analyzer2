@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { getOpenAI } from '@/lib/openai';
 
 export const maxDuration = 60;
 
@@ -47,7 +45,7 @@ Remember: for DMN, lower scores are better (less mind-wandering). For all others
 
 Write the report now.`;
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: 'gpt-4o',
     messages: [
       { role: 'system', content: systemPrompt },

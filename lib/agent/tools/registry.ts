@@ -3,6 +3,7 @@ import type { Autonomy, SideEffect, ToolDef } from '../types';
 import { listConnections } from '../store';
 import { analysesTools } from './analyses';
 import { gmailTools } from './gmail';
+import { driveTools } from './drive';
 
 // Which side effects each autonomy level permits. "whatever the user allows" —
 // the user picks the level per connection.
@@ -25,10 +26,11 @@ export async function buildTools(
   for (const conn of connections) {
     if (conn.provider === 'google') {
       const allowed = ALLOWED_EFFECTS[conn.autonomy];
+      // Gmail respects the connection's autonomy; Drive is read-only either way.
       const usable = gmailTools(conn.id).filter((t) => allowed.includes(t.sideEffect));
-      tools.push(...usable);
+      tools.push(...usable, ...driveTools(conn.id));
       notes.push(
-        `Gmail account ${conn.account_email ?? '(connected)'} — permission level: ${conn.autonomy.replace('_', ' ')}.`
+        `Google account ${conn.account_email ?? '(connected)'} — Gmail permission level: ${conn.autonomy.replace('_', ' ')}; Google Drive: read-only.`
       );
     }
   }

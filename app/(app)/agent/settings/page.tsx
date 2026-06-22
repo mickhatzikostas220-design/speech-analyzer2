@@ -60,7 +60,7 @@ export default function AgentSettingsPage() {
   // Surface OAuth redirect results.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('connected')) setBanner({ kind: 'ok', text: 'Gmail connected.' });
+    if (params.get('connected')) setBanner({ kind: 'ok', text: 'Google connected (Gmail + Drive).' });
     else if (params.get('error'))
       setBanner({ kind: 'err', text: `Connection failed: ${params.get('error')}` });
     if (params.get('connected') || params.get('error')) {
@@ -249,7 +249,7 @@ export default function AgentSettingsPage() {
           <div key={c.id} className="space-y-2 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-surface-card px-3 py-3">
             <div className="flex items-center justify-between">
               <span className="text-sm capitalize text-strong">
-                {c.provider === 'google' ? 'Gmail' : c.provider}
+                {c.provider === 'google' ? 'Google — Gmail & Drive' : c.provider}
                 {c.account_email && <span className="text-muted"> — {c.account_email}</span>}
               </span>
               <button onClick={() => disconnect(c.id)} className="text-xs font-semibold" style={{ color: 'var(--danger)' }}>
@@ -272,11 +272,11 @@ export default function AgentSettingsPage() {
 
         {data.googleConfigured ? (
           <a href="/api/agent/connect/google" className="btn-outline inline-flex" style={{ padding: '8px 18px', fontSize: 'var(--text-sm)' }}>
-            + Connect Gmail
+            + Connect Google (Gmail &amp; Drive)
           </a>
         ) : (
           <p className="text-xs text-faint">
-            Gmail connection is unavailable — the server needs <code>GOOGLE_CLIENT_ID</code> and{' '}
+            Google connection is unavailable — the server needs <code>GOOGLE_CLIENT_ID</code> and{' '}
             <code>GOOGLE_CLIENT_SECRET</code> configured.
           </p>
         )}

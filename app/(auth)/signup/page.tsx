@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
+// Auth screens need runtime Supabase env and must never be statically prerendered.
+export const dynamic = 'force-dynamic';
+
 export default function SignupPage() {
   const router = useRouter();
   const supabase = createClient();
