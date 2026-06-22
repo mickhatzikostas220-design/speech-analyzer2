@@ -1,16 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Autonomy, SideEffect, ToolDef } from '../types';
+import { ALLOWED_EFFECTS, type ToolDef } from '../types';
 import { listConnections } from '../store';
 import { analysesTools } from './analyses';
 import { gmailTools } from './gmail';
-
-// Which side effects each autonomy level permits. "whatever the user allows" —
-// the user picks the level per connection.
-const ALLOWED_EFFECTS: Record<Autonomy, SideEffect[]> = {
-  read_only: ['none'],
-  draft_confirm: ['none', 'reversible'],
-  act_directly: ['none', 'reversible', 'irreversible'],
-};
+import { getComposioKey, listComposioConnections } from '@/lib/composio/store';
+import { buildComposioTools } from '@/lib/composio/tools';
 
 // Assemble the tool set for a request: always the read-only speech-aware tools,
 // plus tools for each connected app gated by that connection's autonomy.
@@ -31,6 +25,26 @@ export async function buildTools(
         `Gmail account ${conn.account_email ?? '(connected)'} — permission level: ${conn.autonomy.replace('_', ' ')}.`
       );
     }
+  }
+
+  // Composio-connected apps (bring-your-own-key). Loaded best-effort so a
+  // Composio hiccup never breaks the chat — the built-in tools still work.
+  try {
+    const composioKey = await getComposioKey(supabase, userId);
+    if (composioKey) {
+      const composioConns = await listComposioConnections(supabase, userId);
+      if (composioConns.length) {
+        const { tools: cTools, notes: cNotes } = await buildComposioTools(
+          composioKey,
+          userId,
+          composioConns.map((c) => ({ toolkit: c.toolkit, autonomy: c.autonomy }))
+        );
+        tools.push(...cTools);
+        notes.push(...cNotes);
+      }
+    }
+  } catch {
+    // Ignore — Composio is additive.
   }
 
   return { tools, notes };

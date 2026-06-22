@@ -15,6 +15,18 @@ interface Connection {
   account_email: string | null;
   autonomy: Autonomy;
 }
+interface ComposioConnection {
+  id: string;
+  toolkit: string;
+  account_label: string | null;
+  autonomy: Autonomy;
+}
+interface ToolkitOption {
+  slug: string;
+  name: string;
+  description?: string;
+  logo?: string;
+}
 interface SettingsData {
   settings: { provider: Provider; model: string; system_prompt: string | null };
   keyHints: Record<string, string>;
@@ -23,6 +35,7 @@ interface SettingsData {
   providerLabels: Record<string, string>;
   encryptionConfigured: boolean;
   googleConfigured: boolean;
+  composio: { keyHint: string | null; connections: ComposioConnection[] };
 }
 
 const AUTONOMY_LABELS: Record<Autonomy, string> = {
@@ -40,6 +53,11 @@ export default function AgentSettingsPage() {
   const [keyInput, setKeyInput] = useState('');
   const [banner, setBanner] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [savingKey, setSavingKey] = useState(false);
+  const [composioKeyInput, setComposioKeyInput] = useState('');
+  const [savingComposioKey, setSavingComposioKey] = useState(false);
+  const [toolkits, setToolkits] = useState<ToolkitOption[] | null>(null);
+  const [toolkitSearch, setToolkitSearch] = useState('');
+  const [loadingToolkits, setLoadingToolkits] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch('/api/agent/settings');
@@ -61,9 +79,11 @@ export default function AgentSettingsPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('connected')) setBanner({ kind: 'ok', text: 'Gmail connected.' });
+    else if (params.get('composio_connected'))
+      setBanner({ kind: 'ok', text: 'App connected via Composio.' });
     else if (params.get('error'))
       setBanner({ kind: 'err', text: `Connection failed: ${params.get('error')}` });
-    if (params.get('connected') || params.get('error')) {
+    if (params.get('connected') || params.get('composio_connected') || params.get('error')) {
       window.history.replaceState({}, '', '/agent/settings');
     }
   }, []);
@@ -123,6 +143,55 @@ export default function AgentSettingsPage() {
 
   async function disconnect(id: string) {
     await fetch(`/api/agent/connections/${id}`, { method: 'DELETE' });
+    load();
+  }
+
+  async function saveComposioKey() {
+    if (!composioKeyInput.trim()) return;
+    setSavingComposioKey(true);
+    const res = await fetch('/api/agent/composio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: composioKeyInput.trim() }),
+    });
+    const j = await res.json().catch(() => ({}));
+    setSavingComposioKey(false);
+    if (res.ok) {
+      setComposioKeyInput('');
+      setBanner({ kind: 'ok', text: 'Composio key saved.' });
+      load();
+    } else {
+      setBanner({ kind: 'err', text: j.error || 'Could not save Composio key.' });
+    }
+  }
+
+  async function removeComposioKey() {
+    await fetch('/api/agent/composio', { method: 'DELETE' });
+    setToolkits(null);
+    setBanner({ kind: 'ok', text: 'Composio key removed.' });
+    load();
+  }
+
+  async function loadToolkits(q?: string) {
+    setLoadingToolkits(true);
+    const res = await fetch(`/api/agent/composio/toolkits${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+    const j = await res.json().catch(() => ({}));
+    setLoadingToolkits(false);
+    if (res.ok) setToolkits(j.toolkits ?? []);
+    else setBanner({ kind: 'err', text: j.error || 'Could not load apps.' });
+  }
+
+  async function setComposioAutonomy(id: string, autonomy: Autonomy) {
+    await fetch(`/api/agent/composio/connections/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ autonomy }),
+    });
+    load();
+  }
+
+  async function disconnectComposio(id: string) {
+    await fetch(`/api/agent/composio/connections/${id}`, { method: 'DELETE' });
     load();
   }
 
@@ -279,6 +348,140 @@ export default function AgentSettingsPage() {
             Gmail connection is unavailable — the server needs <code>GOOGLE_CLIENT_ID</code> and{' '}
             <code>GOOGLE_CLIENT_SECRET</code> configured.
           </p>
+        )}
+      </section>
+
+      {/* Connect more apps via Composio */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-strong">Connect more apps (Composio)</h2>
+        <p className="text-xs text-muted">
+          Use{' '}
+          <a
+            href="https://composio.dev"
+            target="_blank"
+            rel="noreferrer"
+            className="font-semibold"
+            style={{ color: 'var(--text-link)' }}
+          >
+            Composio
+          </a>{' '}
+          to connect hundreds of apps (Slack, Notion, Google Calendar, GitHub, Linear, and more).
+          Bring your own Composio API key — your usage is billed to you, and you control how much each
+          app is allowed to do.
+        </p>
+
+        {data.composio.keyHint ? (
+          <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-surface-card px-3 py-2">
+            <span className="text-sm text-strong">Composio key set •••• {data.composio.keyHint}</span>
+            <button onClick={removeComposioKey} className="text-xs font-semibold" style={{ color: 'var(--danger)' }}>
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={composioKeyInput}
+              onChange={(e) => setComposioKeyInput(e.target.value)}
+              placeholder="Paste your Composio API key"
+              disabled={!data.encryptionConfigured}
+              className="input flex-1 text-sm disabled:opacity-50"
+            />
+            <button
+              onClick={saveComposioKey}
+              disabled={savingComposioKey || !composioKeyInput.trim() || !data.encryptionConfigured}
+              className="btn-ink"
+              style={{ padding: '0 18px', fontSize: 'var(--text-sm)' }}
+            >
+              {savingComposioKey ? 'Checking…' : 'Add'}
+            </button>
+          </div>
+        )}
+
+        {data.composio.keyHint && (
+          <>
+            {data.composio.connections.map((c) => (
+              <div
+                key={c.id}
+                className="space-y-2 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-surface-card px-3 py-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm capitalize text-strong">
+                    {c.toolkit}
+                    {c.account_label && <span className="text-muted"> — {c.account_label}</span>}
+                  </span>
+                  <button
+                    onClick={() => disconnectComposio(c.id)}
+                    className="text-xs font-semibold"
+                    style={{ color: 'var(--danger)' }}
+                  >
+                    Disconnect
+                  </button>
+                </div>
+                <select
+                  value={c.autonomy}
+                  onChange={(e) => setComposioAutonomy(c.id, e.target.value as Autonomy)}
+                  className="input w-full text-xs"
+                >
+                  {(Object.keys(AUTONOMY_LABELS) as Autonomy[]).map((a) => (
+                    <option key={a} value={a}>
+                      {AUTONOMY_LABELS[a]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+
+            {/* App picker */}
+            <div className="space-y-2 rounded-[var(--radius-sm)] border border-dashed border-[var(--border-subtle)] px-3 py-3">
+              {toolkits === null ? (
+                <button onClick={() => loadToolkits()} className="text-xs font-semibold" style={{ color: 'var(--text-link)' }}>
+                  + Connect an app
+                </button>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      value={toolkitSearch}
+                      onChange={(e) => setToolkitSearch(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && loadToolkits(toolkitSearch.trim() || undefined)}
+                      placeholder="Search apps (e.g. Slack, Notion)…"
+                      className="input flex-1 text-xs"
+                    />
+                    <button
+                      onClick={() => loadToolkits(toolkitSearch.trim() || undefined)}
+                      className="btn-outline"
+                      style={{ padding: '0 14px', fontSize: 'var(--text-xs)' }}
+                    >
+                      Search
+                    </button>
+                  </div>
+                  {loadingToolkits ? (
+                    <p className="text-xs text-muted">Loading apps…</p>
+                  ) : toolkits.length === 0 ? (
+                    <p className="text-xs text-faint">No apps found.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {toolkits.map((t) => (
+                        <a
+                          key={t.slug}
+                          href={`/api/agent/composio/connect?toolkit=${encodeURIComponent(t.slug)}`}
+                          className="flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-surface-card px-2 py-2 text-xs text-strong hover:border-[var(--text-link)]"
+                          title={t.description}
+                        >
+                          {t.logo && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={t.logo} alt="" className="h-4 w-4 rounded" />
+                          )}
+                          <span className="truncate">{t.name}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </>
         )}
       </section>
 
