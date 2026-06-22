@@ -53,30 +53,36 @@ alter table feedback_points enable row level security;
 alter table engagement_timeline enable row level security;
 
 -- Profiles policies
-create policy "Users view own profile" on profiles for select using (auth.uid() = id);
-create policy "Users update own profile" on profiles for update using (auth.uid() = id);
+-- Note: auth.uid() is wrapped in a scalar subquery so Postgres evaluates it once
+-- per query rather than once per row (Supabase advisor 0003_auth_rls_initplan).
+create policy "Users view own profile" on profiles for select using ((select auth.uid()) = id);
+create policy "Users update own profile" on profiles for update using ((select auth.uid()) = id);
 
 -- Analyses policies
-create policy "Users view own analyses" on analyses for select using (auth.uid() = user_id);
-create policy "Users insert own analyses" on analyses for insert with check (auth.uid() = user_id);
-create policy "Users update own analyses" on analyses for update using (auth.uid() = user_id);
-create policy "Users delete own analyses" on analyses for delete using (auth.uid() = user_id);
+create policy "Users view own analyses" on analyses for select using ((select auth.uid()) = user_id);
+create policy "Users insert own analyses" on analyses for insert with check ((select auth.uid()) = user_id);
+create policy "Users update own analyses" on analyses for update using ((select auth.uid()) = user_id);
+create policy "Users delete own analyses" on analyses for delete using ((select auth.uid()) = user_id);
 
--- Feedback points — readable by owner, writable by service role (API routes)
+-- Feedback points — readable by owner. Inserts come from the Modal GPU callback
+-- using the service-role key, which bypasses RLS, so NO insert policy is needed
+-- (a `with check (true)` policy would let any user inject rows for any analysis).
 create policy "Users view own feedback" on feedback_points for select using (
-  analysis_id in (select id from analyses where user_id = auth.uid())
+  analysis_id in (select id from analyses where user_id = (select auth.uid()))
 );
-create policy "Service inserts feedback" on feedback_points for insert with check (true);
 
--- Engagement timeline
+-- Engagement timeline — same model as feedback_points (owner-read, service-write).
 create policy "Users view own timeline" on engagement_timeline for select using (
-  analysis_id in (select id from analyses where user_id = auth.uid())
+  analysis_id in (select id from analyses where user_id = (select auth.uid()))
 );
-create policy "Service inserts timeline" on engagement_timeline for insert with check (true);
 
--- Auto-create profile on signup
+-- Auto-create profile on signup.
+-- search_path is pinned (empty) so this SECURITY DEFINER function cannot be
+-- hijacked via a mutable search_path; EXECUTE is revoked from client roles so it
+-- can only run as the auth trigger, never as a direct PostgREST RPC call.
 create or replace function public.handle_new_user()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer
+set search_path = '' as $$
 begin
   insert into public.profiles (id, email)
   values (new.id, new.email)
@@ -84,6 +90,8 @@ begin
   return new;
 end;
 $$;
+
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
@@ -94,14 +102,15 @@ create trigger on_auth_user_created
 -- insert into storage.buckets (id, name, public) values ('speeches', 'speeches', false);
 
 create policy "Users upload own speeches" on storage.objects for insert with check (
-  bucket_id = 'speeches' and auth.uid()::text = (storage.foldername(name))[1]
+  bucket_id = 'speeches' and (select auth.uid())::text = (storage.foldername(name))[1]
 );
 create policy "Users read own speeches" on storage.objects for select using (
-  bucket_id = 'speeches' and auth.uid()::text = (storage.foldername(name))[1]
+  bucket_id = 'speeches' and (select auth.uid())::text = (storage.foldername(name))[1]
 );
 create policy "Users delete own speeches" on storage.objects for delete using (
-  bucket_id = 'speeches' and auth.uid()::text = (storage.foldername(name))[1]
+  bucket_id = 'speeches' and (select auth.uid())::text = (storage.foldername(name))[1]
 );
-create policy "Service reads speeches" on storage.objects for select using (
-  bucket_id = 'speeches'
-);
+-- NOTE: do NOT add a broad "Service reads speeches" SELECT policy here. The
+-- service-role key already bypasses RLS, so server routes can read any file
+-- without one. A `using (bucket_id = 'speeches')` policy would grant SELECT on
+-- EVERY user's private recordings to the public/authenticated roles (IDOR).

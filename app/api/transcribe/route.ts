@@ -17,6 +17,13 @@ export async function POST(request: NextRequest) {
     const audio = formData.get('audio') as Blob | null;
     if (!audio) return NextResponse.json({ error: 'No audio provided' }, { status: 400 });
 
+    // Cap upload size: protects server memory and matches OpenAI Whisper's 25 MB
+    // limit, and stops an authenticated user spending unbounded paid-API budget.
+    const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+    if (audio.size > MAX_AUDIO_BYTES) {
+      return NextResponse.json({ error: 'Audio file too large (max 25 MB).' }, { status: 413 });
+    }
+
     // Prefer the self-hosted Parakeet (parakeet-tdt-0.6b-v3) GPU server when
     // configured; otherwise fall back to OpenAI Whisper. Both return the same
     // { words: [{ word, start, end }], text } shape the script matcher consumes.

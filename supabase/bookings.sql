@@ -25,13 +25,13 @@ create index if not exists bookings_user_idx on bookings (user_id, created_at de
 alter table bookings enable row level security;
 
 drop policy if exists "Users view own bookings" on bookings;
-create policy "Users view own bookings" on bookings for select using (auth.uid() = user_id);
+create policy "Users view own bookings" on bookings for select using ((select auth.uid()) = user_id);
 drop policy if exists "Users insert own bookings" on bookings;
-create policy "Users insert own bookings" on bookings for insert with check (auth.uid() = user_id);
+create policy "Users insert own bookings" on bookings for insert with check ((select auth.uid()) = user_id);
 drop policy if exists "Users update own bookings" on bookings;
-create policy "Users update own bookings" on bookings for update using (auth.uid() = user_id);
+create policy "Users update own bookings" on bookings for update using ((select auth.uid()) = user_id);
 drop policy if exists "Users delete own bookings" on bookings;
-create policy "Users delete own bookings" on bookings for delete using (auth.uid() = user_id);
+create policy "Users delete own bookings" on bookings for delete using ((select auth.uid()) = user_id);
 
 -- Public inquiries (from the one-sheet) are inserted server-side with the
 -- service role, so no public insert policy is needed here.

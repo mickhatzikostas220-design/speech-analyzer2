@@ -123,24 +123,24 @@ alter table clipflow_jobs enable row level security;
 -- Projects
 drop policy if exists "Users manage own clipflow projects" on clipflow_projects;
 create policy "Users manage own clipflow projects" on clipflow_projects
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 -- Clips
 drop policy if exists "Users manage own clipflow clips" on clipflow_clips;
 create policy "Users manage own clipflow clips" on clipflow_clips
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 -- Connections (tokens are encrypted at rest and only ever read server-side)
 drop policy if exists "Users manage own clipflow connections" on clipflow_connections;
 create policy "Users manage own clipflow connections" on clipflow_connections
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 -- Posts
 drop policy if exists "Users manage own clipflow posts" on clipflow_posts;
 create policy "Users manage own clipflow posts" on clipflow_posts
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 -- Jobs
 drop policy if exists "Users manage own clipflow jobs" on clipflow_jobs;
 create policy "Users manage own clipflow jobs" on clipflow_jobs
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);

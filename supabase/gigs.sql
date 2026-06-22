@@ -20,13 +20,13 @@ create index if not exists gigs_user_starts_idx on gigs (user_id, starts_at);
 alter table gigs enable row level security;
 
 drop policy if exists "Users view own gigs" on gigs;
-create policy "Users view own gigs" on gigs for select using (auth.uid() = user_id);
+create policy "Users view own gigs" on gigs for select using ((select auth.uid()) = user_id);
 drop policy if exists "Users insert own gigs" on gigs;
-create policy "Users insert own gigs" on gigs for insert with check (auth.uid() = user_id);
+create policy "Users insert own gigs" on gigs for insert with check ((select auth.uid()) = user_id);
 drop policy if exists "Users update own gigs" on gigs;
-create policy "Users update own gigs" on gigs for update using (auth.uid() = user_id);
+create policy "Users update own gigs" on gigs for update using ((select auth.uid()) = user_id);
 drop policy if exists "Users delete own gigs" on gigs;
-create policy "Users delete own gigs" on gigs for delete using (auth.uid() = user_id);
+create policy "Users delete own gigs" on gigs for delete using ((select auth.uid()) = user_id);
 
 -- A connected calendar feed (Google/Outlook/Apple all expose a secret iCal URL).
 alter table profiles

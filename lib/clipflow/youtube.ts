@@ -28,6 +28,21 @@ export interface VideoMeta {
 
 export class YouTubeError extends Error {}
 
+// YouTube video IDs are always 11 chars from [A-Za-z0-9_-]. Validating at the
+// boundary keeps anything but a clean ID out of the value, which is later
+// interpolated into a yt-dlp URL — defense in depth alongside execFile (no shell).
+const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+// Channel IDs are "UC" + 22 of the same alphabet.
+const CHANNEL_ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
+const HANDLE_RE = /^@[A-Za-z0-9._-]{1,40}$/;
+const NAME_RE = /^[A-Za-z0-9._-]{1,80}$/;
+
+/** Throws if a parsed YouTube video ID is not a clean 11-char id. */
+export function assertVideoId(id: string): string {
+  if (!VIDEO_ID_RE.test(id)) throw new YouTubeError('Invalid YouTube video ID.');
+  return id;
+}
+
 function apiKey(): string {
   const key = process.env.YOUTUBE_API_KEY;
   if (!key) {
@@ -54,29 +69,29 @@ export function parseSourceUrl(input: string): ParsedSource {
   // youtu.be/<id>
   if (host === 'youtu.be') {
     const id = path.slice(1).split('/')[0];
-    if (id) return { type: 'video', videoId: id, raw };
+    if (id && VIDEO_ID_RE.test(id)) return { type: 'video', videoId: id, raw };
   }
 
   if (host.endsWith('youtube.com')) {
     // watch?v=<id>
     const v = url.searchParams.get('v');
-    if (v) return { type: 'video', videoId: v, raw };
+    if (v && VIDEO_ID_RE.test(v)) return { type: 'video', videoId: v, raw };
 
     // /shorts/<id>, /embed/<id>, /v/<id>
     const m = path.match(/^\/(shorts|embed|v)\/([^/?]+)/);
-    if (m) return { type: 'video', videoId: m[2], raw };
+    if (m && VIDEO_ID_RE.test(m[2])) return { type: 'video', videoId: m[2], raw };
 
     // /channel/<UC...>
     const ch = path.match(/^\/channel\/([^/?]+)/);
-    if (ch) return { type: 'channel', channelId: ch[1], raw };
+    if (ch && CHANNEL_ID_RE.test(ch[1])) return { type: 'channel', channelId: ch[1], raw };
 
     // /@handle
     const handle = path.match(/^\/@([^/?]+)/);
-    if (handle) return { type: 'channel', handle: `@${handle[1]}`, raw };
+    if (handle && HANDLE_RE.test(`@${handle[1]}`)) return { type: 'channel', handle: `@${handle[1]}`, raw };
 
     // /user/<name> or /c/<name>
     const user = path.match(/^\/(user|c)\/([^/?]+)/);
-    if (user) return { type: 'channel', username: user[2], raw };
+    if (user && NAME_RE.test(user[2])) return { type: 'channel', username: user[2], raw };
   }
 
   throw new YouTubeError(
