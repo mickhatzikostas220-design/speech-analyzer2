@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { ClipCandidate, PlatformHashtags, TranscriptCue } from './types';
+import type { ClipCandidate, ClipLength, ClipPreferences, PlatformHashtags, TranscriptCue } from './types';
 
 // All ClipFlow text generation runs on OpenAI GPT-4o via the `openai` SDK that
 // already powers Whisper transcription and coaching feedback elsewhere in this
@@ -63,6 +63,42 @@ function fmtTimestampedTranscript(cues: TranscriptCue[]): string {
     .join('\n');
 }
 
+// Hard duration bounds the detector and clamp logic both respect. "any" spans
+// the full allowed range; the others narrow the model toward a target length.
+const LENGTH_BANDS: Record<ClipLength, { min: number; max: number; label: string }> = {
+  any: { min: 15, max: 90, label: '15–90 seconds' },
+  short: { min: 15, max: 30, label: '15–30 seconds (snappy and fast-paced)' },
+  medium: { min: 30, max: 60, label: '30–60 seconds' },
+  long: { min: 60, max: 90, label: '60–90 seconds (room for a fuller story)' },
+};
+
+function bandFor(prefs?: ClipPreferences): { min: number; max: number; label: string } {
+  return LENGTH_BANDS[prefs?.length ?? 'any'] ?? LENGTH_BANDS.any;
+}
+
+// Render the user's preferences as an extra instruction block appended to the
+// detection prompt. Returns '' when there's nothing meaningful to add.
+function fmtPreferences(prefs?: ClipPreferences): string {
+  if (!prefs) return '';
+  const lines: string[] = [];
+  const band = bandFor(prefs);
+  if (prefs.length && prefs.length !== 'any') {
+    lines.push(`- Target clip length: ${band.label}. Strongly prefer clips in this range.`);
+  }
+  const tone = prefs.tone?.trim();
+  if (tone) {
+    lines.push(`- Desired tone/style: ${tone.slice(0, 200)}. Favour moments that fit this vibe.`);
+  }
+  const notes = prefs.notes?.trim();
+  if (notes) {
+    lines.push(`- The user is specifically looking for: ${notes.slice(0, 600)}`);
+  }
+  if (lines.length === 0) return '';
+  return `\n\nUSER PREFERENCES (prioritise these — they describe exactly the clips the user wants):\n${lines.join(
+    '\n'
+  )}`;
+}
+
 interface RawClip {
   start: number;
   end: number;
@@ -93,7 +129,8 @@ Return ONLY minified JSON: an array of clip objects with keys start, end, title,
 async function detectInWindow(
   meta: VideoMetaLike,
   cues: TranscriptCue[],
-  count: number
+  count: number,
+  prefs?: ClipPreferences
 ): Promise<RawClip[]> {
   const transcript = fmtTimestampedTranscript(cues);
   const user = `Video title: ${meta.title}
@@ -102,21 +139,30 @@ Channel: ${meta.channelTitle}
 Transcript (timestamps in seconds at the start of each line):
 ${transcript}
 
-Find the ${count} best short-form clips in this section. Return the JSON array only.`;
+Find the ${count} best short-form clips in this section. Return the JSON array only.${fmtPreferences(
+    prefs
+  )}`;
 
   const clips = await callJson<RawClip[]>(DETECT_SYSTEM, user, 3500, 0.7);
   return Array.isArray(clips) ? clips : [];
 }
 
 // Propose clips when no transcript is available — purely from metadata + duration.
-async function detectFromMetadata(meta: VideoMetaLike, count: number): Promise<RawClip[]> {
+async function detectFromMetadata(
+  meta: VideoMetaLike,
+  count: number,
+  prefs?: ClipPreferences
+): Promise<RawClip[]> {
+  const band = bandFor(prefs);
   const system = `You are ClipFlow. No transcript is available, so propose ${count} plausible short-form clip windows spread across a ${Math.round(
     meta.durationSeconds
-  )}-second video, based on its title and description. Same JSON contract as usual (start, end, title, caption, description, hashtags{default,instagram,tiktok,youtube,twitter}, score, reason). Each clip 20–60s, within the video duration. Return ONLY the JSON array.`;
+  )}-second video, based on its title and description. Same JSON contract as usual (start, end, title, caption, description, hashtags{default,instagram,tiktok,youtube,twitter}, score, reason). Each clip ${
+    band.label
+  }, within the video duration. Return ONLY the JSON array.`;
   const user = `Title: ${meta.title}
 Channel: ${meta.channelTitle}
 Duration: ${Math.round(meta.durationSeconds)}s
-Description: ${meta.description.slice(0, 1500)}`;
+Description: ${meta.description.slice(0, 1500)}${fmtPreferences(prefs)}`;
   const clips = await callJson<RawClip[]>(system, user, 2500, 0.8);
   return Array.isArray(clips) ? clips : [];
 }
@@ -145,14 +191,16 @@ function overlaps(a: RawClip, b: RawClip): boolean {
 export async function detectClips(
   meta: VideoMetaLike,
   cues: TranscriptCue[] | null,
-  opts: { maxClips?: number } = {}
+  opts: { maxClips?: number; preferences?: ClipPreferences } = {}
 ): Promise<ClipCandidate[]> {
   const maxClips = Math.min(10, Math.max(3, opts.maxClips ?? 6));
+  const prefs = opts.preferences;
+  const band = bandFor(prefs);
 
   let raw: RawClip[] = [];
 
   if (!cues || cues.length === 0) {
-    raw = await detectFromMetadata(meta, maxClips);
+    raw = await detectFromMetadata(meta, maxClips, prefs);
   } else {
     const MAX_WINDOWS = 6;
     const duration = meta.durationSeconds || cues[cues.length - 1].end;
@@ -171,7 +219,7 @@ export async function detectClips(
     for (let i = 0; i < windows.length; i += CONCURRENCY) {
       const batch = windows.slice(i, i + CONCURRENCY);
       const results = await Promise.all(
-        batch.map((w) => detectInWindow(meta, w, perWindow).catch(() => []))
+        batch.map((w) => detectInWindow(meta, w, perWindow, prefs).catch(() => []))
       );
       raw.push(...results.flat());
     }
@@ -181,10 +229,10 @@ export async function detectClips(
   const cleaned = raw
     .map((c) => {
       const start = Math.max(0, Number(c.start) || 0);
-      let end = Number(c.end) || start + 30;
+      let end = Number(c.end) || start + band.min;
       const len = end - start;
-      if (len < 15) end = start + 15;
-      if (len > 90) end = start + 90;
+      if (len < band.min) end = start + band.min;
+      if (len > band.max) end = start + band.max;
       return { ...c, start, end, score: Number(c.score) || 50 };
     })
     .filter((c) => c.end > c.start)

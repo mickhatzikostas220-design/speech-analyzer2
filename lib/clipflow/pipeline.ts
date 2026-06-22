@@ -87,7 +87,10 @@ export async function processProject(
     // 4) Detect high-value moments with Claude.
     await update(admin, projectId, { status: 'analyzing', progress: 65 });
     const maxClips = clipCountForDuration(meta.durationSeconds);
-    const candidates = await detectClips(meta, cues, { maxClips });
+    const candidates = await detectClips(meta, cues, {
+      maxClips,
+      preferences: project.preferences ?? undefined,
+    });
 
     if (candidates.length === 0) {
       throw new Error('No clips could be generated for this video.');

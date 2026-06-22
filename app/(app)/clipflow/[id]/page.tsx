@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { ClipCard, type Clip } from '@/components/clipflow/ClipCard';
+import { CLIP_LENGTH_LABELS, type ClipPreferences } from '@/lib/clipflow/types';
 
 interface Project {
   id: string;
@@ -12,6 +13,7 @@ interface Project {
   title: string | null;
   channel_title: string | null;
   duration_seconds: number | null;
+  preferences: ClipPreferences | null;
   status: string;
   progress: number;
   error: string | null;
@@ -130,6 +132,28 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
             Source ↗
           </a>
         </div>
+
+        {/* Preferences the clips were generated with */}
+        {project.preferences &&
+          (project.preferences.tone || project.preferences.length || project.preferences.notes) && (
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              {project.preferences.length && (
+                <span className="text-xs text-zinc-300 bg-zinc-800/80 border border-zinc-700 rounded-full px-2.5 py-1">
+                  {CLIP_LENGTH_LABELS[project.preferences.length]}
+                </span>
+              )}
+              {project.preferences.tone && (
+                <span className="text-xs text-zinc-300 bg-zinc-800/80 border border-zinc-700 rounded-full px-2.5 py-1">
+                  {project.preferences.tone}
+                </span>
+              )}
+              {project.preferences.notes && (
+                <span className="text-xs text-zinc-400 bg-zinc-800/50 border border-zinc-700 rounded-full px-2.5 py-1 max-w-full truncate">
+                  “{project.preferences.notes}”
+                </span>
+              )}
+            </div>
+          )}
       </div>
 
       {/* Progress */}

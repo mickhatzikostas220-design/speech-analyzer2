@@ -26,6 +26,30 @@ export type PostStatus = 'queued' | 'scheduled' | 'posting' | 'posted' | 'failed
 
 export type CaptionStyle = 'opus' | 'karaoke' | 'minimal';
 
+// How long the user wants their clips to be. Each band maps to a duration
+// window the moment-detector is asked to honour (see ai.ts LENGTH_BANDS).
+export type ClipLength = 'short' | 'medium' | 'long' | 'any';
+
+export const CLIP_LENGTHS: ClipLength[] = ['any', 'short', 'medium', 'long'];
+
+export const CLIP_LENGTH_LABELS: Record<ClipLength, string> = {
+  any: 'Any length',
+  short: 'Short · 15–30s',
+  medium: 'Medium · 30–60s',
+  long: 'Long · 60–90s',
+};
+
+// User preferences for the kinds of clips ClipFlow should surface. All fields
+// are optional; an empty/absent object means "use the defaults".
+export interface ClipPreferences {
+  // Free-form tone/style, e.g. "funny", "educational", "inspirational".
+  tone?: string;
+  // Preferred clip duration band.
+  length?: ClipLength;
+  // Anything else the user wants the AI to look for or avoid.
+  notes?: string;
+}
+
 export interface TranscriptCue {
   start: number;
   end: number;
@@ -52,6 +76,7 @@ export interface ClipFlowProject {
   duration_seconds: number | null;
   thumbnail_url: string | null;
   transcript: TranscriptCue[] | null;
+  preferences: ClipPreferences | null;
   status: ProjectStatus;
   progress: number;
   error: string | null;
