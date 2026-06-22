@@ -4,6 +4,7 @@ import { getSettings, listConnections, listKeyHints, saveSettings } from '@/lib/
 import { MODEL_OPTIONS, PROVIDER_LABEL, isProvider } from '@/lib/agent/models';
 import { isEncryptionConfigured } from '@/lib/crypto';
 import { googleConfigured } from '@/lib/agent/google';
+import { getComposioKeyHint, listComposioConnections } from '@/lib/composio/store';
 
 export const runtime = 'nodejs';
 
@@ -11,11 +12,14 @@ export async function GET() {
   const auth = await getUserAndAdmin();
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const [settings, keyHints, connections] = await Promise.all([
-    getSettings(auth.admin, auth.user.id),
-    listKeyHints(auth.admin, auth.user.id),
-    listConnections(auth.admin, auth.user.id),
-  ]);
+  const [settings, keyHints, connections, composioKeyHint, composioConnections] =
+    await Promise.all([
+      getSettings(auth.admin, auth.user.id),
+      listKeyHints(auth.admin, auth.user.id),
+      listConnections(auth.admin, auth.user.id),
+      getComposioKeyHint(auth.admin, auth.user.id),
+      listComposioConnections(auth.admin, auth.user.id),
+    ]);
 
   return NextResponse.json({
     settings,
@@ -25,6 +29,15 @@ export async function GET() {
     providerLabels: PROVIDER_LABEL,
     encryptionConfigured: isEncryptionConfigured(),
     googleConfigured: googleConfigured(),
+    composio: {
+      keyHint: composioKeyHint,
+      connections: composioConnections.map((c) => ({
+        id: c.id,
+        toolkit: c.toolkit,
+        account_label: c.account_label,
+        autonomy: c.autonomy,
+      })),
+    },
   });
 }
 

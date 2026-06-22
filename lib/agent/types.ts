@@ -7,6 +7,15 @@ export type Autonomy = 'read_only' | 'draft_confirm' | 'act_directly';
 // model at each autonomy level.
 export type SideEffect = 'none' | 'reversible' | 'irreversible';
 
+// Which side effects each autonomy level permits. "whatever the user allows" —
+// the user picks the level per connection. Shared by the built-in tool registry
+// and the Composio adapter so gating stays consistent.
+export const ALLOWED_EFFECTS: Record<Autonomy, SideEffect[]> = {
+  read_only: ['none'],
+  draft_confirm: ['none', 'reversible'],
+  act_directly: ['none', 'reversible', 'irreversible'],
+};
+
 export interface ToolCall {
   id: string;
   name: string;

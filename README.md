@@ -230,6 +230,15 @@ outside apps (starting with Gmail).
   recorded in the `agent_actions` audit log.
 - **Extensible.** Tools live in `lib/agent/tools/` and are assembled per request in
   `lib/agent/tools/registry.ts`.
+- **Connect 250+ more apps via [Composio](https://composio.dev).** In **Assistant →
+  Settings**, a speaker can paste their own Composio API key (bring-your-own-key,
+  validated + encrypted at rest) and connect apps like Slack, Notion, Google
+  Calendar, GitHub, or Linear through Composio's hosted OAuth. Composio holds the
+  OAuth tokens; we store only a pointer per connected toolkit plus the autonomy the
+  user granted it. The agent loads each connected toolkit's tools per request,
+  gated by that same *read only* / *draft & confirm* / *act directly* level (the
+  risk of each tool is inferred from its action verb). Run `supabase/agent_composio.sql`
+  to enable it. Implementation: `lib/composio/*`, routes under `app/api/agent/composio/*`.
 
 ## Booking Inbox & public one-sheet
 
