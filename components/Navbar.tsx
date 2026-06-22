@@ -13,6 +13,7 @@ const NAV_LINKS: { href: string; label: string }[] = [
   { href: '/agent', label: 'Assistant' },
   { href: '/bookings', label: 'Bookings' },
   { href: '/history', label: 'Library' },
+  { href: '/seo', label: 'SEO' },
   { href: '/editor', label: 'Studio' },
   { href: '/clipflow', label: 'ClipFlow' },
 ];
