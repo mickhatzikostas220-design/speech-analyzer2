@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getUpcomingGigs } from '@/lib/gigs/server';
 import { getBookings } from '@/lib/bookings/server';
 import { ToolGrid } from '@/components/hub/ToolGrid';
+import { FeatureTour, TourButton } from '@/components/hub/FeatureTour';
 import { RecentActivity } from '@/components/hub/RecentActivity';
 import { StatTiles, type Stat } from '@/components/hub/StatTiles';
 import { UpcomingGigs } from '@/components/hub/UpcomingGigs';
@@ -68,10 +69,17 @@ export default async function HubPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 pb-20 pt-10 sm:px-6">
+      {/* First-run walkthrough of every feature (auto-opens once per browser). */}
+      <FeatureTour brandName={brand.name} />
+
       {/* hero */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow mb-2">Your hub</p>
+          <div className="mb-2 flex items-center gap-3">
+            <p className="eyebrow">Your hub</p>
+            <span className="text-[var(--border-subtle)]">·</span>
+            <TourButton />
+          </div>
           <h1 className="display-h1">
             Hey {first},{' '}
             <span className="script" style={{ fontSize: '1.2em' }}>
