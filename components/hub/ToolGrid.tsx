@@ -8,6 +8,7 @@ import {
   Sparkles,
   Bot,
   Inbox,
+  Search,
   ArrowUpRight,
   type LucideIcon,
 } from 'lucide-react';
@@ -65,6 +66,14 @@ export function ToolGrid({ analysisCount, bookingCount = 0 }: { analysisCount: n
       desc: 'Cut highlight reels and shareable clips straight from your recorded talks.',
       href: '/editor',
       bg: 'var(--blue)',
+      fg: '#fff',
+    },
+    {
+      icon: Search,
+      name: 'SEO & AEO Audit',
+      desc: 'Paste your website and get prioritized tips to rank in search and get cited by AI.',
+      href: '/seo',
+      bg: 'var(--accent-2)',
       fg: '#fff',
     },
     {
