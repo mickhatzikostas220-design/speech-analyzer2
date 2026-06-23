@@ -1,13 +1,29 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { sendAccessRequestNotification } from '@/lib/email';
+import { rateLimit, clientIp } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { name, email, reason } = body;
+  // Public endpoint — throttle by IP to blunt request floods / email-bombing.
+  if (!rateLimit(`request-access:${clientIp(request)}`, 5, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  }
+  const name = typeof body.name === 'string' ? body.name : '';
+  const email = typeof body.email === 'string' ? body.email : '';
+  const reason = typeof body.reason === 'string' ? body.reason : '';
 
   if (!name?.trim() || !email?.trim() || !reason?.trim()) {
     return NextResponse.json({ error: 'All fields are required.' }, { status: 400 });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 422 });
   }
 
   const adminSupabase = createAdminClient();
@@ -33,7 +49,8 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error || !inserted) {
-    return NextResponse.json({ error: error?.message ?? 'Insert failed' }, { status: 500 });
+    console.error('[request-access] insert failed', error);
+    return NextResponse.json({ error: 'Could not submit your request. Please try again.' }, { status: 500 });
   }
 
   if (process.env.RESEND_API_KEY) {

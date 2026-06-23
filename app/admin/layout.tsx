@@ -2,14 +2,13 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { Logo } from '@/components/brand/Logo';
 import { DEFAULT_BRAND } from '@/lib/brand/defaults';
-
-const ADMIN_EMAIL = 'mickhatzikostas220@gmail.com';
+import { isAdminUser } from '@/lib/admin';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!isAdminUser(user)) {
     redirect('/dashboard');
   }
 
