@@ -44,6 +44,8 @@ export interface AeoState {
   // No catalog tips left to release.
   exhausted: boolean;
   totalCatalog: number;
+  // Whether Stripe billing is configured (drives the upgrade button).
+  billingConfigured: boolean;
 }
 
 export const CADENCE_LABELS: Record<Cadence, string> = {

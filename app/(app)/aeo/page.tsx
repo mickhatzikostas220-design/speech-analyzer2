@@ -22,6 +22,7 @@ export default async function AeoPage() {
         nextAvailableAt: null,
         exhausted: false,
         totalCatalog: AEO_CATALOG.length,
+        billingConfigured: false,
       };
 
   return <AeoCoach initial={initial} />;

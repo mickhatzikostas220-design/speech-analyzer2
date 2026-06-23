@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAeoState, getPlan } from '@/lib/aeo/server';
-import type { Cadence, Plan } from '@/lib/aeo/types';
+import type { Cadence } from '@/lib/aeo/types';
 
 export const runtime = 'nodejs';
 
 const CADENCES: Cadence[] = ['daily', 'weekly', 'biweekly', 'monthly'];
-const PLANS: Plan[] = ['free', 'pro'];
 
 export async function PUT(req: NextRequest) {
   const supabase = createClient();
@@ -22,26 +21,16 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
   }
 
-  // Plan changes. (Billing is wired separately; this flips the gate the app reads.)
-  if (typeof body.plan === 'string' && PLANS.includes(body.plan as Plan)) {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ plan: body.plan })
-      .eq('id', user.id);
-    if (error) {
-      return NextResponse.json(
-        { error: 'Could not update plan. Make sure the AEO migration has run.' },
-        { status: 500 }
-      );
-    }
-  }
+  // Plan is NOT settable here — Pro is granted only by a verified Stripe payment
+  // (see /api/billing/*). The profiles billing columns are also locked at the DB
+  // level so a user can't grant themselves Pro by writing the row directly.
 
   // Cadence is a Pro feature — free users stay weekly.
   if (typeof body.cadence === 'string' && CADENCES.includes(body.cadence as Cadence)) {
     const plan = await getPlan(supabase, user.id);
     if (plan !== 'pro' && body.cadence !== 'weekly') {
       return NextResponse.json(
-        { error: 'Custom schedules are a Pro feature. Free plan is weekly.' },
+        { error: 'Custom schedules are a Pro feature. Upgrade to choose your own cadence.' },
         { status: 403 }
       );
     }
@@ -63,3 +52,4 @@ export async function PUT(req: NextRequest) {
   const state = await getAeoState(supabase, user.id);
   return NextResponse.json(state);
 }
+

@@ -43,6 +43,7 @@ supabase/bookings.sql       # booking inbox (incoming speaking inquiries)
 supabase/onesheet.sql       # public speaker one-sheet (URL slug)
 supabase/agent.sql          # personal AI assistant (settings, keys, connections)
 supabase/aeo.sql            # AEO Coach (plan, delivery schedule, tips + completion)
+supabase/billing.sql        # Stripe billing columns + plan-tamper guard trigger
 ```
 
 **Create the storage bucket** — in the same SQL Editor, run:
@@ -271,9 +272,25 @@ scheduling/release logic in `lib/aeo/server.ts`, API under `app/api/aeo/*`, and 
 `components/aeo/AeoCoach.tsx`. Data model: `supabase/aeo.sql` (`profiles.plan`,
 `aeo_settings`, `aeo_tips`).
 
-> **Plan gating.** The app reads `profiles.plan` (`free` | `pro`). The “Upgrade to Pro”
-> button flips that column directly so the feature is fully usable today; wire it to your
-> billing provider's webhook (set `plan` on checkout / cancellation) when you add billing.
+### Billing (Stripe) — selling Pro
+
+Pro is gated behind a real Stripe subscription:
+
+- **Upgrade** → `POST /api/billing/checkout` creates a Stripe Checkout session and
+  redirects the speaker to pay. **Manage / cancel** → `POST /api/billing/portal` opens
+  the Stripe billing portal.
+- **Webhook** → `POST /api/billing/webhook` (signature-verified) is the *only* thing
+  that sets `profiles.plan`: `checkout.session.completed` and the
+  `customer.subscription.*` events flip the plan to `pro`/`free` and record status +
+  renewal date.
+- **Tamper-proof.** A `before update` trigger on `profiles` (`supabase/billing.sql`)
+  reverts any change to `plan`/billing columns unless made by the service role, so a
+  user can't grant themselves Pro by writing their own profile row.
+
+Config: set `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` (a recurring Price), and
+`STRIPE_WEBHOOK_SECRET` (see `.env.local.example`). Run `supabase/billing.sql`. Until
+these are set the app stays on Free and the upgrade button is disabled. Implementation:
+`lib/billing/stripe.ts` + `app/api/billing/*`.
 
 ## Booking Inbox & public one-sheet
 

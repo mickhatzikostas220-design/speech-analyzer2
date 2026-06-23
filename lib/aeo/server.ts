@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { AEO_CATALOG, CATALOG_KEYS, getTipContent } from './catalog';
+import { billingConfigured } from '@/lib/billing/stripe';
 import type { AeoState, Cadence, Plan, Track, UserTip } from './types';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -87,6 +88,7 @@ export async function getAeoState(supabase: SupabaseClient, userId: string): Pro
     nextAvailableAt: null,
     exhausted: false,
     totalCatalog: AEO_CATALOG.length,
+    billingConfigured: billingConfigured(),
   };
 
   try {
@@ -147,6 +149,7 @@ export async function getAeoState(supabase: SupabaseClient, userId: string): Pro
       nextAvailableAt,
       exhausted,
       totalCatalog: AEO_CATALOG.length,
+      billingConfigured: billingConfigured(),
     };
   } catch {
     return empty;

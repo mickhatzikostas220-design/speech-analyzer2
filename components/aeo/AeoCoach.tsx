@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Check,
   ChevronDown,
@@ -67,19 +67,59 @@ export function AeoCoach({ initial }: { initial: AeoState }) {
     setBusy(null);
   }
 
-  async function setPlan(plan: 'free' | 'pro') {
-    setBusy('plan');
-    setBanner(null);
-    const ok = await call('/api/aeo/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan }),
-    });
-    if (ok)
+  // Surface the result of returning from Stripe Checkout / portal.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('upgraded')) {
       setBanner({
         kind: 'ok',
-        text: plan === 'pro' ? 'You’re on Pro — set any schedule you like.' : 'Switched to Free.',
+        text: 'Payment received — your Pro plan is activating. Refresh in a moment if it hasn’t updated.',
       });
+    } else if (params.get('canceled')) {
+      setBanner({ kind: 'err', text: 'Checkout canceled — you’re still on the Free plan.' });
+    }
+    if (params.get('upgraded') || params.get('canceled')) {
+      window.history.replaceState({}, '', '/aeo');
+    }
+  }, []);
+
+  // Send the user to Stripe Checkout to subscribe to Pro.
+  async function upgrade() {
+    if (!state.billingConfigured) {
+      setBanner({ kind: 'err', text: 'Billing isn’t set up yet — check back soon.' });
+      return;
+    }
+    setBusy('plan');
+    setBanner(null);
+    try {
+      const res = await fetch('/api/billing/checkout', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setBanner({ kind: 'err', text: data.error || 'Could not start checkout.' });
+    } catch {
+      setBanner({ kind: 'err', text: 'Could not reach checkout.' });
+    }
+    setBusy(null);
+  }
+
+  // Open the Stripe billing portal (update card or cancel — cancel downgrades via webhook).
+  async function manageBilling() {
+    setBusy('plan');
+    setBanner(null);
+    try {
+      const res = await fetch('/api/billing/portal', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setBanner({ kind: 'err', text: data.error || 'Could not open billing.' });
+    } catch {
+      setBanner({ kind: 'err', text: 'Could not reach billing.' });
+    }
     setBusy(null);
   }
 
@@ -211,18 +251,22 @@ export function AeoCoach({ initial }: { initial: AeoState }) {
           )}
 
           {!isPro && (
-            <button onClick={() => setPlan('pro')} disabled={busy === 'plan'} className="btn-ink">
-              <Sparkles className="h-4 w-4" />
+            <button
+              onClick={upgrade}
+              disabled={busy === 'plan' || !state.billingConfigured}
+              className="btn-ink"
+            >
+              {busy === 'plan' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               Upgrade to Pro — unlimited tips
             </button>
           )}
           {isPro && (
             <button
-              onClick={() => setPlan('free')}
+              onClick={manageBilling}
               disabled={busy === 'plan'}
               className="text-xs font-semibold text-faint transition-colors hover:text-muted"
             >
-              Switch to Free
+              Manage billing
             </button>
           )}
         </div>
@@ -231,6 +275,7 @@ export function AeoCoach({ initial }: { initial: AeoState }) {
           <p className="mt-2 text-xs text-faint">
             Free plan delivers one tip a week. Pro unlocks unlimited tips on any schedule — daily,
             weekly, or whenever you want one.
+            {!state.billingConfigured && ' (Upgrades open once billing is connected.)'}
           </p>
         )}
       </div>
