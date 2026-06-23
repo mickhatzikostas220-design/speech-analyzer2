@@ -43,6 +43,7 @@ export function Navbar({ brand }: { brand: BrandKit }) {
           <nav className="hidden items-center gap-5 sm:flex">
             {link('/dashboard', 'Hub')}
             {link('/agent', 'Assistant')}
+            {link('/aeo', 'AEO')}
             {link('/bookings', 'Bookings')}
             {link('/history', 'Library')}
             {link('/editor', 'Studio')}

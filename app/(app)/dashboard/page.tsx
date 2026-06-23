@@ -110,6 +110,20 @@ export default async function HubPage() {
             <UpcomingGigs initialGigs={gigs} initialCalendarUrl={calendarUrl} />
           </section>
           <TipCard tip={buildTip(completed, avg)} />
+          <Link
+            href="/aeo"
+            className="flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-surface-card p-4 transition-all hover:-translate-y-0.5 hover:border-strong hover:shadow-soft"
+          >
+            <div>
+              <p className="text-sm font-extrabold text-strong">Get found by AI</p>
+              <p className="mt-0.5 text-xs text-muted">
+                Your weekly AEO tip is waiting — make ChatGPT &amp; Perplexity recommend you.
+              </p>
+            </div>
+            <span aria-hidden className="ml-3 text-lg text-faint">
+              →
+            </span>
+          </Link>
         </div>
       </div>
     </div>

@@ -8,6 +8,7 @@ import {
   Sparkles,
   Bot,
   Inbox,
+  Radar,
   ArrowUpRight,
   type LucideIcon,
 } from 'lucide-react';
@@ -41,6 +42,14 @@ export function ToolGrid({ analysisCount, bookingCount = 0 }: { analysisCount: n
       href: '/agent',
       bg: 'var(--accent-2)',
       fg: '#fff',
+    },
+    {
+      icon: Radar,
+      name: 'AEO Coach',
+      desc: 'Get found by AI. Weekly, step-by-step moves so ChatGPT & Perplexity recommend you.',
+      href: '/aeo',
+      bg: 'var(--accent-1, var(--signature))',
+      fg: 'var(--on-signature)',
     },
     {
       icon: Inbox,

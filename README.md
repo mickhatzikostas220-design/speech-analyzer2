@@ -41,6 +41,9 @@ supabase/brand.sql          # per-speaker branding (colors, logo, fonts, voice)
 supabase/gigs.sql           # speaking gigs + connected calendar feed
 supabase/bookings.sql       # booking inbox (incoming speaking inquiries)
 supabase/onesheet.sql       # public speaker one-sheet (URL slug)
+supabase/agent.sql          # personal AI assistant (settings, keys, connections)
+supabase/aeo.sql            # AEO Coach (plan, delivery schedule, tips + completion)
+supabase/billing.sql        # Stripe billing columns + plan-tamper guard trigger
 ```
 
 **Create the storage bucket** — in the same SQL Editor, run:
@@ -230,6 +233,64 @@ outside apps (starting with Gmail).
   recorded in the `agent_actions` audit log.
 - **Extensible.** Tools live in `lib/agent/tools/` and are assembled per request in
   `lib/agent/tools/registry.ts`.
+
+**Connectors**
+
+A single Google OAuth app powers the connected apps. Connecting Google grants:
+
+| Connector | Tools | Side effect |
+|-----------|-------|-------------|
+| **Gmail** | search, read, draft, send | gated by the connection's autonomy level |
+| **Google Drive** | search files, read file content (Docs/Sheets/Slides export + text files) | read-only, always available |
+
+Adding a new connector is three steps: write a `lib/agent/tools/<name>.ts` exporting
+`ToolDef[]`, register it in `lib/agent/tools/registry.ts` for the relevant provider,
+and (for OAuth apps) add its scope in `lib/agent/google.ts`. Drive was added exactly
+this way and shares Gmail's consent screen.
+
+> Already connected Google before Drive was added? Disconnect and reconnect once in
+> **Assistant → Settings** to grant the new `drive.readonly` scope.
+
+## AEO Coach — get found by AI
+
+`/aeo` is the **Answer Engine Optimization** coach: a curated playbook of concrete
+moves that make AI answer engines (ChatGPT, Perplexity, Google AI Overviews, Gemini)
+understand and recommend the speaker.
+
+- **One tip at a time.** Tips are released on a schedule, each with a *why it matters*
+  and **step-by-step instructions**. Every tip ships three tracks — **Wix**,
+  **another website builder**, and **straight code** — so the speaker follows whichever
+  fits how their site is built.
+- **Free vs Pro.** Free speakers get **one tip a week**, delivered automatically. Pro
+  speakers get **unlimited** tips on **any schedule they choose** — daily, weekly,
+  every two weeks, or monthly — and can pull extra tips on demand.
+- **Check it off.** Mark a tip complete (or not-done); progress is tracked against the
+  whole playbook.
+
+The playbook content lives in `lib/aeo/catalog.ts` (add tips by appending entries),
+scheduling/release logic in `lib/aeo/server.ts`, API under `app/api/aeo/*`, and UI in
+`components/aeo/AeoCoach.tsx`. Data model: `supabase/aeo.sql` (`profiles.plan`,
+`aeo_settings`, `aeo_tips`).
+
+### Billing (Stripe) — selling Pro
+
+Pro is gated behind a real Stripe subscription:
+
+- **Upgrade** → `POST /api/billing/checkout` creates a Stripe Checkout session and
+  redirects the speaker to pay. **Manage / cancel** → `POST /api/billing/portal` opens
+  the Stripe billing portal.
+- **Webhook** → `POST /api/billing/webhook` (signature-verified) is the *only* thing
+  that sets `profiles.plan`: `checkout.session.completed` and the
+  `customer.subscription.*` events flip the plan to `pro`/`free` and record status +
+  renewal date.
+- **Tamper-proof.** A `before update` trigger on `profiles` (`supabase/billing.sql`)
+  reverts any change to `plan`/billing columns unless made by the service role, so a
+  user can't grant themselves Pro by writing their own profile row.
+
+Config: set `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` (a recurring Price), and
+`STRIPE_WEBHOOK_SECRET` (see `.env.local.example`). Run `supabase/billing.sql`. Until
+these are set the app stays on Free and the upgrade button is disabled. Implementation:
+`lib/billing/stripe.ts` + `app/api/billing/*`.
 
 ## Booking Inbox & public one-sheet
 
