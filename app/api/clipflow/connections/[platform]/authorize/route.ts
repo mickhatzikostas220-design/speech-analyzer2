@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthorizeUrl, PlatformError } from '@/lib/clipflow/platforms';
+import { resolveOAuthCreds } from '@/lib/clipflow/secrets';
 import { PLATFORMS, type Platform } from '@/lib/clipflow/types';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +24,8 @@ export async function GET(request: NextRequest, { params }: { params: { platform
 
   try {
     const state = randomUUID();
-    const url = getAuthorizeUrl(platform, state);
+    const creds = await resolveOAuthCreds(supabase, user.id, platform);
+    const url = getAuthorizeUrl(platform, state, creds);
     const res = NextResponse.redirect(url);
     res.cookies.set('clipflow_oauth_state', state, {
       httpOnly: true,

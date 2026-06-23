@@ -94,6 +94,31 @@ create table if not exists clipflow_posts (
 
 create index if not exists clipflow_posts_clip_idx on clipflow_posts (clip_id);
 
+-- ── Per-user API keys / credentials (BYOK), encrypted at rest ───────────────
+-- Lets each user bring their own ClipFlow keys instead of relying on the
+-- app-wide env vars: their OpenAI key (clip AI), their Upload-Post key (publish
+-- under their own account/billing), and their own per-platform OAuth client
+-- credentials. Ciphertext (AES-256-GCM via APP_ENCRYPTION_KEY) never leaves the
+-- server; the client only ever sees `hint` (last 4 chars).
+--   kind ∈ 'openai' | 'upload_post' |
+--          'oauth_youtube' | 'oauth_tiktok' | 'oauth_instagram' | 'oauth_twitter'
+-- For the oauth_* kinds the encrypted value is JSON {clientId, clientSecret}.
+create table if not exists clipflow_secrets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles(id) on delete cascade not null,
+  kind text not null check (kind in (
+    'openai', 'upload_post',
+    'oauth_youtube', 'oauth_tiktok', 'oauth_instagram', 'oauth_twitter'
+  )),
+  encrypted_value text not null,
+  hint text not null default '',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (user_id, kind)
+);
+
+create index if not exists clipflow_secrets_user_idx on clipflow_secrets (user_id);
+
 -- ── Jobs: lightweight Postgres-backed work queue (Bull-style, serverless-safe)
 create table if not exists clipflow_jobs (
   id uuid primary key default gen_random_uuid(),
@@ -119,6 +144,7 @@ alter table clipflow_clips enable row level security;
 alter table clipflow_connections enable row level security;
 alter table clipflow_posts enable row level security;
 alter table clipflow_jobs enable row level security;
+alter table clipflow_secrets enable row level security;
 
 -- Projects
 drop policy if exists "Users manage own clipflow projects" on clipflow_projects;
@@ -143,4 +169,9 @@ create policy "Users manage own clipflow posts" on clipflow_posts
 -- Jobs
 drop policy if exists "Users manage own clipflow jobs" on clipflow_jobs;
 create policy "Users manage own clipflow jobs" on clipflow_jobs
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Secrets (encrypted at rest; only ever read server-side)
+drop policy if exists "Users manage own clipflow secrets" on clipflow_secrets;
+create policy "Users manage own clipflow secrets" on clipflow_secrets
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

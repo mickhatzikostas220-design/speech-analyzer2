@@ -3,7 +3,9 @@ import type { ClipCandidate, ClipLength, ClipPreferences, PlatformHashtags, Tran
 
 // All ClipFlow text generation runs on OpenAI GPT-4o via the `openai` SDK that
 // already powers Whisper transcription and coaching feedback elsewhere in this
-// project — so it reuses the existing OPENAI_API_KEY and needs no extra key.
+// project. By default it reuses the app-wide OPENAI_API_KEY, but callers can
+// pass a per-user `apiKey` (resolved from clipflow_secrets) so each user's
+// clipping is billed to their own OpenAI account.
 
 const MODEL = 'gpt-4o';
 
@@ -18,14 +20,14 @@ interface VideoMetaLike {
 
 export class ClipAIError extends Error {}
 
-function client(): OpenAI {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+function client(apiKey?: string): OpenAI {
+  const key = apiKey || process.env.OPENAI_API_KEY;
+  if (!key) {
     throw new ClipAIError(
-      'AI generation is not configured. Set OPENAI_API_KEY to enable clipping and captions.'
+      'AI generation is not configured. Add your OpenAI API key in ClipFlow → API keys (or set OPENAI_API_KEY) to enable clipping and captions.'
     );
   }
-  return new OpenAI({ apiKey });
+  return new OpenAI({ apiKey: key });
 }
 
 function parseJson<T>(raw: string): T {
@@ -44,8 +46,14 @@ function parseJson<T>(raw: string): T {
   return JSON.parse(text) as T;
 }
 
-async function callJson<T>(system: string, user: string, maxTokens = 3000, temperature = 0.7): Promise<T> {
-  const res = await client().chat.completions.create({
+async function callJson<T>(
+  system: string,
+  user: string,
+  maxTokens = 3000,
+  temperature = 0.7,
+  apiKey?: string
+): Promise<T> {
+  const res = await client(apiKey).chat.completions.create({
     model: MODEL,
     max_tokens: maxTokens,
     temperature,
@@ -130,7 +138,8 @@ async function detectInWindow(
   meta: VideoMetaLike,
   cues: TranscriptCue[],
   count: number,
-  prefs?: ClipPreferences
+  prefs?: ClipPreferences,
+  apiKey?: string
 ): Promise<RawClip[]> {
   const transcript = fmtTimestampedTranscript(cues);
   const user = `Video title: ${meta.title}
@@ -143,7 +152,7 @@ Find the ${count} best short-form clips in this section. Return the JSON array o
     prefs
   )}`;
 
-  const clips = await callJson<RawClip[]>(DETECT_SYSTEM, user, 3500, 0.7);
+  const clips = await callJson<RawClip[]>(DETECT_SYSTEM, user, 3500, 0.7, apiKey);
   return Array.isArray(clips) ? clips : [];
 }
 
@@ -151,7 +160,8 @@ Find the ${count} best short-form clips in this section. Return the JSON array o
 async function detectFromMetadata(
   meta: VideoMetaLike,
   count: number,
-  prefs?: ClipPreferences
+  prefs?: ClipPreferences,
+  apiKey?: string
 ): Promise<RawClip[]> {
   const band = bandFor(prefs);
   const system = `You are ClipFlow. No transcript is available, so propose ${count} plausible short-form clip windows spread across a ${Math.round(
@@ -163,7 +173,7 @@ async function detectFromMetadata(
 Channel: ${meta.channelTitle}
 Duration: ${Math.round(meta.durationSeconds)}s
 Description: ${meta.description.slice(0, 1500)}${fmtPreferences(prefs)}`;
-  const clips = await callJson<RawClip[]>(system, user, 2500, 0.8);
+  const clips = await callJson<RawClip[]>(system, user, 2500, 0.8, apiKey);
   return Array.isArray(clips) ? clips : [];
 }
 
@@ -191,16 +201,17 @@ function overlaps(a: RawClip, b: RawClip): boolean {
 export async function detectClips(
   meta: VideoMetaLike,
   cues: TranscriptCue[] | null,
-  opts: { maxClips?: number; preferences?: ClipPreferences } = {}
+  opts: { maxClips?: number; preferences?: ClipPreferences; apiKey?: string } = {}
 ): Promise<ClipCandidate[]> {
   const maxClips = Math.min(10, Math.max(3, opts.maxClips ?? 6));
   const prefs = opts.preferences;
+  const apiKey = opts.apiKey;
   const band = bandFor(prefs);
 
   let raw: RawClip[] = [];
 
   if (!cues || cues.length === 0) {
-    raw = await detectFromMetadata(meta, maxClips, prefs);
+    raw = await detectFromMetadata(meta, maxClips, prefs, apiKey);
   } else {
     const MAX_WINDOWS = 6;
     const duration = meta.durationSeconds || cues[cues.length - 1].end;
@@ -219,7 +230,7 @@ export async function detectClips(
     for (let i = 0; i < windows.length; i += CONCURRENCY) {
       const batch = windows.slice(i, i + CONCURRENCY);
       const results = await Promise.all(
-        batch.map((w) => detectInWindow(meta, w, perWindow, prefs).catch(() => []))
+        batch.map((w) => detectInWindow(meta, w, perWindow, prefs, apiKey).catch(() => []))
       );
       raw.push(...results.flat());
     }
@@ -267,6 +278,7 @@ export async function detectClips(
 export async function generateClipCopy(input: {
   videoTitle: string;
   transcriptText: string;
+  apiKey?: string;
 }): Promise<Pick<ClipCandidate, 'title' | 'caption' | 'description' | 'hashtags'>> {
   const system = `You are ClipFlow, a short-form copywriter. Given a clip's transcript, write platform-native copy. Return ONLY minified JSON with keys: title (<=60 chars), caption (<=90 chars on-screen hook), description (1-2 sentences), hashtags (object with default, instagram, tiktok, youtube, twitter arrays of 3-6 lowercase tags without #).`;
   const user = `Source video: ${input.videoTitle}
@@ -279,7 +291,7 @@ ${input.transcriptText.slice(0, 4000)}`;
     caption: string;
     description: string;
     hashtags: PlatformHashtags;
-  }>(system, user, 1200, 0.8);
+  }>(system, user, 1200, 0.8, input.apiKey);
 
   return {
     title: (out.title || 'Untitled clip').slice(0, 80),
