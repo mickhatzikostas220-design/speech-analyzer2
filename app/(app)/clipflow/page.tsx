@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ConnectionsPanel } from '@/components/clipflow/ConnectionsPanel';
 import { UploadPostPanel } from '@/components/clipflow/UploadPostPanel';
+import { ApiKeysPanel } from '@/components/clipflow/ApiKeysPanel';
 import { CLIP_LENGTHS, CLIP_LENGTH_LABELS, type ClipLength } from '@/lib/clipflow/types';
 
 const TONE_SUGGESTIONS = ['Funny', 'Educational', 'Inspirational', 'High-energy', 'Storytelling', 'Controversial'];
@@ -265,6 +266,8 @@ export default function ClipFlowPage() {
           </p>
         )}
       </form>
+
+      <ApiKeysPanel onChanged={() => setConnRefresh((v) => v + 1)} />
 
       <UploadPostPanel onChanged={() => setConnRefresh((v) => v + 1)} />
 

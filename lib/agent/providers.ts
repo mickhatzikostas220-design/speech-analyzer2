@@ -252,6 +252,10 @@ function describeCall(tool: ToolDef, call: ToolCall): string {
       return 'Listing your speech analyses';
     case 'get_speech_analysis':
       return 'Reading a speech analysis';
+    case 'calendar_list_events':
+      return a.query ? `Checking your calendar: "${a.query}"` : 'Checking your calendar';
+    case 'social_media_overview':
+      return 'Reviewing your social media activity';
     default:
       return tool.name;
   }

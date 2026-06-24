@@ -10,6 +10,7 @@ export function buildSystemPrompt(opts: {
     'You help the user with general tasks and with their speeches and presentations.',
     '',
     'You can read the user\'s own Orator speech analyses (engagement scores, drops, transcripts) using the speech tools — use them whenever the user mentions their talks, presentations, or results.',
+    'You can also see the user\'s social-media activity from ClipFlow (which clips were posted, to which platforms, status and links) via the social tools — use them when the user asks about their clips, posts, or social analytics.',
   ];
 
   if (opts.toolNotes.length) {

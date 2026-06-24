@@ -62,9 +62,27 @@ export function platformLabel(platform: Platform): string {
   return CONFIG[platform].label;
 }
 
-export function isConfigured(platform: Platform): boolean {
+// A platform's OAuth client credentials. Users can bring their own (stored in
+// clipflow_secrets); otherwise the app-level env vars are used.
+export interface OAuthCreds {
+  clientId: string;
+  clientSecret: string;
+}
+
+function envCreds(platform: Platform): OAuthCreds | null {
   const c = CONFIG[platform];
-  return Boolean(process.env[c.clientIdEnv] && process.env[c.clientSecretEnv]);
+  const clientId = process.env[c.clientIdEnv];
+  const clientSecret = process.env[c.clientSecretEnv];
+  return clientId && clientSecret ? { clientId, clientSecret } : null;
+}
+
+export function isConfigured(platform: Platform): boolean {
+  return Boolean(envCreds(platform));
+}
+
+/** Configured if the user supplied their own creds, or the app env has them. */
+export function isConfiguredWith(platform: Platform, creds: OAuthCreds | null): boolean {
+  return Boolean(creds) || isConfigured(platform);
 }
 
 function appUrl(): string {
@@ -78,15 +96,20 @@ export function redirectUri(platform: Platform): string {
 }
 
 /** Build the OAuth authorize URL the user is redirected to. */
-export function getAuthorizeUrl(platform: Platform, state: string): string {
+export function getAuthorizeUrl(
+  platform: Platform,
+  state: string,
+  creds?: OAuthCreds | null
+): string {
   const c = CONFIG[platform];
-  if (!isConfigured(platform)) {
+  const resolved = creds ?? envCreds(platform);
+  if (!resolved) {
     throw new PlatformError(
-      `${c.label} is not configured. Add ${c.clientIdEnv} and ${c.clientSecretEnv} to enable it.`
+      `${c.label} is not configured. Add your ${c.label} client id & secret in ClipFlow → API keys (or set ${c.clientIdEnv} / ${c.clientSecretEnv}).`
     );
   }
   const params = new URLSearchParams({
-    client_id: process.env[c.clientIdEnv]!,
+    client_id: resolved.clientId,
     redirect_uri: redirectUri(platform),
     response_type: 'code',
     scope: c.scopes,
@@ -108,14 +131,15 @@ export interface TokenResult {
 /** Exchange an authorization code for tokens, then fetch the account name. */
 export async function exchangeCodeForTokens(
   platform: Platform,
-  code: string
+  code: string,
+  creds?: OAuthCreds | null
 ): Promise<TokenResult> {
   const c = CONFIG[platform];
-  const clientId = process.env[c.clientIdEnv];
-  const clientSecret = process.env[c.clientSecretEnv];
-  if (!clientId || !clientSecret) {
+  const resolved = creds ?? envCreds(platform);
+  if (!resolved) {
     throw new PlatformError(`${c.label} is not configured.`);
   }
+  const { clientId, clientSecret } = resolved;
 
   const body = new URLSearchParams({
     client_id: clientId,

@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { processProject } from './pipeline';
 import { publishClip } from './platforms';
-import { uploadPostEnabled, publishViaUploadPost } from './uploadpost';
+import { uploadPostEnabledFor, publishViaUploadPost } from './uploadpost';
+import { resolveUploadPostKey } from './secrets';
 import { decryptToken } from './crypto';
 import type { Job } from './queue';
 import type { Platform, PlatformHashtags } from './types';
@@ -48,18 +49,24 @@ export async function publishOnePost(admin: SupabaseClient, postId: string): Pro
     const platform = post.platform as Platform;
     const hashtags = tagsForPlatform(clip.hashtags as PlatformHashtags, platform);
 
-    // Publish through Upload-Post when it's configured (it owns the platform
-    // connections via each user's profile); otherwise fall back to the
-    // per-platform OAuth path.
+    // Publish through Upload-Post when a key is available (the user's own key,
+    // else the app account key) — it owns the platform connections via each
+    // user's profile. Otherwise fall back to the per-platform OAuth path.
+    const uploadPostKey = await resolveUploadPostKey(admin, post.user_id);
     let result: { externalId: string | null; externalUrl: string | null };
-    if (uploadPostEnabled()) {
-      result = await publishViaUploadPost(post.user_id, platform, {
-        videoUrl: signed.signedUrl,
-        cacheKey: clip.file_path,
-        title: clip.title ?? '',
-        description: clip.description ?? '',
-        hashtags,
-      });
+    if (uploadPostEnabledFor(uploadPostKey)) {
+      result = await publishViaUploadPost(
+        post.user_id,
+        platform,
+        {
+          videoUrl: signed.signedUrl,
+          cacheKey: clip.file_path,
+          title: clip.title ?? '',
+          description: clip.description ?? '',
+          hashtags,
+        },
+        uploadPostKey!
+      );
     } else {
       const { data: connection } = await admin
         .from('clipflow_connections')

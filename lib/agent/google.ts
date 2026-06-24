@@ -1,9 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { decrypt, encrypt } from '@/lib/crypto';
 
-// Google OAuth + token management for connected Gmail accounts.
-// One Google OAuth app (client id/secret) unlocks Gmail today and Calendar /
-// Drive later — they share the same consent flow.
+// Google OAuth + token management for connected Google accounts.
+// One Google OAuth app (client id/secret) unlocks Gmail + Calendar — they share
+// the same consent flow. Accounts connected before Calendar was added need to
+// reconnect once to grant the new (read-only) Calendar scope.
 
 export const GOOGLE_SCOPES = [
   'openid',
@@ -11,6 +12,7 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.compose',
   'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/calendar.readonly',
 ];
 
 export function googleConfigured(): boolean {

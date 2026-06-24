@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { exchangeCodeForTokens } from '@/lib/clipflow/platforms';
+import { resolveOAuthCreds } from '@/lib/clipflow/secrets';
 import { encryptToken } from '@/lib/clipflow/crypto';
 import { PLATFORMS, type Platform } from '@/lib/clipflow/types';
 
@@ -35,7 +36,8 @@ export async function GET(request: NextRequest, { params }: { params: { platform
   if (!user) return NextResponse.redirect(`${origin}/login`);
 
   try {
-    const tokens = await exchangeCodeForTokens(platform, code);
+    const creds = await resolveOAuthCreds(supabase, user.id, platform);
+    const tokens = await exchangeCodeForTokens(platform, code, creds);
 
     const { error } = await supabase.from('clipflow_connections').upsert(
       {
