@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 // stores the connection. Tokens are never sent to the browser.
 export async function GET(request: NextRequest, { params }: { params: { platform: string } }) {
   const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || request.nextUrl.origin;
-  const back = (qs: string) => NextResponse.redirect(`${origin}/clipflow?${qs}`);
+  const back = (qs: string) => NextResponse.redirect(`${origin}/settings/connections?${qs}`);
 
   const platform = params.platform as Platform;
   if (!PLATFORMS.includes(platform)) return back('connect=error&msg=Unknown%20platform');
