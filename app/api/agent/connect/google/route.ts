@@ -13,7 +13,7 @@ export async function GET() {
   if (!auth) return NextResponse.redirect(`${APP_URL}/login`);
 
   if (!googleConfigured() || !isEncryptionConfigured()) {
-    return NextResponse.redirect(`${APP_URL}/agent/settings?error=google_not_configured`);
+    return NextResponse.redirect(`${APP_URL}/settings/connections?error=google_not_configured`);
   }
 
   const state = crypto.randomBytes(16).toString('hex');
