@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { ShieldCheck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 interface Props {
@@ -134,7 +135,7 @@ export function UploadZone({ onAnalysisCreated }: Props) {
           </div>
         ) : (
           <div className="space-y-4 py-2">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[var(--radius-md)] bg-[var(--signature)]">
+            <div className="animate-floaty mx-auto flex h-[60px] w-[60px] items-center justify-center rounded-[18px] bg-[var(--signature)]">
               <svg className="h-7 w-7" style={{ color: 'var(--on-signature)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
                   d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
@@ -158,6 +159,11 @@ export function UploadZone({ onAnalysisCreated }: Props) {
       {(error || rejectionMsg) && (
         <p className="mt-2 text-center text-xs" style={{ color: 'var(--danger)' }}>{error ?? rejectionMsg}</p>
       )}
+
+      <p className="mt-3.5 flex items-center justify-center gap-1.5 text-xs text-faint">
+        <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+        Your recordings are private and encrypted — analyzed by Tribe v2, never shared.
+      </p>
     </div>
   );
 }

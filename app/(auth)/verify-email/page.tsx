@@ -67,7 +67,7 @@ export default function VerifyEmailPage() {
   }
 
   return (
-    <form onSubmit={verify} className="space-y-4">
+    <form onSubmit={verify} className="mx-auto max-w-sm space-y-4">
       <div className="card space-y-4 p-6 text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--signature)]">
           <svg className="h-6 w-6" style={{ color: 'var(--on-signature)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">

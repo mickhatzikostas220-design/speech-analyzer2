@@ -41,6 +41,11 @@ video { outline: none; }
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Gentle float — used by the upload zone icon. */
+@keyframes floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.animate-floaty { animation: floaty 4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .animate-floaty { animation: none; } }
+
 /* ============================================================
    Brand utility classes — used by the layout + brand screens.
    ============================================================ */
