@@ -25,7 +25,7 @@ export async function buildTools(
   for (const conn of connections) {
     if (conn.provider === 'google') {
       const allowed = ALLOWED_EFFECTS[conn.autonomy];
-      const usable = gmailTools(conn.id).filter((t) => allowed.includes(t.sideEffect));
+      const usable = gmailTools(conn.id, userId).filter((t) => allowed.includes(t.sideEffect));
       tools.push(...usable);
       notes.push(
         `Gmail account ${conn.account_email ?? '(connected)'} — permission level: ${conn.autonomy.replace('_', ' ')}.`

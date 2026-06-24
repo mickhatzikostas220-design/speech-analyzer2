@@ -82,7 +82,16 @@ export interface RenderResult {
  * Render a single vertical 9:16 clip. Returns local temp file paths; the caller
  * is responsible for uploading them and cleaning up the work dir via cleanup().
  */
+// YouTube video ids are 11 chars of [A-Za-z0-9_-]; we accept a slightly wider
+// length range to be safe. Validating before the id reaches a shell command
+// closes off command injection even if a malformed id is ever stored.
+const YT_ID_RE = /^[A-Za-z0-9_-]{6,20}$/;
+
 export async function renderClip(opts: RenderOptions): Promise<RenderResult> {
+  if (!YT_ID_RE.test(opts.youtubeId)) {
+    throw new Error(`Invalid YouTube id: ${opts.youtubeId}`);
+  }
+
   const tools = await checkTools();
   if (!tools.ytdlp || !tools.ffmpeg) {
     const missing = [

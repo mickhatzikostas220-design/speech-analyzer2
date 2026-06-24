@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { claimDueJobs, completeJob, failJob } from '@/lib/clipflow/queue';
 import { runJob } from '@/lib/clipflow/runner';
+
+// Constant-time bearer-token check so the cron secret can't be recovered by
+// timing the response to a `===` comparison.
+function bearerMatches(authHeader: string | null, secret: string): boolean {
+  if (!authHeader) return false;
+  const expected = `Bearer ${secret}`;
+  const a = Buffer.from(authHeader);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 // Drains the ClipFlow job queue: processing pipelines and scheduled posts that
 // are now due. Wire this to a scheduled trigger (e.g. a Vercel Cron hitting
@@ -15,7 +26,7 @@ export async function POST(request: NextRequest) {
   // Auth: either a valid cron secret, or a signed-in user.
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = request.headers.get('authorization');
-  const cronAuthorized = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  const cronAuthorized = !!cronSecret && bearerMatches(authHeader, cronSecret);
 
   if (!cronAuthorized) {
     const supabase = createClient();

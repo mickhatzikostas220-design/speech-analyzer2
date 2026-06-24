@@ -30,9 +30,12 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     if (error || !project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const admin = createAdminClient();
+    // Only sign paths inside the caller's own storage prefix — clip paths come
+    // from client-editable JSON, so an arbitrary path here would otherwise let
+    // a user read another user's files via a signed URL (cross-tenant read).
     const clips: ScriptClip[] = await Promise.all(
       (project.clips as ScriptClip[]).map(async (clip) => {
-        if (!clip.path) return clip;
+        if (!clip.path || !clip.path.startsWith(`${user.id}/`)) return clip;
         const { data } = await admin.storage
           .from('speeches')
           .createSignedUrl(clip.path, 3600);
@@ -93,7 +96,8 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
       const admin = createAdminClient();
       const paths = (project.clips as ScriptClip[])
         .map((c) => c.path)
-        .filter(Boolean);
+        // Never delete outside the caller's own prefix — paths are client-set.
+        .filter((p) => p && p.startsWith(`${user.id}/`));
       if (paths.length > 0) {
         await admin.storage.from('speeches').remove(paths);
       }
