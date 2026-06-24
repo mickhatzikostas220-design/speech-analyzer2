@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 import { VideoPlayer } from '@/components/VideoPlayer';
 import { EngagementChart } from '@/components/EngagementChart';
 import { ROIChart } from '@/components/ROIChart';
@@ -190,6 +192,13 @@ export default function AnalysisPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
 
+      <Link
+        href="/history"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted transition-colors hover:text-strong"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back to library
+      </Link>
+
       {/* Delete confirmation modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
@@ -310,6 +319,28 @@ export default function AnalysisPage() {
       {/* ── Complete ── */}
       {analysis.status === 'complete' && file_url && (
         <>
+          {/* Plain-language takeaway — the headline before the neuroscience. */}
+          {analysis.overall_score !== null && (
+            <div className="card p-4 sm:p-5">
+              <p className="text-sm leading-relaxed text-body">
+                <span className="font-semibold text-strong">In plain terms: </span>
+                {feedback_points.length === 0
+                  ? `Your audience stayed locked in (${analysis.overall_score}/100) — no attention dips worth flagging. Nice.`
+                  : `Your audience engaged at ${analysis.overall_score}/100 overall. There ${
+                      feedback_points.length === 1 ? 'is' : 'are'
+                    } ${feedback_points.length} moment${
+                      feedback_points.length === 1 ? '' : 's'
+                    } where attention dipped${
+                      analysis.peak_moments && analysis.peak_moments.length > 0
+                        ? ` and ${analysis.peak_moments.length} peak${
+                            analysis.peak_moments.length === 1 ? '' : 's'
+                          } to lean into`
+                        : ''
+                    }. Tap any moment below to jump straight to it in the video.`}
+              </p>
+            </div>
+          )}
+
           <VideoPlayer
             fileUrl={file_url}
             fileType={analysis.file_type}
