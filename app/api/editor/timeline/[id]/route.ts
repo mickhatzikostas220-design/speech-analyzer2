@@ -24,9 +24,15 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const segments = (project.segments ?? []) as Array<{ clips: Array<{ clipPath: string }> }>;
     const pathToUrl = new Map<string, string>();
 
+    // Only ever sign paths inside the caller's own storage prefix. Clip paths
+    // live in client-editable JSON, so without this check a user could PATCH
+    // another user's storage path into their project and read it back as a
+    // signed URL (cross-tenant file read).
+    const ownsPath = (p: string) => p.startsWith(`${user.id}/`);
+
     for (const seg of segments) {
       for (const clip of seg.clips ?? []) {
-        if (clip.clipPath && !pathToUrl.has(clip.clipPath)) {
+        if (clip.clipPath && ownsPath(clip.clipPath) && !pathToUrl.has(clip.clipPath)) {
           const { data } = await admin.storage.from('speeches').createSignedUrl(clip.clipPath, 3600);
           if (data?.signedUrl) pathToUrl.set(clip.clipPath, data.signedUrl);
         }

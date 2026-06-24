@@ -86,12 +86,17 @@ async function refreshAccessToken(refreshToken: string): Promise<TokenResponse> 
 // Returns a valid access token for a connection, refreshing + persisting if expired.
 export async function getValidAccessToken(
   supabase: SupabaseClient,
-  connectionId: string
+  connectionId: string,
+  userId: string
 ): Promise<string> {
+  // Scope by user_id as well as id: tool execution uses the service-role
+  // client (RLS-bypassing), so this is the only guard preventing one user's
+  // tokens from being read via another connection id.
   const { data } = await supabase
     .from('agent_connections')
     .select('encrypted_access_token, encrypted_refresh_token, token_expires_at')
     .eq('id', connectionId)
+    .eq('user_id', userId)
     .single();
   if (!data) throw new Error('Connection not found');
 
@@ -116,6 +121,7 @@ export async function getValidAccessToken(
       token_expires_at: newExpiry,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', connectionId);
+    .eq('id', connectionId)
+    .eq('user_id', userId);
   return refreshed.access_token;
 }

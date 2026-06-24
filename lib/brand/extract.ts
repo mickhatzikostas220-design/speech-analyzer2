@@ -1,6 +1,7 @@
 import type { BrandKit } from './types';
 import { cloneDefaultBrand } from './defaults';
 import { normalizeHex, isNeutral, saturation, readableTextOn, hexToRgb } from './color';
+import { safeFetch, SsrfError } from '@/lib/net/safeFetch';
 
 /**
  * Auto-extract a brand kit from a speaker's website. Pure server-side:
@@ -34,8 +35,9 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    // safeFetch blocks private/loopback/link-local targets (SSRF) and
+    // re-validates each redirect hop.
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         // A normal browser UA — speakers ask us to read their own public
@@ -65,6 +67,9 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
     return { html, finalUrl: res.url || url };
   } catch (err) {
     if (err instanceof BrandExtractError) throw err;
+    if (err instanceof SsrfError) {
+      throw new BrandExtractError("That address isn't allowed. Use your public website URL.");
+    }
     throw new BrandExtractError(
       "Couldn't reach that website. Check the address, or set your brand by hand."
     );

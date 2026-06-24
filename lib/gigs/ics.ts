@@ -6,6 +6,8 @@
  * Best-effort: returns [] on any fetch/parse failure so the hub never
  * breaks on a bad feed.
  */
+import { safeFetch } from '@/lib/net/safeFetch';
+
 export interface IcsEvent {
   title: string;
   location?: string;
@@ -84,7 +86,9 @@ export async function fetchIcsEvents(url: string): Promise<IcsEvent[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9000);
   try {
-    const res = await fetch(httpUrl, {
+    // safeFetch blocks private/loopback/link-local targets (SSRF) and
+    // re-validates each redirect hop; a blocked URL throws and we return [].
+    const res = await safeFetch(httpUrl, {
       signal: controller.signal,
       headers: {
         'User-Agent':
