@@ -10,7 +10,7 @@ Orator analyzes speeches and presentations using the Tribe v2 fMRI-based neural 
 
 - **Frontend + API**: Next.js 14 (App Router), TypeScript, Tailwind CSS
 - **Auth + DB + Storage**: Supabase
-- **Transcription**: OpenAI Whisper
+- **Transcription**: NVIDIA Parakeet TDT 0.6b v3 (GPU server, optional — falls back to OpenAI Whisper)
 - **Feedback generation**: OpenAI GPT-4o
 - **Neural engagement model**: Facebook Research Tribe v2 (GPU server, optional — falls back to mock)
 - **Email**: Resend
@@ -68,6 +68,8 @@ cp .env.local.example .env.local
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3002` for local dev |
 | `TRIBE_SERVER_URL` | Leave blank to use mock data (see GPU server section) |
 | `TRIBE_SERVER_SECRET` | Optional bearer token for your GPU server |
+| `PARAKEET_SERVER_URL` | Leave blank to use OpenAI Whisper (see Parakeet section) |
+| `PARAKEET_SERVER_SECRET` | Optional bearer token for the Parakeet server |
 
 ### 4. Run locally
 
@@ -131,6 +133,36 @@ Modal will output a URL like `https://your-name--tribe-server.modal.run`. Set th
 ```bash
 curl https://your-name--tribe-server.modal.run/health
 ```
+
+---
+
+## Deploying the Parakeet ASR server (Modal.com)
+
+The script editor transcribes each clip to word-level timestamps before matching it against your script. By default this uses OpenAI Whisper. Deploy `tribe-server/parakeet-modal.py` to run NVIDIA **parakeet-tdt-0.6b-v3** on your own GPU instead — more accurate word timestamps (cleaner clip cuts), faster, no per-minute API cost, and multilingual (25 languages).
+
+### Steps
+
+**1. Install Modal** (same as above — `pip install modal && modal token new`)
+
+**2. Set the auth secret (recommended)**
+
+The endpoint is public, so add a shared secret to stop strangers using your GPU:
+
+```bash
+modal secret create parakeet-secret PARAKEET_SERVER_SECRET=$(openssl rand -hex 16)
+```
+
+To run without auth, remove the `parakeet-secret` line from `secrets=[...]` in `parakeet-modal.py`.
+
+**3. Deploy**
+
+```bash
+modal deploy tribe-server/parakeet-modal.py
+```
+
+Modal outputs a URL like `https://your-name--parakeet-transcribe.modal.run`. Set it as `PARAKEET_SERVER_URL` (and the matching `PARAKEET_SERVER_SECRET`) in your Vercel/`.env.local` environment.
+
+> The first request after idle pays a cold start (image pull + model download to the cache volume). The container stays warm for 5 min afterward; set `min_containers=1` in `parakeet-modal.py` for zero cold starts (~$1/hr idle on A10G).
 
 ---
 
