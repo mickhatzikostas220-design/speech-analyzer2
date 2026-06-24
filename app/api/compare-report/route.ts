@@ -1,22 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { createClient } from '@/lib/supabase/server';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { labelA, labelB, avgs, choices } = body;
+  // Require a signed-in user: this route calls a paid OpenAI model, so leaving
+  // it open lets anyone burn the API budget (financial DoS).
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const rows = avgs.map((m: { key: string; a: number; b: number; diff: number }) =>
-    `  ${m.key}: ${labelA}=${m.a}, ${labelB}=${m.b}, difference=${m.diff > 0 ? '+' : ''}${m.diff}`
-  ).join('\n');
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  }
+  const { labelA, labelB, avgs, choices } = body as {
+    labelA?: unknown; labelB?: unknown; avgs?: unknown; choices?: Record<string, unknown>;
+  };
 
-  const sections = (choices.include as string[]).join(', ');
-  const tone = choices.tone as string;
-  const audience = choices.audience as string;
-  const length = choices.length as string;
+  if (!Array.isArray(avgs) || !choices || typeof choices !== 'object') {
+    return NextResponse.json({ error: 'Missing comparison data.' }, { status: 422 });
+  }
+
+  const safeLabel = (v: unknown, fallback: string) =>
+    typeof v === 'string' && v.trim() ? v.trim().slice(0, 120) : fallback;
+  const labelAStr = safeLabel(labelA, 'Speech A');
+  const labelBStr = safeLabel(labelB, 'Speech B');
+
+  const rows = (avgs as Array<{ key?: unknown; a?: unknown; b?: unknown; diff?: unknown }>)
+    .slice(0, 30)
+    .map((m) => {
+      const key = typeof m.key === 'string' ? m.key.slice(0, 40) : 'metric';
+      const a = Number(m.a) || 0;
+      const b = Number(m.b) || 0;
+      const diff = Number(m.diff) || 0;
+      return `  ${key}: ${labelAStr}=${a}, ${labelBStr}=${b}, difference=${diff > 0 ? '+' : ''}${diff}`;
+    })
+    .join('\n');
+
+  const labelA2 = labelAStr;
+  const labelB2 = labelBStr;
+  const sections = (Array.isArray(choices.include) ? (choices.include as unknown[]) : [])
+    .filter((s): s is string => typeof s === 'string')
+    .slice(0, 12)
+    .join(', ');
+  const tone = typeof choices.tone === 'string' ? choices.tone.slice(0, 40) : 'professional';
+  const audience = typeof choices.audience === 'string' ? choices.audience.slice(0, 60) : 'the speaker';
+  const length = typeof choices.length === 'string' ? choices.length.slice(0, 40) : 'medium';
 
   const systemPrompt = `You are an expert speech coach writing a neural engagement analysis report.
 You have access to Tribe v2 fMRI brain encoding model data that predicts how an audience's brain responds to speech.
@@ -37,8 +72,8 @@ Include these sections: ${sections}.`;
 
   const userPrompt = `Compare these two speeches using their neural engagement data:
 
-Speech A: "${labelA}"
-Speech B: "${labelB}"
+Speech A: "${labelA2}"
+Speech B: "${labelB2}"
 
 Neural scores (0–100):
 ${rows}

@@ -14,10 +14,16 @@ insert into storage.buckets (id, name, public)
 values ('brand-assets', 'brand-assets', true)
 on conflict (id) do nothing;
 
--- Public read (assets are referenced by <img src>), owner-scoped writes.
+-- Assets are referenced by <img src> via their public URL (the bucket is public,
+-- so object URLs resolve without any RLS policy). The storage-API SELECT policy
+-- is scoped to the owner's own folder to avoid letting clients list/enumerate
+-- every file in the bucket. Owner-scoped writes below.
 drop policy if exists "Public read brand assets" on storage.objects;
-create policy "Public read brand assets" on storage.objects
-  for select using (bucket_id = 'brand-assets');
+drop policy if exists "Users read own brand assets" on storage.objects;
+create policy "Users read own brand assets" on storage.objects
+  for select using (
+    bucket_id = 'brand-assets' and auth.uid()::text = (storage.foldername(name))[1]
+  );
 
 drop policy if exists "Users upload own brand assets" on storage.objects;
 create policy "Users upload own brand assets" on storage.objects

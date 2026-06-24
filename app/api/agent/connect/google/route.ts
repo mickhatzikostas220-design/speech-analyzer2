@@ -20,7 +20,7 @@ export async function GET() {
   const response = NextResponse.redirect(buildAuthUrl(state));
   response.cookies.set('agent_oauth_state', state, {
     httpOnly: true,
-    secure: APP_URL.startsWith('https'),
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 600,
     path: '/',
