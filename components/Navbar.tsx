@@ -45,6 +45,7 @@ export function Navbar({ brand }: { brand: BrandKit }) {
             {link('/agent', 'Assistant')}
             {link('/bookings', 'Bookings')}
             {link('/history', 'Library')}
+            {link('/seo', 'SEO')}
             {link('/editor', 'Studio')}
             {link('/clipflow', 'ClipFlow')}
           </nav>
