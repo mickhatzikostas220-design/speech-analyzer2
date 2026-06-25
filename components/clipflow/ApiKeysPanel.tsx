@@ -18,6 +18,14 @@ const PLATFORM_LABELS: Record<Platform, string> = {
 
 const PLATFORMS: Platform[] = ['youtube', 'tiktok', 'instagram', 'twitter'];
 
+// Where each platform's OAuth client id/secret is created.
+const PLATFORM_DOCS: Record<Platform, { href: string; label: string }> = {
+  youtube: { href: 'https://console.cloud.google.com/apis/credentials', label: 'Google Cloud Console → Credentials' },
+  tiktok: { href: 'https://developers.tiktok.com/apps', label: 'TikTok for Developers → Manage apps' },
+  instagram: { href: 'https://developers.facebook.com/apps', label: 'Meta for Developers → My Apps' },
+  twitter: { href: 'https://developer.x.com/en/portal/dashboard', label: 'X Developer Portal' },
+};
+
 // Lets each user bring their own ClipFlow API keys: OpenAI (clip AI), Upload-Post
 // (publish under their own account), and per-platform OAuth client credentials
 // for the direct-posting path. Keys are encrypted server-side; only a 4-char
@@ -54,6 +62,7 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
 
   const hints = data?.hints ?? {};
   const disabled = data ? !data.encryptionConfigured : false;
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
   async function saveSimple(kind: 'openai' | 'upload_post', key: string, clear: () => void) {
     if (!key.trim()) return;
@@ -166,6 +175,7 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
             placeholder="sk-…"
             busy={busy === 'openai'}
             disabled={disabled}
+            link={{ href: 'https://platform.openai.com/api-keys', label: 'Get an OpenAI API key →' }}
           />
 
           {/* Upload-Post */}
@@ -180,6 +190,7 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
             placeholder="Upload-Post API key"
             busy={busy === 'upload_post'}
             disabled={disabled}
+            link={{ href: 'https://app.upload-post.com/', label: 'Get your Upload-Post API key (dashboard → API Keys) →' }}
           />
 
           {/* Per-platform OAuth apps */}
@@ -209,6 +220,22 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
                     ) : (
                       <span className="text-[10px] text-zinc-600">Not set</span>
                     )}
+                  </div>
+                  <div className="space-y-1">
+                    <a
+                      href={PLATFORM_DOCS[p].href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-purple-400 hover:text-purple-300 inline-block"
+                    >
+                      Create an app: {PLATFORM_DOCS[p].label} →
+                    </a>
+                    <p className="text-[10px] text-zinc-500 break-all">
+                      Set the app&apos;s redirect URI to:{' '}
+                      <code className="text-zinc-400">
+                        {origin || 'https://your-app'}/api/clipflow/connections/{p}/callback
+                      </code>
+                    </p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <input
@@ -270,12 +297,23 @@ function KeyRow(props: {
   placeholder: string;
   busy: boolean;
   disabled: boolean;
+  link?: { href: string; label: string };
 }) {
   return (
     <div className="space-y-2">
       <div>
         <h3 className="text-sm font-medium text-zinc-200">{props.label}</h3>
         <p className="text-xs text-zinc-500 mt-0.5">{props.help}</p>
+        {props.link && (
+          <a
+            href={props.link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] text-purple-400 hover:text-purple-300 mt-1 inline-block"
+          >
+            {props.link.label}
+          </a>
+        )}
       </div>
       {props.hint && (
         <div className="flex items-center justify-between bg-zinc-950/40 border border-zinc-800 rounded-lg px-3 py-1.5">
