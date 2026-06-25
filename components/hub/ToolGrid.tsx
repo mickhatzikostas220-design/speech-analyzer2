@@ -8,6 +8,7 @@ import {
   Sparkles,
   Bot,
   Inbox,
+  Search,
   ArrowUpRight,
   type LucideIcon,
 } from 'lucide-react';
@@ -20,6 +21,7 @@ interface Tool {
   bg: string;
   fg: string;
   count?: string;
+  badge?: string;
 }
 
 /** Only tools that map to real, working features today. */
@@ -85,6 +87,15 @@ export function ToolGrid({ analysisCount, bookingCount = 0 }: { analysisCount: n
       count: analysisCount > 0 ? `${analysisCount} ${analysisCount === 1 ? 'talk' : 'talks'}` : undefined,
     },
     {
+      icon: Search,
+      name: 'AEO / SEO',
+      desc: 'Rank on Google and get cited by AI — meta tags, keywords, and JSON-LD for your talks.',
+      href: '/aeo',
+      bg: 'var(--accent-2)',
+      fg: '#fff',
+      badge: 'Full Premium',
+    },
+    {
       icon: Sparkles,
       name: 'Brand Kit',
       desc: 'Your colors, logo, fonts, and voice — keep the hub unmistakably you.',
@@ -103,6 +114,11 @@ export function ToolGrid({ analysisCount, bookingCount = 0 }: { analysisCount: n
           className="group relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-surface-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-strong hover:shadow-soft"
         >
           <ArrowUpRight className="absolute right-5 top-5 h-5 w-5 text-[var(--ink-300)] transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[var(--ink-900)]" />
+          {t.badge && (
+            <span className="absolute right-12 top-5 rounded-full bg-[var(--ink-900)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--signature)]">
+              {t.badge}
+            </span>
+          )}
           <span
             className="mb-4 flex h-12 w-12 items-center justify-center rounded-[14px]"
             style={{ background: t.bg, color: t.fg }}

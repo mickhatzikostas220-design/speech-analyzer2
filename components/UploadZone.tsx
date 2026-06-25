@@ -1,11 +1,26 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useDropzone } from 'react-dropzone';
 import { createClient } from '@/lib/supabase/client';
 
 interface Props {
   onAnalysisCreated: (id: string) => void;
+}
+
+const DEFAULT_MAX_BYTES = 10 * 1024 * 1024; // free-plan default until /me loads
+
+interface BillingInfo {
+  planName: string;
+  maxUploadBytes: number;
+  remaining: number | null;
+}
+
+function formatMb(bytes: number): string {
+  return bytes >= 1024 * 1024 * 1024
+    ? `${Math.round(bytes / (1024 * 1024 * 1024))} GB`
+    : `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
 const ACCEPTED = {
@@ -38,18 +53,51 @@ export function UploadZone({ onAnalysisCreated }: Props) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [needsUpgrade, setNeedsUpgrade] = useState(false);
+  const [billing, setBilling] = useState<BillingInfo | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/billing/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data) {
+          setBilling({
+            planName: data.planName,
+            maxUploadBytes: data.maxUploadBytes ?? DEFAULT_MAX_BYTES,
+            remaining: data.remaining ?? null,
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const maxBytes = billing?.maxUploadBytes ?? DEFAULT_MAX_BYTES;
 
   const onDrop = useCallback(async (files: File[]) => {
     const file = files[0];
     if (!file) return;
 
     setError(null);
+    setNeedsUpgrade(false);
     setUploading(true);
     setProgress(5);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated.');
+
+      if (file.size > maxBytes) {
+        setNeedsUpgrade(true);
+        throw new Error(
+          `That file is ${formatMb(file.size)}. Your ${billing?.planName ?? 'Free'} plan allows up to ${formatMb(
+            maxBytes
+          )}. Upgrade for larger uploads.`
+        );
+      }
 
       const ext = file.name.split('.').pop() ?? 'bin';
       const filePath = `${user.id}/${Date.now()}.${ext}`;
@@ -81,7 +129,11 @@ export function UploadZone({ onAnalysisCreated }: Props) {
         }),
       });
 
-      if (!createRes.ok) throw new Error('Failed to create analysis record.');
+      if (!createRes.ok) {
+        const payload = await createRes.json().catch(() => null);
+        if (payload?.upgrade) setNeedsUpgrade(true);
+        throw new Error(payload?.error ?? 'Failed to create analysis record.');
+      }
       const { id } = await createRes.json();
       setProgress(80);
 
@@ -100,7 +152,7 @@ export function UploadZone({ onAnalysisCreated }: Props) {
   const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
     onDrop,
     accept: ACCEPTED,
-    maxSize: 500 * 1024 * 1024,
+    maxSize: maxBytes,
     maxFiles: 1,
     disabled: uploading,
   });
@@ -145,8 +197,14 @@ export function UploadZone({ onAnalysisCreated }: Props) {
                 {isDragActive ? 'Drop to upload' : 'Drop your talk here'}
               </p>
               <p className="mt-1 text-xs text-muted">
-                MP4, MOV, AVI, WebM, MP3, WAV, FLAC — up to 500 MB
+                MP4, MOV, AVI, WebM, MP3, WAV, FLAC — up to {formatMb(maxBytes)}
               </p>
+              {billing?.remaining != null && (
+                <p className="mt-1 text-xs text-muted">
+                  {billing.remaining} analysis{billing.remaining === 1 ? '' : 'es'} left this month on{' '}
+                  {billing.planName}.
+                </p>
+              )}
             </div>
             <button type="button" className="btn-outline" style={{ padding: '8px 18px', fontSize: 'var(--text-sm)' }}>
               Choose file
@@ -157,6 +215,13 @@ export function UploadZone({ onAnalysisCreated }: Props) {
 
       {(error || rejectionMsg) && (
         <p className="mt-2 text-center text-xs" style={{ color: 'var(--danger)' }}>{error ?? rejectionMsg}</p>
+      )}
+      {needsUpgrade && (
+        <p className="mt-2 text-center text-xs">
+          <Link href="/pricing" className="font-bold underline" style={{ color: 'var(--signature)' }}>
+            View plans &amp; upgrade →
+          </Link>
+        </p>
       )}
     </div>
   );
