@@ -11,8 +11,8 @@ export const DEFAULT_BRAND: BrandKit = {
   colors: {
     // Neutral black/white/navy default — the look before a speaker
     // personalizes their hub during setup.
-    signature: '#1A2B50', // navy
-    accent: '#2E4D8E', // steel navy (links / accents)
+    signature: '#17294E', // navy (refined: deeper, richer)
+    accent: '#2E55AE', // steel-royal navy (links / accents — cleaner, more legible)
     ink: '#111114', // near-black
     paper: '#FFFFFF',
     page: '#F6F6F9',
