@@ -10,6 +10,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Confirm the caller owns this project before issuing a signed upload URL.
+    const { data: project } = await supabase
+      .from('editor_projects')
+      .select('id')
+      .eq('id', params.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
     const rawText = (await request.text()).trim();
     const { fileName } = rawText ? JSON.parse(rawText) : {};
     if (!fileName) return NextResponse.json({ error: 'fileName required' }, { status: 400 });

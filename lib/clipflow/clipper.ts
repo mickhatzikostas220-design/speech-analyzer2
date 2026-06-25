@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { mkdir, writeFile, rm, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -6,6 +6,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import type { CaptionStyle, TranscriptCue } from './types';
+import { assertVideoId } from './youtube';
 
 // Video rendering: downloads only the needed section of a YouTube video with
 // yt-dlp, reframes it to vertical 9:16 with FFmpeg, and burns in captions.
@@ -15,6 +16,7 @@ import type { CaptionStyle, TranscriptCue } from './types';
 // handle 1-hour+ source videos without timing out or filling disk.
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export class ClipperUnavailableError extends Error {}
 
@@ -97,6 +99,9 @@ export async function renderClip(opts: RenderOptions): Promise<RenderResult> {
   const workDir = join(tmpdir(), `clipflow-${randomUUID()}`);
   await mkdir(workDir, { recursive: true });
 
+  // Re-validate the id read back from the DB before it touches any subprocess.
+  const youtubeId = assertVideoId(opts.youtubeId);
+
   const pad = 0.25; // small lead-in so we don't clip the first word
   const start = Math.max(0, opts.start - pad);
   const end = opts.end + pad;
@@ -104,12 +109,17 @@ export async function renderClip(opts: RenderOptions): Promise<RenderResult> {
   const videoFile = join(workDir, 'clip.mp4');
   const thumbFile = join(workDir, 'thumb.jpg');
 
-  // 1) Download only the needed section.
-  await execAsync(
-    `yt-dlp -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b" ` +
-      `--download-sections "*${start.toFixed(2)}-${end.toFixed(2)}" ` +
-      `--force-keyframes-at-cuts -o "${sourceFile}" ` +
-      `"https://www.youtube.com/watch?v=${opts.youtubeId}"`,
+  // 1) Download only the needed section. execFile (argv array, no shell) so
+  // none of the arguments are ever interpreted by a shell.
+  await execFileAsync(
+    'yt-dlp',
+    [
+      '-f', 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b',
+      '--download-sections', `*${start.toFixed(2)}-${end.toFixed(2)}`,
+      '--force-keyframes-at-cuts',
+      '-o', sourceFile,
+      `https://www.youtube.com/watch?v=${youtubeId}`,
+    ],
     { maxBuffer: 50 * 1024 * 1024, timeout: 300_000 }
   );
 
@@ -129,17 +139,24 @@ export async function renderClip(opts: RenderOptions): Promise<RenderResult> {
   }
 
   // 3) Re-encode to the final clip.
-  await execAsync(
-    `ffmpeg -y -i "${sourceFile}" -vf "${filters.join(',')}" ` +
-      `-c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k ` +
-      `-movflags +faststart "${videoFile}"`,
+  await execFileAsync(
+    'ffmpeg',
+    [
+      '-y', '-i', sourceFile,
+      '-vf', filters.join(','),
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+      '-c:a', 'aac', '-b:a', '128k',
+      '-movflags', '+faststart',
+      videoFile,
+    ],
     { maxBuffer: 50 * 1024 * 1024, timeout: 300_000 }
   );
 
   // 4) Grab a thumbnail from the middle of the clip.
   const mid = Math.max(0, (opts.end - opts.start) / 2);
-  await execAsync(
-    `ffmpeg -y -ss ${mid.toFixed(2)} -i "${videoFile}" -frames:v 1 -q:v 3 "${thumbFile}"`,
+  await execFileAsync(
+    'ffmpeg',
+    ['-y', '-ss', mid.toFixed(2), '-i', videoFile, '-frames:v', '1', '-q:v', '3', thumbFile],
     { maxBuffer: 10 * 1024 * 1024, timeout: 60_000 }
   );
 

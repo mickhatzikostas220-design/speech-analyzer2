@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getProfileBySlug } from '@/lib/onesheet/server';
+import { rateLimit, clientIp } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -10,6 +11,15 @@ export const runtime = 'nodejs';
  * one-sheet. Inserted (service role) into that speaker's Booking Inbox.
  */
 export async function POST(req: NextRequest) {
+  // Public, unauthenticated insert — throttle to curb inbox/DB spam.
+  const rl = rateLimit(`inquiry:${clientIp(req)}`, 10, 60 * 60 * 1000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } }
+    );
+  }
+
   let b: Record<string, unknown> = {};
   try {
     b = await req.json();

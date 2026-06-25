@@ -53,26 +53,36 @@ alter table feedback_points enable row level security;
 alter table engagement_timeline enable row level security;
 
 -- Profiles policies
-create policy "Users view own profile" on profiles for select using (auth.uid() = id);
-create policy "Users update own profile" on profiles for update using (auth.uid() = id);
+create policy "Users view own profile" on profiles for select using ((select auth.uid()) = id);
+create policy "Users update own profile" on profiles for update
+  using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
 
 -- Analyses policies
-create policy "Users view own analyses" on analyses for select using (auth.uid() = user_id);
-create policy "Users insert own analyses" on analyses for insert with check (auth.uid() = user_id);
-create policy "Users update own analyses" on analyses for update using (auth.uid() = user_id);
-create policy "Users delete own analyses" on analyses for delete using (auth.uid() = user_id);
+create policy "Users view own analyses" on analyses for select using ((select auth.uid()) = user_id);
+create policy "Users insert own analyses" on analyses for insert with check ((select auth.uid()) = user_id);
+create policy "Users update own analyses" on analyses for update
+  using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create policy "Users delete own analyses" on analyses for delete using ((select auth.uid()) = user_id);
 
--- Feedback points — readable by owner, writable by service role (API routes)
+-- Feedback points — readable by owner. Inserts are done server-side with the
+-- service-role key, which bypasses RLS, so we DO NOT add a permissive insert
+-- policy. (A `with check (true)` insert policy would let any authenticated user
+-- inject rows into anyone's analysis.) The insert check is scoped to the owner
+-- so that even an anon-key insert can only target the caller's own analyses.
 create policy "Users view own feedback" on feedback_points for select using (
-  analysis_id in (select id from analyses where user_id = auth.uid())
+  analysis_id in (select id from analyses where user_id = (select auth.uid()))
 );
-create policy "Service inserts feedback" on feedback_points for insert with check (true);
+create policy "Users insert own feedback" on feedback_points for insert with check (
+  analysis_id in (select id from analyses where user_id = (select auth.uid()))
+);
 
--- Engagement timeline
+-- Engagement timeline — same model as feedback_points.
 create policy "Users view own timeline" on engagement_timeline for select using (
-  analysis_id in (select id from analyses where user_id = auth.uid())
+  analysis_id in (select id from analyses where user_id = (select auth.uid()))
 );
-create policy "Service inserts timeline" on engagement_timeline for insert with check (true);
+create policy "Users insert own timeline" on engagement_timeline for insert with check (
+  analysis_id in (select id from analyses where user_id = (select auth.uid()))
+);
 
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()
@@ -94,14 +104,15 @@ create trigger on_auth_user_created
 -- insert into storage.buckets (id, name, public) values ('speeches', 'speeches', false);
 
 create policy "Users upload own speeches" on storage.objects for insert with check (
-  bucket_id = 'speeches' and auth.uid()::text = (storage.foldername(name))[1]
+  bucket_id = 'speeches' and (select auth.uid())::text = (storage.foldername(name))[1]
 );
 create policy "Users read own speeches" on storage.objects for select using (
-  bucket_id = 'speeches' and auth.uid()::text = (storage.foldername(name))[1]
+  bucket_id = 'speeches' and (select auth.uid())::text = (storage.foldername(name))[1]
 );
 create policy "Users delete own speeches" on storage.objects for delete using (
-  bucket_id = 'speeches' and auth.uid()::text = (storage.foldername(name))[1]
+  bucket_id = 'speeches' and (select auth.uid())::text = (storage.foldername(name))[1]
 );
-create policy "Service reads speeches" on storage.objects for select using (
-  bucket_id = 'speeches'
-);
+-- NOTE: Do NOT add a blanket `using (bucket_id = 'speeches')` read policy. It
+-- has no per-user scope, so it would let ANY authenticated user read EVERY
+-- user's private uploads. Server-side reads use the service-role key, which
+-- bypasses RLS and needs no policy. The per-user policies above are sufficient.
