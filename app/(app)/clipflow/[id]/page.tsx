@@ -116,7 +116,7 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
         <Link href="/clipflow" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
           ← ClipFlow
         </Link>
-        <h1 className="text-2xl font-semibold text-white mt-2">
+        <h1 className="text-2xl font-semibold text-strong mt-2">
           {project.title || 'Processing…'}
         </h1>
         <div className="flex items-center gap-3 mt-1">
@@ -171,7 +171,7 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
               style={{ width: `${project.progress}%` }}
             />
           </div>
-          <p className="text-xs text-zinc-600 mt-3">
+          <p className="text-xs text-zinc-400 mt-3">
             This can take a moment for long videos — you can leave this page and come back.
           </p>
         </div>
@@ -198,7 +198,7 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
       {project.clips.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-white">
+            <h2 className="text-base font-semibold text-strong">
               {project.clips.length} clips
             </h2>
             {connected.length === 0 && (

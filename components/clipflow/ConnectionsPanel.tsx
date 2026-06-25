@@ -84,10 +84,10 @@ export function ConnectionsPanel({ refresh = 0 }: { refresh?: number }) {
                     {conn.account_name || 'Connected'}
                   </span>
                 ) : (
-                  <span className="text-[10px] text-zinc-600">Connect above ↑</span>
+                  <span className="text-[10px] text-zinc-400">Connect above ↑</span>
                 )
               ) : !conn.configured ? (
-                <span className="text-[10px] text-zinc-600">Not configured</span>
+                <span className="text-[10px] text-zinc-400">Not configured</span>
               ) : conn.connected ? (
                 <div className="flex flex-col items-center gap-1">
                   <span className="text-[10px] text-green-400 truncate max-w-[90px]">

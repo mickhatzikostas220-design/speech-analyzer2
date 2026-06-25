@@ -167,7 +167,7 @@ export function AgentConnectionsPanel({ onChanged }: { onChanged?: () => void })
       <div className="space-y-2">
         <h3 className="text-sm font-medium text-zinc-200">Connected apps</h3>
         {data.connections.length === 0 && (
-          <p className="text-xs text-zinc-600">Nothing connected yet.</p>
+          <p className="text-xs text-zinc-400">Nothing connected yet.</p>
         )}
         {data.connections.map((c) => (
           <div key={c.id} className="bg-zinc-950/40 border border-zinc-800 rounded-lg p-3 space-y-2">
@@ -205,7 +205,7 @@ export function AgentConnectionsPanel({ onChanged }: { onChanged?: () => void })
             + Connect Google (Gmail + Calendar)
           </a>
         ) : (
-          <p className="text-[11px] text-zinc-600">
+          <p className="text-[11px] text-zinc-400">
             Google connection is unavailable — the server needs <code>GOOGLE_CLIENT_ID</code> and{' '}
             <code>GOOGLE_CLIENT_SECRET</code>.
           </p>

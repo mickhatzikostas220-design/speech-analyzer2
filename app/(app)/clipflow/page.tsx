@@ -112,8 +112,8 @@ export default function ClipFlowPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 space-y-10">
       <div>
-        <h1 className="text-2xl font-semibold text-white">ClipFlow</h1>
-        <p className="text-zinc-500 text-sm mt-1">
+        <h1 className="text-2xl font-semibold text-strong">ClipFlow</h1>
+        <p className="text-muted text-sm mt-1">
           Paste a YouTube video or channel — get scroll-stopping vertical clips with AI titles,
           captions, and hashtags, ready to post.
         </p>
@@ -258,7 +258,7 @@ export default function ClipFlowPage() {
 
       {/* Projects */}
       <div>
-        <h2 className="text-base font-semibold text-white mb-4">Your videos</h2>
+        <h2 className="text-base font-semibold text-strong mb-4">Your videos</h2>
         {loading ? (
           <div className="space-y-3">
             {[0, 1, 2].map((i) => (
@@ -270,7 +270,7 @@ export default function ClipFlowPage() {
             <svg className="w-10 h-10 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
-            <p className="text-sm text-zinc-600">No videos yet — paste a YouTube link above to begin.</p>
+            <p className="text-sm text-zinc-400">No videos yet — paste a YouTube link above to begin.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -298,9 +298,9 @@ export default function ClipFlowPage() {
                           : ''}
                       </span>
                       {fmtDuration(p.duration_seconds) && (
-                        <span className="text-xs text-zinc-600">{fmtDuration(p.duration_seconds)}</span>
+                        <span className="text-xs text-zinc-400">{fmtDuration(p.duration_seconds)}</span>
                       )}
-                      <span className="text-xs text-zinc-600">{timeAgo(p.created_at)}</span>
+                      <span className="text-xs text-zinc-400">{timeAgo(p.created_at)}</span>
                     </div>
                   </div>
                 </button>
