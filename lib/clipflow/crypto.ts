@@ -19,6 +19,11 @@ function getKey(): Buffer {
       'CLIPFLOW_TOKEN_SECRET (or SUPABASE_SERVICE_ROLE_KEY) must be set to encrypt platform tokens'
     );
   }
+  // Reject weak/short secrets so a low-entropy value can't be used as the
+  // encryption key for OAuth tokens at rest.
+  if (secret.length < 16) {
+    throw new Error('CLIPFLOW_TOKEN_SECRET must be at least 16 characters.');
+  }
   return scryptSync(secret, STATIC_SALT, 32);
 }
 

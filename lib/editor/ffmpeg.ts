@@ -1,9 +1,11 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { mkdir } from 'fs/promises';
 import { dirname } from 'path';
 
-const execAsync = promisify(exec);
+// execFile (argv array, no shell) — paths and numeric args are passed as
+// discrete arguments so they can never be interpreted by a shell.
+const execFileAsync = promisify(execFile);
 
 export interface Segment {
   start: number;
@@ -11,9 +13,12 @@ export interface Segment {
 }
 
 export async function getVideoDuration(videoPath: string): Promise<number> {
-  const { stdout } = await execAsync(
-    `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`
-  );
+  const { stdout } = await execFileAsync('ffprobe', [
+    '-v', 'error',
+    '-show_entries', 'format=duration',
+    '-of', 'default=noprint_wrappers=1:nokey=1',
+    videoPath,
+  ]);
   return parseFloat(stdout.trim());
 }
 
@@ -24,8 +29,11 @@ export async function detectSpeechSegments(
 ): Promise<Segment[]> {
   const duration = await getVideoDuration(videoPath);
 
-  const { stderr } = await execAsync(
-    `ffmpeg -i "${videoPath}" -af "silencedetect=noise=${noiseDb}dB:d=${minSilenceDuration}" -f null - 2>&1`,
+  // ffmpeg writes silencedetect output to stderr; execFile captures it directly
+  // (no need for the shell `2>&1` redirect the previous exec() form used).
+  const { stderr } = await execFileAsync(
+    'ffmpeg',
+    ['-i', videoPath, '-af', `silencedetect=noise=${noiseDb}dB:d=${minSilenceDuration}`, '-f', 'null', '-'],
     { maxBuffer: 10 * 1024 * 1024 }
   );
 
@@ -67,8 +75,9 @@ export async function exportSegments(
 
   if (segments.length === 1) {
     const { start, end } = segments[0];
-    await execAsync(
-      `ffmpeg -y -i "${inputPath}" -ss ${start} -to ${end} -c copy "${outputPath}"`,
+    await execFileAsync(
+      'ffmpeg',
+      ['-y', '-i', inputPath, '-ss', String(start), '-to', String(end), '-c', 'copy', outputPath],
       { maxBuffer: 10 * 1024 * 1024, timeout: 600000 }
     );
     return;
@@ -87,8 +96,16 @@ export async function exportSegments(
     `${concatInputs}concat=n=${segments.length}:v=1:a=1[outv][outa]`,
   ].join(';');
 
-  await execAsync(
-    `ffmpeg -y -i "${inputPath}" -filter_complex "${filterComplex}" -map "[outv]" -map "[outa]" -c:v libx264 -preset fast -crf 23 -c:a aac -b:a 192k "${outputPath}"`,
+  await execFileAsync(
+    'ffmpeg',
+    [
+      '-y', '-i', inputPath,
+      '-filter_complex', filterComplex,
+      '-map', '[outv]', '-map', '[outa]',
+      '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+      '-c:a', 'aac', '-b:a', '192k',
+      outputPath,
+    ],
     { maxBuffer: 50 * 1024 * 1024, timeout: 600000 }
   );
 }

@@ -1,8 +1,18 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { sendAccessRequestNotification } from '@/lib/email';
+import { rateLimit, clientIp } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
+  // Each request triggers a DB write + outbound admin email — throttle hard.
+  const rl = rateLimit(`request-access:${clientIp(request)}`, 5, 60 * 60 * 1000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } }
+    );
+  }
+
   const body = await request.json();
   const { name, email, reason } = body;
 
