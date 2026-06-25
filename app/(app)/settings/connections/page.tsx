@@ -58,7 +58,7 @@ export default function ConnectionsSettingsPage() {
     <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-black">Connections &amp; API keys</h1>
+          <h1 className="text-2xl font-semibold text-white">Connections &amp; API keys</h1>
           <p className="text-zinc-500 text-sm mt-1">
             Connect your apps and add your API keys here — shared by the Assistant and ClipFlow.
           </p>
@@ -78,7 +78,7 @@ export default function ConnectionsSettingsPage() {
       {/* ClipFlow */}
       <section className="space-y-4">
         <div>
-          <h2 className="text-base font-semibold text-black">ClipFlow</h2>
+          <h2 className="text-base font-semibold text-white">ClipFlow</h2>
           <p className="text-xs text-zinc-500 mt-0.5">
             Keys for clip generation and the accounts your clips publish to.
           </p>

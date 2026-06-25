@@ -112,7 +112,7 @@ export default function ClipFlowPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 space-y-10">
       <div>
-        <h1 className="text-2xl font-semibold text-black">ClipFlow</h1>
+        <h1 className="text-2xl font-semibold text-white">ClipFlow</h1>
         <p className="text-zinc-500 text-sm mt-1">
           Paste a YouTube video or channel — get scroll-stopping vertical clips with AI titles,
           captions, and hashtags, ready to post.
@@ -258,7 +258,7 @@ export default function ClipFlowPage() {
 
       {/* Projects */}
       <div>
-        <h2 className="text-base font-semibold text-black mb-4">Your videos</h2>
+        <h2 className="text-base font-semibold text-white mb-4">Your videos</h2>
         {loading ? (
           <div className="space-y-3">
             {[0, 1, 2].map((i) => (
