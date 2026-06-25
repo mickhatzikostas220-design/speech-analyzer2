@@ -207,7 +207,7 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
                         Remove (client ••••{set})
                       </button>
                     ) : (
-                      <span className="text-[10px] text-zinc-600">Not set</span>
+                      <span className="text-[10px] text-zinc-400">Not set</span>
                     )}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

@@ -19,6 +19,19 @@ export default async function SettingsPage() {
       </p>
 
       <Link
+        href="/settings/connections"
+        className="card mb-4 flex items-center justify-between gap-4 p-4 transition hover:border-strong"
+      >
+        <div>
+          <p className="font-bold text-strong">Connections &amp; API keys →</p>
+          <p className="text-sm text-muted">
+            Connect apps and add your API keys — shared by the Assistant and ClipFlow.
+          </p>
+        </div>
+        <ArrowUpRight className="h-5 w-5 shrink-0 text-muted" />
+      </Link>
+
+      <Link
         href="/settings/one-sheet"
         className="card mb-8 flex items-center justify-between gap-4 p-4 transition hover:border-strong"
       >

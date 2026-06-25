@@ -182,7 +182,7 @@ export function ClipCard({
             title="clip preview"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">No preview</div>
+          <div className="w-full h-full flex items-center justify-center text-zinc-400 text-xs">No preview</div>
         )}
         {clip.score != null && (
           <span className="absolute top-2 left-2 text-[10px] font-semibold bg-purple-600/90 text-white px-2 py-0.5 rounded-full">

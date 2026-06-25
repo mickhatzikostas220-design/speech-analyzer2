@@ -1,10 +1,8 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { ConnectionsPanel } from '@/components/clipflow/ConnectionsPanel';
-import { UploadPostPanel } from '@/components/clipflow/UploadPostPanel';
-import { ApiKeysPanel } from '@/components/clipflow/ApiKeysPanel';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { CLIP_LENGTHS, CLIP_LENGTH_LABELS, type ClipLength } from '@/lib/clipflow/types';
 
 const TONE_SUGGESTIONS = ['Funny', 'Educational', 'Inspirational', 'High-energy', 'Storytelling', 'Controversial'];
@@ -50,27 +48,6 @@ function timeAgo(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function ConnectBanner() {
-  const params = useSearchParams();
-  const connect = params.get('connect');
-  const platform = params.get('platform');
-  const msg = params.get('msg');
-  if (!connect) return null;
-
-  if (connect === 'success') {
-    return (
-      <p className="text-xs text-green-400 bg-green-950/40 border border-green-800 rounded-lg px-3 py-2">
-        {platform ? `${platform} connected.` : 'Connected.'}
-      </p>
-    );
-  }
-  return (
-    <p className="text-xs text-red-400 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
-      {msg ? decodeURIComponent(msg) : 'Could not connect that platform.'}
-    </p>
-  );
-}
-
 export default function ClipFlowPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -78,7 +55,6 @@ export default function ClipFlowPage() {
   const [url, setUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [connRefresh, setConnRefresh] = useState(0);
 
   // Clip preferences — what kind of clips the user is looking for.
   const [showPrefs, setShowPrefs] = useState(false);
@@ -136,16 +112,12 @@ export default function ClipFlowPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 space-y-10">
       <div>
-        <h1 className="text-2xl font-semibold text-white">ClipFlow</h1>
-        <p className="text-zinc-500 text-sm mt-1">
+        <h1 className="text-2xl font-semibold text-strong">ClipFlow</h1>
+        <p className="text-muted text-sm mt-1">
           Paste a YouTube video or channel — get scroll-stopping vertical clips with AI titles,
           captions, and hashtags, ready to post.
         </p>
       </div>
-
-      <Suspense fallback={null}>
-        <ConnectBanner />
-      </Suspense>
 
       {/* URL input */}
       <form onSubmit={submit} className="space-y-3">
@@ -267,15 +239,26 @@ export default function ClipFlowPage() {
         )}
       </form>
 
-      <ApiKeysPanel onChanged={() => setConnRefresh((v) => v + 1)} />
-
-      <UploadPostPanel onChanged={() => setConnRefresh((v) => v + 1)} />
-
-      <ConnectionsPanel refresh={connRefresh} />
+      {/* Connect accounts & API keys live in shared Settings */}
+      <Link
+        href="/settings/connections"
+        className="flex items-center justify-between gap-4 bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition-colors"
+      >
+        <div>
+          <p className="text-sm font-semibold text-white">Connect accounts &amp; API keys →</p>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            Add your OpenAI / Upload-Post keys and connect TikTok, Instagram, YouTube &amp; X to post
+            clips — managed in Settings.
+          </p>
+        </div>
+        <svg className="w-5 h-5 text-zinc-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </Link>
 
       {/* Projects */}
       <div>
-        <h2 className="text-base font-semibold text-white mb-4">Your videos</h2>
+        <h2 className="text-base font-semibold text-strong mb-4">Your videos</h2>
         {loading ? (
           <div className="space-y-3">
             {[0, 1, 2].map((i) => (
@@ -287,7 +270,7 @@ export default function ClipFlowPage() {
             <svg className="w-10 h-10 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
-            <p className="text-sm text-zinc-600">No videos yet — paste a YouTube link above to begin.</p>
+            <p className="text-sm text-zinc-400">No videos yet — paste a YouTube link above to begin.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -315,9 +298,9 @@ export default function ClipFlowPage() {
                           : ''}
                       </span>
                       {fmtDuration(p.duration_seconds) && (
-                        <span className="text-xs text-zinc-600">{fmtDuration(p.duration_seconds)}</span>
+                        <span className="text-xs text-zinc-400">{fmtDuration(p.duration_seconds)}</span>
                       )}
-                      <span className="text-xs text-zinc-600">{timeAgo(p.created_at)}</span>
+                      <span className="text-xs text-zinc-400">{timeAgo(p.created_at)}</span>
                     </div>
                   </div>
                 </button>

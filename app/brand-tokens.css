@@ -57,9 +57,9 @@
   --ink-50:      #F6F6F9;
 
   /* ---- Navy (default signature family) ---- */
-  --navy:        #1A2B50;
-  --navy-strong: #11203F;
-  --navy-accent: #2E4D8E;
+  --navy:        #17294E;
+  --navy-strong: #0F1E3A;
+  --navy-accent: #2E55AE;
 
   /* ============================================================
      PER-SPEAKER BRAND HOOKS
@@ -101,19 +101,19 @@
   --focus-ring:      var(--navy-accent);
 
   /* ---- Status ---- */
-  --success:       #1F9D55;
+  --success:       #1B9A55;
   --success-bg:    #E4F4EC;
-  --warning:       var(--yellow-500);
-  --warning-bg:    var(--yellow-100);
-  --danger:        var(--red-500);
-  --danger-bg:     var(--red-100);
-  --info:          var(--blue-500);
-  --info-bg:       var(--blue-100);
+  --warning:       #B5840A;
+  --warning-bg:    #FBEFC9;
+  --danger:        #E0402A;
+  --danger-bg:     #FBE3DC;
+  --info:          #0E8FB6;
+  --info-bg:       #D7EFF8;
 
   /* ---- Engagement scale (Orator) ---- */
-  --score-high:    #1F9D55;
-  --score-mid:     var(--yellow-500);
-  --score-low:     var(--red-500);
+  --score-high:    #1B9A55;
+  --score-mid:     #D49A00;
+  --score-low:     #E0402A;
 
   /* ============================================================
      TYPOGRAPHY

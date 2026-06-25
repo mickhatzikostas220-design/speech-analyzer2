@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || request.nextUrl.origin;
-    const url = await generateConnectLink(user.id, `${origin}/clipflow?connected=uploadpost`, key!);
+    const url = await generateConnectLink(user.id, `${origin}/settings/connections?connected=uploadpost`, key!);
     return NextResponse.json({ url });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

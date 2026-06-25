@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
   const cookieState = request.cookies.get('agent_oauth_state')?.value;
 
   if (url.searchParams.get('error')) {
-    return NextResponse.redirect(`${APP_URL}/agent/settings?error=google_denied`);
+    return NextResponse.redirect(`${APP_URL}/settings/connections?error=google_denied`);
   }
   if (!code || !state || !cookieState || state !== cookieState) {
-    return NextResponse.redirect(`${APP_URL}/agent/settings?error=google_state`);
+    return NextResponse.redirect(`${APP_URL}/settings/connections?error=google_state`);
   }
 
   try {
@@ -44,13 +44,13 @@ export async function GET(request: NextRequest) {
       .from('agent_connections')
       .upsert(row, { onConflict: 'user_id,provider,account_email' });
 
-    const response = NextResponse.redirect(`${APP_URL}/agent/settings?connected=google`);
+    const response = NextResponse.redirect(`${APP_URL}/settings/connections?connected=google`);
     response.cookies.delete('agent_oauth_state');
     return response;
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';
     return NextResponse.redirect(
-      `${APP_URL}/agent/settings?error=${encodeURIComponent(`google_exchange:${msg}`.slice(0, 120))}`
+      `${APP_URL}/settings/connections?error=${encodeURIComponent(`google_exchange:${msg}`.slice(0, 120))}`
     );
   }
 }
