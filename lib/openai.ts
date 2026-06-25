@@ -1,6 +1,13 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let _openai: OpenAI | null = null;
+
+/** Lazily construct the OpenAI client so importing this module never throws
+ *  at build time when OPENAI_API_KEY is absent. */
+function client(): OpenAI {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return _openai;
+}
 
 export interface TranscriptWord {
   word: string;
@@ -14,7 +21,7 @@ export async function transcribeAudio(
 ): Promise<{ text: string; words: TranscriptWord[]; durationSeconds: number }> {
   const file = new File([blob], filename, { type: blob.type || 'audio/mpeg' });
 
-  const response = await openai.audio.transcriptions.create({
+  const response = await client().audio.transcriptions.create({
     file,
     model: 'whisper-1',
     response_format: 'verbose_json',
@@ -45,7 +52,7 @@ export async function generateFeedback(params: {
   const seconds = Math.floor(startSeconds % 60);
   const timeLabel = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-  const response = await openai.chat.completions.create({
+  const response = await client().chat.completions.create({
     model: 'gpt-4o',
     messages: [
       {
@@ -78,4 +85,96 @@ Full speech (first 400 chars): "${fullTranscript.slice(0, 400)}"`,
     feedback: lines[0] ?? 'Neural engagement dropped here.',
     suggestion: lines[1] ?? 'Add a concrete example or vary your vocal pacing.',
   };
+}
+
+export interface AeoSeoResult {
+  metaTitle: string;
+  metaDescription: string;
+  keywords: string[];
+  faq: { question: string; answer: string }[];
+  jsonLd: Record<string, unknown>;
+}
+
+/**
+ * Answer-Engine / Search-Engine optimization content for a talk. Produces a
+ * meta title/description, keywords, an AEO-friendly FAQ (the Q&A shape that
+ * answer engines surface), and a JSON-LD blob for an indexable talk page.
+ */
+export async function generateAeoContent(params: {
+  speakerName: string;
+  talkTitle: string;
+  topic: string;
+  audience?: string;
+}): Promise<AeoSeoResult> {
+  const { speakerName, talkTitle, topic, audience } = params;
+
+  const response = await client().chat.completions.create({
+    model: 'gpt-4o',
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'system',
+        content: `You are an SEO and Answer-Engine-Optimization (AEO) specialist for professional speakers. Given a talk, return JSON to help the speaker rank in Google and be cited by AI answer engines.
+
+Return ONLY a JSON object with this exact shape:
+{
+  "metaTitle": "under 60 characters, includes the speaker name",
+  "metaDescription": "under 155 characters, compelling, includes the topic",
+  "keywords": ["6-10 search phrases a booker would actually type"],
+  "faq": [{"question": "...", "answer": "..."}, ...]  // 4-6 conversational Q&As an answer engine would surface
+}`,
+      },
+      {
+        role: 'user',
+        content: `Speaker: ${speakerName}
+Talk title: ${talkTitle}
+Topic / description: ${topic}
+${audience ? `Target audience: ${audience}` : ''}`,
+      },
+    ],
+    max_tokens: 900,
+    temperature: 0.7,
+  });
+
+  const raw = response.choices[0]?.message?.content ?? '{}';
+  let parsed: Partial<AeoSeoResult> = {};
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = {};
+  }
+
+  const metaTitle = parsed.metaTitle ?? `${talkTitle} — ${speakerName}`;
+  const metaDescription = parsed.metaDescription ?? topic.slice(0, 150);
+  const keywords = Array.isArray(parsed.keywords) ? parsed.keywords : [];
+  const faq = Array.isArray(parsed.faq) ? parsed.faq : [];
+
+  // Assemble JSON-LD locally so it always reflects the real fields.
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    name: speakerName,
+    jobTitle: 'Speaker',
+    description: metaDescription,
+    knowsAbout: keywords,
+    subjectOf: {
+      '@type': 'Event',
+      name: talkTitle,
+      description: topic,
+    },
+    ...(faq.length
+      ? {
+          mainEntityOfPage: {
+            '@type': 'FAQPage',
+            mainEntity: faq.map((f) => ({
+              '@type': 'Question',
+              name: f.question,
+              acceptedAnswer: { '@type': 'Answer', text: f.answer },
+            })),
+          },
+        }
+      : {}),
+  };
+
+  return { metaTitle, metaDescription, keywords, faq, jsonLd };
 }

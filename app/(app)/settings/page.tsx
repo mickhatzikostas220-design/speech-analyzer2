@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ArrowUpRight } from 'lucide-react';
 import { getUserBrandState } from '@/lib/brand/server';
+import { createClient } from '@/lib/supabase/server';
+import { getUserBilling } from '@/lib/billing/server';
 import { BrandSettings } from '@/components/brand/BrandSettings';
 
 export const dynamic = 'force-dynamic';
@@ -10,6 +12,9 @@ export default async function SettingsPage() {
   const state = await getUserBrandState();
   if (!state.userId) redirect('/login');
 
+  const supabase = createClient();
+  const billing = await getUserBilling(supabase, state.userId);
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <p className="eyebrow mb-2">Settings</p>
@@ -17,6 +22,28 @@ export default async function SettingsPage() {
       <p className="mb-8 text-muted">
         Make the hub feel like you. Changes apply across your whole hub.
       </p>
+
+      <Link
+        href="/pricing"
+        className="card mb-4 flex items-center justify-between gap-4 p-4 transition hover:border-strong"
+      >
+        <div>
+          <p className="font-bold text-strong">
+            Plan &amp; billing → <span className="text-muted">{billing.planConfig.name}</span>
+            {billing.paymentFailed && (
+              <span className="ml-2 text-xs font-bold" style={{ color: 'var(--danger)' }}>
+                payment failed
+              </span>
+            )}
+          </p>
+          <p className="text-sm text-muted">
+            {billing.plan === 'free'
+              ? 'Upgrade for unlimited analyses, bigger uploads, and advanced AI insights.'
+              : 'Manage your subscription, update your card, or change plans.'}
+          </p>
+        </div>
+        <ArrowUpRight className="h-5 w-5 shrink-0 text-muted" />
+      </Link>
 
       <Link
         href="/settings/connections"
