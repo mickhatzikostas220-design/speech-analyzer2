@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Trash2, CalendarPlus, Mail, MapPin, Building2 } from 'lucide-react';
 import {
   type Booking,
@@ -41,6 +41,17 @@ export function BookingInbox({ initialBookings }: { initialBookings: Booking[] }
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [addedGigs, setAddedGigs] = useState<Record<string, boolean>>({});
+  const [deleteTarget, setDeleteTarget] = useState<Booking | null>(null);
+
+  // Close the delete-confirmation modal on Escape — standard a11y expectation.
+  useEffect(() => {
+    if (!deleteTarget) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setDeleteTarget(null);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [deleteTarget]);
 
   async function addBooking(e: React.FormEvent) {
     e.preventDefault();
@@ -84,10 +95,13 @@ export function BookingInbox({ initialBookings }: { initialBookings: Booking[] }
     }
   }
 
-  async function remove(id: string) {
-    setBookings((prev) => prev.filter((b) => b.id !== id));
+  async function confirmRemove() {
+    const target = deleteTarget;
+    if (!target) return;
+    setDeleteTarget(null);
+    setBookings((prev) => prev.filter((b) => b.id !== target.id));
     try {
-      await fetch(`/api/bookings/${id}`, { method: 'DELETE' });
+      await fetch(`/api/bookings/${target.id}`, { method: 'DELETE' });
     } catch {
       /* ignore */
     }
@@ -189,7 +203,7 @@ export function BookingInbox({ initialBookings }: { initialBookings: Booking[] }
                         </p>
                       )}
                     </div>
-                    <button onClick={() => remove(b.id)} aria-label="Remove" className="shrink-0 text-faint transition-colors hover:text-[color:var(--danger)]">
+                    <button onClick={() => setDeleteTarget(b)} aria-label="Remove" className="shrink-0 text-faint transition-colors hover:text-[color:var(--danger)]">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -237,6 +251,33 @@ export function BookingInbox({ initialBookings }: { initialBookings: Booking[] }
             </div>
           </section>
         )
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div className="card w-full max-w-sm p-6" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-2 font-semibold text-strong">Remove inquiry?</h3>
+            <p className="mb-5 text-sm text-muted">
+              &ldquo;{deleteTarget.event_name || deleteTarget.organization || deleteTarget.contact_name || 'This inquiry'}&rdquo;
+              will be permanently removed. This can&apos;t be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={confirmRemove}
+                className="flex-1 rounded-[var(--radius-sm)] bg-[color:var(--danger)] py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              >
+                Remove
+              </button>
+              <button onClick={() => setDeleteTarget(null)} className="btn-outline flex-1 text-sm">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
