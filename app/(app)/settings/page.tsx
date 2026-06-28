@@ -33,12 +33,25 @@ export default async function SettingsPage() {
 
       <Link
         href="/settings/one-sheet"
-        className="card mb-8 flex items-center justify-between gap-4 p-4 transition hover:border-strong"
+        className="card mb-4 flex items-center justify-between gap-4 p-4 transition hover:border-strong"
       >
         <div>
           <p className="font-bold text-strong">Public one-sheet →</p>
           <p className="text-sm text-muted">
             Your shareable speaker page (bio, talks, testimonials) with a “book me” form.
+          </p>
+        </div>
+        <ArrowUpRight className="h-5 w-5 shrink-0 text-muted" />
+      </Link>
+
+      <Link
+        href="/settings/plans"
+        className="card mb-8 flex items-center justify-between gap-4 p-4 transition hover:border-strong"
+      >
+        <div>
+          <p className="font-bold text-strong">Plans &amp; billing →</p>
+          <p className="text-sm text-muted">
+            See your current plan and what each tier unlocks.
           </p>
         </div>
         <ArrowUpRight className="h-5 w-5 shrink-0 text-muted" />
