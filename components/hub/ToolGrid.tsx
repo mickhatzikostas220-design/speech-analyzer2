@@ -8,6 +8,8 @@ import {
   Sparkles,
   Bot,
   Inbox,
+  Lightbulb,
+  Search,
   ArrowUpRight,
   type LucideIcon,
 } from 'lucide-react';
@@ -83,6 +85,22 @@ export function ToolGrid({ analysisCount, bookingCount = 0 }: { analysisCount: n
       bg: 'var(--pink-200)',
       fg: 'var(--ink-900)',
       count: analysisCount > 0 ? `${analysisCount} ${analysisCount === 1 ? 'talk' : 'talks'}` : undefined,
+    },
+    {
+      icon: Search,
+      name: 'SEO & AEO',
+      desc: 'Drop in your website and get tips to rank on Google and get cited by AI answer engines.',
+      href: '/seo',
+      bg: 'var(--accent-2)',
+      fg: '#fff',
+    },
+    {
+      icon: Lightbulb,
+      name: 'Coaching Tips',
+      desc: 'A fresh tip every week — schedule the ones you want to work on and check them off.',
+      href: '/tips',
+      bg: 'var(--yellow-400)',
+      fg: 'var(--ink-900)',
     },
     {
       icon: Sparkles,
