@@ -6,13 +6,16 @@ import { redirect } from 'next/navigation';
 import { Check, ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { getUserPlan } from '@/lib/subscription/server';
-import { PLANS, PLAN_BY_ID, planRank } from '@/lib/subscription/plans';
+import { PLANS, PLAN_BY_ID } from '@/lib/subscription/plans';
+import { PlanActions } from '@/components/subscription/PlanActions';
 
 export const dynamic = 'force-dynamic';
 
-const SUPPORT_EMAIL = process.env.ADMIN_EMAIL ?? 'mickhatzikostas220@gmail.com';
-
-export default async function PlansPage() {
+export default async function PlansPage({
+  searchParams,
+}: {
+  searchParams: { upgraded?: string };
+}) {
   const supabase = createClient();
   const {
     data: { user },
@@ -20,7 +23,7 @@ export default async function PlansPage() {
   if (!user) redirect('/login');
 
   const currentPlan = await getUserPlan(supabase);
-  const currentRank = planRank(currentPlan);
+  const justUpgraded = searchParams.upgraded === '1';
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -38,11 +41,14 @@ export default async function PlansPage() {
         <span className="font-bold text-strong">{PLAN_BY_ID[currentPlan].name}</span> plan.
       </p>
 
+      {justUpgraded && (
+        <div className="mb-6 rounded-[var(--radius-md)] border border-[color:var(--success)]/40 bg-[var(--success-bg)] px-4 py-3 text-sm text-[color:var(--success)]">
+          Thanks! Your subscription is being activated — it’ll update here within a moment.
+        </div>
+      )}
+
       <div className="grid gap-5 md:grid-cols-3">
-        {PLANS.map((plan) => {
-          const isCurrent = plan.id === currentPlan;
-          const isUpgrade = planRank(plan.id) > currentRank;
-          return (
+        {PLANS.map((plan) => (
             <div
               key={plan.id}
               className={`relative flex flex-col rounded-[var(--radius-lg)] border bg-surface-card p-6 ${
@@ -75,41 +81,14 @@ export default async function PlansPage() {
               </ul>
 
               <div className="mt-6">
-                {isCurrent ? (
-                  <button
-                    disabled
-                    className="w-full rounded-[var(--radius-pill)] border-2 border-[var(--border-subtle)] py-2 text-sm font-bold text-muted"
-                  >
-                    Current plan
-                  </button>
-                ) : isUpgrade ? (
-                  <a
-                    href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
-                      `Upgrade to ${plan.name}`
-                    )}&body=${encodeURIComponent(
-                      `Hi, I'd like to upgrade my account (${user.email}) to the ${plan.name} plan.`
-                    )}`}
-                    className={plan.highlighted ? 'btn-primary w-full' : 'btn-outline w-full'}
-                  >
-                    Upgrade
-                  </a>
-                ) : (
-                  <button
-                    disabled
-                    className="w-full rounded-[var(--radius-pill)] border-2 border-[var(--border-subtle)] py-2 text-sm font-bold text-faint"
-                  >
-                    Included
-                  </button>
-                )}
+                <PlanActions planId={plan.id} currentPlan={currentPlan} highlighted={plan.highlighted} />
               </div>
             </div>
-          );
-        })}
+          ))}
       </div>
 
       <p className="mt-8 text-center text-xs text-faint">
-        Online checkout is coming soon. To change your plan now, use the Upgrade button to reach us
-        and we&apos;ll get you set up.
+        Secure checkout and billing are handled by Stripe. Cancel anytime from “Manage billing”.
       </p>
     </div>
   );
