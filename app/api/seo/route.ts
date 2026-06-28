@@ -1,7 +1,8 @@
 // SEO & AEO advisor: fetch the user's website, extract on-page signals, and ask
-// Claude for concrete SEO (search) + AEO (answer-engine / AI) improvement tips.
+// GPT-4o for concrete SEO (search) + AEO (answer-engine / AI) improvement tips.
+// Uses the OpenAI key already configured for the rest of the app.
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { normalizeUrl, BrandExtractError } from '@/lib/brand/extract';
 import { createClient } from '@/lib/supabase/server';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
@@ -78,9 +79,9 @@ function extractSignals(html: string) {
   };
 }
 
-let _client: Anthropic | null = null;
-function anthropic(): Anthropic {
-  if (!_client) _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+let _client: OpenAI | null = null;
+function openai(): OpenAI {
+  if (!_client) _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   return _client;
 }
 
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ error: 'The SEO tool is not configured yet.' }, { status: 503 });
   }
 
@@ -151,15 +152,14 @@ Aim for 3–5 items in each array. No markdown, no code fences.`;
 
   let report: { summary: string; seo: unknown[]; aeo: unknown[] };
   try {
-    const msg = await anthropic().messages.create({
-      model: 'claude-sonnet-4-6',
+    const completion = await openai().chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 1600,
+      response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: prompt }],
     });
-    const textPart = msg.content.find((c) => c.type === 'text');
-    const raw = (textPart && 'text' in textPart ? textPart.text : '').trim();
-    const json = raw.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
-    report = JSON.parse(json);
+    const raw = completion.choices[0]?.message?.content ?? '';
+    report = JSON.parse(raw);
   } catch (err) {
     console.error('SEO analysis failed:', err);
     return NextResponse.json(
