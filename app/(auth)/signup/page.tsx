@@ -64,6 +64,7 @@ export default function SignupPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            autoComplete="email"
             className="input w-full text-sm"
             placeholder="you@example.com"
           />
@@ -76,6 +77,7 @@ export default function SignupPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            autoComplete="new-password"
             className="input w-full text-sm"
             placeholder="At least 6 characters"
           />
