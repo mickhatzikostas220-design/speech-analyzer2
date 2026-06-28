@@ -36,6 +36,7 @@ export default function AgentPage() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ConversationSummary | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const loadConversations = useCallback(async () => {
@@ -50,6 +51,16 @@ export default function AgentPage() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
+
+  // Close the delete-confirmation modal on Escape — standard a11y expectation.
+  useEffect(() => {
+    if (!deleteTarget) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setDeleteTarget(null);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [deleteTarget]);
 
   async function openConversation(id: string) {
     setActiveId(id);
@@ -72,12 +83,14 @@ export default function AgentPage() {
     setError(null);
   }
 
-  async function deleteConversation(id: string) {
-    if (!window.confirm('Delete this chat? This can’t be undone.')) return;
-    setConversations((prev) => prev.filter((c) => c.id !== id));
-    if (activeId === id) newChat();
+  async function confirmDeleteConversation() {
+    const target = deleteTarget;
+    if (!target) return;
+    setDeleteTarget(null);
+    setConversations((prev) => prev.filter((c) => c.id !== target.id));
+    if (activeId === target.id) newChat();
     try {
-      await fetch(`/api/agent/conversations/${id}`, { method: 'DELETE' });
+      await fetch(`/api/agent/conversations/${target.id}`, { method: 'DELETE' });
     } catch {
       loadConversations();
     }
@@ -204,7 +217,7 @@ export default function AgentPage() {
                 {c.title}
               </button>
               <button
-                onClick={() => deleteConversation(c.id)}
+                onClick={() => setDeleteTarget(c)}
                 aria-label="Delete chat"
                 title="Delete chat"
                 className="shrink-0 rounded p-1 text-faint opacity-0 transition hover:text-[color:var(--danger)] focus:opacity-100 group-hover:opacity-100"
@@ -295,6 +308,37 @@ export default function AgentPage() {
           </button>
         </div>
       </section>
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div
+            className="card w-full max-w-sm p-6"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-2 font-semibold text-strong">Delete chat?</h3>
+            <p className="mb-5 text-sm text-muted">
+              &ldquo;{deleteTarget.title}&rdquo; will be permanently deleted. This can&apos;t be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={confirmDeleteConversation}
+                className="flex-1 rounded-[var(--radius-sm)] bg-[color:var(--danger)] py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              >
+                Delete
+              </button>
+              <button onClick={() => setDeleteTarget(null)} className="btn-outline flex-1 text-sm">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
