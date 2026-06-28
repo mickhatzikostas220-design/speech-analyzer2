@@ -2,8 +2,37 @@ import { Resend } from 'resend';
 import { signToken } from './adminToken';
 
 const FROM = 'ACA <onboarding@resend.dev>';
+// Sender for user-facing transactional email (verification codes). Override
+// EMAIL_FROM with a verified domain in production — the resend.dev test sender
+// only delivers to the Resend account owner, so real signups won't receive it.
+const VERIFY_FROM = process.env.EMAIL_FROM ?? 'Speaker Hub <onboarding@resend.dev>';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3002';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'mickhatzikostas220@gmail.com';
+
+/**
+ * Send a 6-digit account-verification code, branded to the Speaker Hub theme.
+ * We generate the code ourselves (Supabase admin generateLink) and deliver it
+ * through Resend, because Supabase's built-in confirmation email is heavily
+ * rate-limited and unreliable in production.
+ */
+export async function sendVerificationCode(to: string, code: string) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  await resend.emails.send({
+    from: VERIFY_FROM,
+    to,
+    subject: `Your verification code: ${code}`,
+    html: `
+      <div style="font-family:system-ui,Segoe UI,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#ffffff;color:#111114;border:1px solid #e5e5ea;border-radius:16px;">
+        <div style="width:40px;height:40px;background:#1A2B50;border-radius:10px;margin-bottom:20px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:20px;font-family:system-ui;">S</div>
+        <h1 style="font-size:20px;font-weight:800;margin:0 0 8px;color:#111114;">Confirm your email</h1>
+        <p style="color:#6E6E78;margin:0 0 24px;line-height:1.6;font-size:14px;">Enter this 6-digit code in Speaker Hub to finish creating your account.</p>
+        <div style="font-size:34px;font-weight:800;letter-spacing:10px;color:#1A2B50;background:#F6F6F9;border:1px solid #e5e5ea;border-radius:12px;padding:18px 0;text-align:center;margin-bottom:24px;">${code}</div>
+        <p style="color:#9A9AA4;font-size:12px;margin:0;line-height:1.6;">This code expires in 1 hour. If you didn't try to sign up, you can safely ignore this email.</p>
+        <p style="color:#C9C9D1;font-size:11px;margin-top:28px;">Speaker Hub</p>
+      </div>
+    `,
+  });
+}
 
 export async function sendAccessRequestNotification(
   requestId: string,
