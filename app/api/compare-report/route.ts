@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
+// Created lazily inside the handler — instantiating at module scope throws
+// when OPENAI_API_KEY is missing during `next build`, which breaks the build.
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
@@ -47,6 +47,7 @@ Remember: for DMN, lower scores are better (less mind-wandering). For all others
 
 Write the report now.`;
 
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
     messages: [

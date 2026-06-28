@@ -77,24 +77,24 @@ export function UploadPostPanel({ onChanged }: { onChanged?: () => void }) {
   const connected = status?.connected ?? [];
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
+    <div className="card space-y-3 p-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h2 className="text-base font-semibold text-white">Publish accounts</h2>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <h2 className="text-base font-semibold text-strong">Publish accounts</h2>
+          <p className="mt-0.5 text-xs text-muted">
             Connect your TikTok, Instagram, YouTube, and X accounts to post clips — handled securely
             through Upload-Post, no per-platform app to set up.
           </p>
         </div>
         {!loading && connected.length > 0 && (
-          <span className="text-[10px] text-green-400 bg-green-950/40 border border-green-800 rounded-full px-2 py-0.5 whitespace-nowrap">
+          <span className="whitespace-nowrap rounded-full border border-[color:var(--success)]/40 bg-[var(--success-bg)] px-2 py-0.5 text-[10px] text-[color:var(--success)]">
             {connected.length} connected
           </span>
         )}
       </div>
 
       {loading ? (
-        <div className="h-9 bg-zinc-800/60 rounded-lg animate-pulse" />
+        <div className="h-9 animate-pulse rounded-[var(--radius-sm)] bg-[var(--surface-sunk)]" />
       ) : (
         <>
           {connected.length > 0 && (
@@ -102,7 +102,7 @@ export function UploadPostPanel({ onChanged }: { onChanged?: () => void }) {
               {connected.map((p) => (
                 <span
                   key={p}
-                  className="text-[11px] text-green-300 border border-green-800/70 bg-green-950/30 rounded-full px-2 py-0.5"
+                  className="rounded-full border border-[color:var(--success)]/40 bg-[var(--success-bg)] px-2 py-0.5 text-[11px] text-[color:var(--success)]"
                 >
                   {LABELS[p]}
                   {status?.names?.[p] ? ` · ${status.names[p]}` : ''}
@@ -115,7 +115,8 @@ export function UploadPostPanel({ onChanged }: { onChanged?: () => void }) {
             <button
               onClick={connect}
               disabled={working}
-              className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+              className="btn-primary text-xs"
+              style={{ padding: '8px 16px' }}
             >
               {working ? 'Opening…' : connected.length > 0 ? 'Add / manage accounts' : 'Connect accounts'}
             </button>
@@ -123,7 +124,7 @@ export function UploadPostPanel({ onChanged }: { onChanged?: () => void }) {
               <button
                 onClick={disconnect}
                 disabled={working}
-                className="text-xs text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50"
+                className="text-xs text-muted transition-colors hover:text-[color:var(--danger)] disabled:opacity-50"
               >
                 Disconnect all
               </button>
@@ -132,7 +133,7 @@ export function UploadPostPanel({ onChanged }: { onChanged?: () => void }) {
         </>
       )}
 
-      {error && <p className="text-[11px] text-red-400">{error}</p>}
+      {error && <p className="text-[11px] text-[color:var(--danger)]">{error}</p>}
     </div>
   );
 }

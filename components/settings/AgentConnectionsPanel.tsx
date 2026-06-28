@@ -92,20 +92,20 @@ export function AgentConnectionsPanel({ onChanged }: { onChanged?: () => void })
   }
 
   if (!data) {
-    return <div className="bg-zinc-900 border border-zinc-800 rounded-xl h-40 animate-pulse" />;
+    return <div className="h-40 animate-pulse rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)]" />;
   }
 
   const hint = data.keyHints[provider];
   const providerLabel = data.providerLabels[provider] ?? provider;
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-5">
+    <div className="card space-y-5 p-4">
       <div>
-        <h2 className="text-base font-semibold text-white">Assistant</h2>
-        <p className="text-xs text-zinc-500 mt-0.5">
+        <h2 className="text-base font-semibold text-strong">Assistant</h2>
+        <p className="mt-0.5 text-xs text-muted">
           Bring your own AI key and connect apps so the assistant can read your email, calendar, and
           social activity. Pick the model on the{' '}
-          <a href="/agent/settings" className="text-purple-400 hover:text-purple-300">
+          <a href="/agent/settings" className="hover:underline" style={{ color: 'var(--text-link)' }}>
             assistant settings page
           </a>
           .
@@ -113,7 +113,7 @@ export function AgentConnectionsPanel({ onChanged }: { onChanged?: () => void })
       </div>
 
       {!data.encryptionConfigured && (
-        <p className="text-[11px] text-amber-400 bg-amber-950/40 border border-amber-900 rounded-lg px-3 py-2">
+        <p className="rounded-[var(--radius-sm)] border border-[var(--warning)]/40 bg-[var(--warning-bg)] px-3 py-2 text-[11px] text-[#8A6D00]">
           Server is missing APP_ENCRYPTION_KEY — keys and app connections are disabled until it&apos;s
           set.
         </p>
@@ -121,14 +121,14 @@ export function AgentConnectionsPanel({ onChanged }: { onChanged?: () => void })
 
       {/* AI provider key */}
       <div className="space-y-2">
-        <h3 className="text-sm font-medium text-zinc-200">AI provider key</h3>
-        <p className="text-xs text-zinc-500">
+        <h3 className="text-sm font-medium text-strong">AI provider key</h3>
+        <p className="text-xs text-muted">
           Your own key — the assistant&apos;s usage is billed to you.
         </p>
         <select
           value={provider}
           onChange={(e) => setProvider(e.target.value as Provider)}
-          className="w-full bg-zinc-950/40 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+          className="w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-surface-card px-3 py-2 text-xs text-strong focus:border-[color:var(--signature)] focus:outline-none"
         >
           {Object.entries(data.providerLabels).map(([id, label]) => (
             <option key={id} value={id}>
@@ -137,9 +137,9 @@ export function AgentConnectionsPanel({ onChanged }: { onChanged?: () => void })
           ))}
         </select>
         {hint && (
-          <div className="flex items-center justify-between bg-zinc-950/40 border border-zinc-800 rounded-lg px-3 py-1.5">
-            <span className="text-xs text-zinc-300">Key set ••••{hint}</span>
-            <button onClick={removeKey} className="text-[11px] text-zinc-500 hover:text-red-400">
+          <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)] px-3 py-1.5">
+            <span className="text-xs text-body">Key set ••••{hint}</span>
+            <button onClick={removeKey} className="text-[11px] text-muted hover:text-[color:var(--danger)]">
               Remove
             </button>
           </div>
@@ -151,12 +151,13 @@ export function AgentConnectionsPanel({ onChanged }: { onChanged?: () => void })
             onChange={(e) => setKeyInput(e.target.value)}
             placeholder={`Paste your ${providerLabel} API key`}
             disabled={!data.encryptionConfigured}
-            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500 disabled:opacity-50"
+            className="flex-1 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-surface-card px-3 py-2 text-xs text-strong placeholder:text-[var(--text-faint)] focus:border-[color:var(--signature)] focus:outline-none disabled:opacity-50"
           />
           <button
             onClick={saveKey}
             disabled={savingKey || !keyInput.trim() || !data.encryptionConfigured}
-            className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
+            className="btn-primary whitespace-nowrap text-xs"
+            style={{ padding: '8px 16px' }}
           >
             {savingKey ? 'Checking…' : hint ? 'Replace' : 'Add'}
           </button>
@@ -165,20 +166,20 @@ export function AgentConnectionsPanel({ onChanged }: { onChanged?: () => void })
 
       {/* Connected apps */}
       <div className="space-y-2">
-        <h3 className="text-sm font-medium text-zinc-200">Connected apps</h3>
+        <h3 className="text-sm font-medium text-strong">Connected apps</h3>
         {data.connections.length === 0 && (
-          <p className="text-xs text-zinc-600">Nothing connected yet.</p>
+          <p className="text-xs text-faint">Nothing connected yet.</p>
         )}
         {data.connections.map((c) => (
-          <div key={c.id} className="bg-zinc-950/40 border border-zinc-800 rounded-lg p-3 space-y-2">
+          <div key={c.id} className="space-y-2 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)] p-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-white">
+              <span className="text-xs text-strong">
                 {c.provider === 'google' ? 'Google (Gmail + Calendar)' : c.provider}
-                {c.account_email && <span className="text-zinc-500"> — {c.account_email}</span>}
+                {c.account_email && <span className="text-muted"> — {c.account_email}</span>}
               </span>
               <button
                 onClick={() => disconnect(c.id)}
-                className="text-[11px] text-zinc-500 hover:text-red-400"
+                className="text-[11px] text-muted hover:text-[color:var(--danger)]"
               >
                 Disconnect
               </button>
@@ -186,7 +187,7 @@ export function AgentConnectionsPanel({ onChanged }: { onChanged?: () => void })
             <select
               value={c.autonomy}
               onChange={(e) => setAutonomy(c.id, e.target.value as Autonomy)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-[11px] text-white focus:outline-none focus:border-purple-500"
+              className="w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-surface-card px-3 py-2 text-[11px] text-strong focus:border-[color:var(--signature)] focus:outline-none"
             >
               {(Object.keys(AUTONOMY_LABELS) as Autonomy[]).map((a) => (
                 <option key={a} value={a}>
@@ -200,12 +201,13 @@ export function AgentConnectionsPanel({ onChanged }: { onChanged?: () => void })
         {data.googleConfigured ? (
           <a
             href="/api/agent/connect/google"
-            className="inline-flex text-xs bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg transition-colors"
+            className="btn-outline inline-flex text-xs"
+            style={{ padding: '8px 16px' }}
           >
             + Connect Google (Gmail + Calendar)
           </a>
         ) : (
-          <p className="text-[11px] text-zinc-600">
+          <p className="text-[11px] text-faint">
             Google connection is unavailable — the server needs <code>GOOGLE_CLIENT_ID</code> and{' '}
             <code>GOOGLE_CLIENT_SECRET</code>.
           </p>
@@ -214,10 +216,10 @@ export function AgentConnectionsPanel({ onChanged }: { onChanged?: () => void })
 
       {banner && (
         <p
-          className={`text-[11px] rounded-lg px-3 py-2 ${
+          className={`rounded-[var(--radius-sm)] px-3 py-2 text-[11px] ${
             banner.kind === 'ok'
-              ? 'text-green-400 bg-green-950/40 border border-green-800'
-              : 'text-red-400 bg-red-950/40 border border-red-800'
+              ? 'border border-[color:var(--success)]/40 bg-[var(--success-bg)] text-[color:var(--success)]'
+              : 'border border-[color:var(--danger)]/40 bg-[var(--danger-bg)] text-[color:var(--danger)]'
           }`}
         >
           {banner.text}

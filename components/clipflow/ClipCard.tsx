@@ -36,12 +36,16 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 
 const POST_STATUS_COLOR: Record<string, string> = {
-  queued: 'text-zinc-400 border-zinc-700',
-  scheduled: 'text-blue-400 border-blue-800',
-  posting: 'text-purple-400 border-purple-800',
-  posted: 'text-green-400 border-green-800',
-  failed: 'text-red-400 border-red-800',
+  queued: 'text-muted border-[var(--border-default)]',
+  scheduled: 'text-[color:var(--info)] border-[color:var(--info)]/40',
+  posting: 'text-[color:var(--accent-2)] border-[color:var(--accent-2)]/40',
+  posted: 'text-[color:var(--success)] border-[color:var(--success)]/40',
+  failed: 'text-[color:var(--danger)] border-[color:var(--danger)]/40',
 };
+
+// Shared compact input styling, tuned to the dense clip-editor layout.
+const INPUT_CLS =
+  'w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-surface-card px-2 py-1.5 placeholder:text-[var(--text-faint)] focus:border-[color:var(--signature)] focus:outline-none';
 
 function fmtRange(start: number, end: number) {
   const f = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
@@ -167,69 +171,69 @@ export function ClipCard({
     : null;
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden flex flex-col">
+    <div className="card flex flex-col overflow-hidden">
       {/* Preview */}
       <div className="relative aspect-[9/16] bg-black">
         {clip.videoUrl ? (
           // eslint-disable-next-line jsx-a11y/media-has-caption
-          <video src={clip.videoUrl} controls className="w-full h-full object-cover" />
+          <video src={clip.videoUrl} controls className="h-full w-full object-cover" />
         ) : embedUrl ? (
           <iframe
             src={embedUrl}
-            className="w-full h-full"
+            className="h-full w-full"
             allow="accelerometer; encrypted-media; picture-in-picture"
             allowFullScreen
             title="clip preview"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">No preview</div>
+          <div className="flex h-full w-full items-center justify-center text-xs text-white/60">No preview</div>
         )}
         {clip.score != null && (
-          <span className="absolute top-2 left-2 text-[10px] font-semibold bg-purple-600/90 text-white px-2 py-0.5 rounded-full">
+          <span className="absolute left-2 top-2 rounded-full bg-[var(--signature)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--on-signature)]">
             {clip.score}
           </span>
         )}
-        <span className="absolute top-2 right-2 text-[10px] bg-black/70 text-zinc-200 px-2 py-0.5 rounded-full">
+        <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] text-white/90">
           {fmtRange(clip.start_seconds, clip.end_seconds)}
         </span>
       </div>
 
       {/* Editor */}
-      <div className="p-3 space-y-3 text-sm">
+      <div className="space-y-3 p-3 text-sm">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Title"
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-white font-medium placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+          className={`${INPUT_CLS} font-medium text-strong`}
         />
         <textarea
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
           placeholder="On-screen caption / hook"
           rows={2}
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-200 text-xs placeholder-zinc-500 focus:outline-none focus:border-purple-500 resize-none"
+          className={`${INPUT_CLS} resize-none text-xs text-body`}
         />
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Post description"
           rows={2}
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-400 text-xs placeholder-zinc-500 focus:outline-none focus:border-purple-500 resize-none"
+          className={`${INPUT_CLS} resize-none text-xs text-muted`}
         />
         <input
           value={tags}
           onChange={(e) => setTags(e.target.value)}
           placeholder="hashtags, comma, separated"
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-purple-300 text-xs placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+          className={`${INPUT_CLS} text-xs text-[color:var(--accent-2)]`}
         />
 
-        {clip.reason && <p className="text-[11px] text-zinc-500 italic">{clip.reason}</p>}
+        {clip.reason && <p className="text-[11px] italic text-muted">{clip.reason}</p>}
 
         <div className="flex items-center gap-2">
           <select
             value={style}
             onChange={(e) => setStyle(e.target.value as Clip['caption_style'])}
-            className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-purple-500"
+            className={`${INPUT_CLS} w-auto text-xs text-body`}
           >
             <option value="opus">Opus captions</option>
             <option value="karaoke">Karaoke</option>
@@ -238,14 +242,16 @@ export function ClipCard({
           <button
             onClick={save}
             disabled={saving}
-            className="text-xs bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+            className="btn-outline text-xs"
+            style={{ padding: '6px 12px' }}
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
           <button
             onClick={regenerate}
             disabled={regenerating}
-            className="text-xs text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50"
+            className="text-xs transition-colors hover:underline disabled:opacity-50"
+            style={{ color: 'var(--text-link)' }}
           >
             {regenerating ? 'Regenerating…' : 'Regenerate'}
           </button>
@@ -255,13 +261,14 @@ export function ClipCard({
         <button
           onClick={render}
           disabled={rendering}
-          className="w-full text-xs bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+          className="btn-outline w-full text-xs"
+          style={{ padding: '8px 12px' }}
         >
           {rendering ? 'Rendering 9:16…' : clip.videoUrl ? 'Re-render video' : 'Render 9:16 video'}
         </button>
 
         {/* Platform toggles */}
-        <div className="border-t border-zinc-800 pt-3 space-y-2">
+        <div className="space-y-2 border-t border-[var(--border-subtle)] pt-3">
           <div className="flex flex-wrap gap-1.5">
             {(['instagram', 'tiktok', 'youtube', 'twitter'] as const).map((p) => {
               const connected = connectedPlatforms.includes(p);
@@ -271,12 +278,12 @@ export function ClipCard({
                   key={p}
                   onClick={() => connected && toggle(p)}
                   disabled={!connected}
-                  className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
+                  className={`rounded-full border px-2 py-1 text-[11px] transition-colors ${
                     on && connected
-                      ? 'bg-purple-600 border-purple-500 text-white'
+                      ? 'border-[color:var(--signature)] bg-[var(--signature)] text-[color:var(--on-signature)]'
                       : connected
-                      ? 'border-zinc-700 text-zinc-400 hover:border-zinc-600'
-                      : 'border-zinc-800 text-zinc-700 cursor-not-allowed'
+                      ? 'border-[var(--border-default)] text-muted hover:border-strong'
+                      : 'cursor-not-allowed border-[var(--border-subtle)] text-faint'
                   }`}
                   title={connected ? '' : 'Connect this platform first'}
                 >
@@ -291,12 +298,13 @@ export function ClipCard({
               type="datetime-local"
               value={scheduledAt}
               onChange={(e) => setScheduledAt(e.target.value)}
-              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] text-zinc-300 focus:outline-none focus:border-purple-500"
+              className={`${INPUT_CLS} flex-1 text-[11px] text-body`}
             />
             <button
               onClick={post}
               disabled={posting}
-              className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
+              className="btn-primary whitespace-nowrap text-xs"
+              style={{ padding: '6px 16px' }}
             >
               {posting ? 'Posting…' : scheduledAt ? 'Schedule' : 'Post now'}
             </button>
@@ -308,7 +316,7 @@ export function ClipCard({
               {clip.posts.map((p, i) => (
                 <span
                   key={`${p.platform}-${i}`}
-                  className={`text-[10px] px-2 py-0.5 rounded-full border ${POST_STATUS_COLOR[p.status] ?? 'text-zinc-400 border-zinc-700'}`}
+                  className={`rounded-full border px-2 py-0.5 text-[10px] ${POST_STATUS_COLOR[p.status] ?? 'text-muted border-[var(--border-default)]'}`}
                   title={p.error ?? ''}
                 >
                   {PLATFORM_LABELS[p.platform] ?? p.platform}: {p.status}
@@ -326,8 +334,8 @@ export function ClipCard({
           )}
         </div>
 
-        {msg && <p className="text-[11px] text-zinc-400">{msg}</p>}
-        {clip.error && <p className="text-[11px] text-red-400">{clip.error}</p>}
+        {msg && <p className="text-[11px] text-muted">{msg}</p>}
+        {clip.error && <p className="text-[11px] text-[color:var(--danger)]">{clip.error}</p>}
       </div>
     </div>
   );

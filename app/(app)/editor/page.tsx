@@ -98,6 +98,18 @@ export default function EditorPage() {
   // ── Delete confirmation ────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'editor' | 'script' | 'timeline'; id: string; title: string } | null>(null);
 
+  // Close any open modal on Escape — a standard accessibility expectation.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+      setShowModal(false);
+      setShowScriptModal(false);
+      setDeleteTarget(null);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   useEffect(() => {
     fetch('/api/editor')
       .then(safeJson)
@@ -353,8 +365,8 @@ export default function EditorPage() {
 
       {/* ── Delete Confirmation Modal ──────────────────────── */}
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="card p-6 max-w-sm w-full">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={() => setDeleteTarget(null)}>
+          <div className="card p-6 max-w-sm w-full" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-semibold text-strong mb-2">Delete project?</h3>
             <p className="text-muted text-sm mb-5">
               &ldquo;{deleteTarget.title}&rdquo; will be permanently deleted. This cannot be undone.
@@ -374,7 +386,7 @@ export default function EditorPage() {
       {/* ── New Silence Project Modal ───────────────────────── */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--ink-900)]/50 p-4" onClick={() => setShowModal(false)}>
-          <div className="card w-full max-w-sm p-6" style={{ borderWidth: 2, borderColor: 'var(--border-strong)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="card w-full max-w-sm p-6" role="dialog" aria-modal="true" style={{ borderWidth: 2, borderColor: 'var(--border-strong)' }} onClick={(e) => e.stopPropagation()}>
             <h2 className="section-title mb-4" style={{ fontSize: 'var(--text-h4)' }}>New project</h2>
             <form onSubmit={createProject} className="space-y-4">
               {createError && (
@@ -406,7 +418,7 @@ export default function EditorPage() {
       {/* ── New Script Project Modal ────────────────────────── */}
       {showScriptModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--ink-900)]/50 p-4" onClick={() => setShowScriptModal(false)}>
-          <div className="card w-full max-w-sm p-6" style={{ borderWidth: 2, borderColor: 'var(--border-strong)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="card w-full max-w-sm p-6" role="dialog" aria-modal="true" style={{ borderWidth: 2, borderColor: 'var(--border-strong)' }} onClick={(e) => e.stopPropagation()}>
             <h2 className="section-title mb-4" style={{ fontSize: 'var(--text-h4)' }}>New script project</h2>
             <form onSubmit={createScriptProject} className="space-y-4">
               {scriptCreateError && (

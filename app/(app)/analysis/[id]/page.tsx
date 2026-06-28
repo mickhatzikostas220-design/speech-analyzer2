@@ -84,6 +84,16 @@ export default function AnalysisPage() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [fetchDetail]);
 
+  // Close the delete-confirmation modal on Escape — standard a11y expectation.
+  useEffect(() => {
+    if (!showDeleteConfirm) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setShowDeleteConfirm(false);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showDeleteConfirm]);
+
   async function handleDelete() {
     setDeleting(true);
     const res = await fetch(`/api/analyses/${id}`, { method: 'DELETE' });
@@ -192,8 +202,8 @@ export default function AnalysisPage() {
 
       {/* Delete confirmation modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-surface-card border border-[var(--border-subtle)] rounded-[var(--radius-lg)] p-6 max-w-sm w-full shadow-[var(--shadow-lg)]">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="bg-surface-card border border-[var(--border-subtle)] rounded-[var(--radius-lg)] p-6 max-w-sm w-full shadow-[var(--shadow-lg)]" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-strong font-semibold mb-2">Delete analysis?</h3>
             <p className="text-muted text-sm mb-5">
               This will permanently delete the recording and all analysis data. This cannot be undone.

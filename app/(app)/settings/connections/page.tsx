@@ -37,14 +37,14 @@ function Banner() {
 
 function Ok({ text }: { text: string }) {
   return (
-    <p className="text-xs text-green-400 bg-green-950/40 border border-green-800 rounded-lg px-3 py-2">
+    <p className="rounded-[var(--radius-sm)] border border-[color:var(--success)]/40 bg-[var(--success-bg)] px-3 py-2 text-xs text-[color:var(--success)]">
       {text}
     </p>
   );
 }
 function Err({ text }: { text: string }) {
   return (
-    <p className="text-xs text-red-400 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
+    <p className="rounded-[var(--radius-sm)] border border-[color:var(--danger)]/40 bg-[var(--danger-bg)] px-3 py-2 text-xs text-[color:var(--danger)]">
       {text}
     </p>
   );
@@ -55,15 +55,15 @@ export default function ConnectionsSettingsPage() {
   const bump = () => setConnRefresh((v) => v + 1);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
+    <div className="mx-auto max-w-3xl space-y-8 px-4 py-10">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Connections &amp; API keys</h1>
-          <p className="text-zinc-500 text-sm mt-1">
+          <h1 className="text-2xl font-semibold text-strong">Connections &amp; API keys</h1>
+          <p className="mt-1 text-sm text-muted">
             Connect your apps and add your API keys here — shared by the Assistant and ClipFlow.
           </p>
         </div>
-        <Link href="/settings" className="text-sm font-semibold text-purple-400 hover:text-purple-300">
+        <Link href="/settings" className="text-sm font-semibold hover:underline" style={{ color: 'var(--text-link)' }}>
           ← Settings
         </Link>
       </div>
@@ -78,8 +78,8 @@ export default function ConnectionsSettingsPage() {
       {/* ClipFlow */}
       <section className="space-y-4">
         <div>
-          <h2 className="text-base font-semibold text-white">ClipFlow</h2>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <h2 className="text-base font-semibold text-strong">ClipFlow</h2>
+          <p className="mt-0.5 text-xs text-muted">
             Keys for clip generation and the accounts your clips publish to.
           </p>
         </div>

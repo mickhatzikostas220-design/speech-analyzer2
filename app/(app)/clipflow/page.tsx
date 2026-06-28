@@ -22,13 +22,13 @@ interface ProjectSummary {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  queued: 'text-zinc-400',
-  fetching: 'text-blue-400',
-  transcribing: 'text-blue-400',
-  analyzing: 'text-purple-400',
-  clipping: 'text-purple-400',
-  ready: 'text-green-400',
-  error: 'text-red-400',
+  queued: 'text-muted',
+  fetching: 'text-[color:var(--info)]',
+  transcribing: 'text-[color:var(--info)]',
+  analyzing: 'text-[color:var(--accent-2)]',
+  clipping: 'text-[color:var(--accent-2)]',
+  ready: 'text-[color:var(--success)]',
+  error: 'text-[color:var(--danger)]',
 };
 
 function fmtDuration(s: number | null) {
@@ -55,6 +55,7 @@ export default function ClipFlowPage() {
   const [url, setUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectSummary | null>(null);
 
   // Clip preferences — what kind of clips the user is looking for.
   const [showPrefs, setShowPrefs] = useState(false);
@@ -73,6 +74,16 @@ export default function ClipFlowPage() {
   useEffect(() => {
     load();
   }, []);
+
+  // Close the delete-confirmation modal on Escape — standard a11y expectation.
+  useEffect(() => {
+    if (!deleteTarget) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setDeleteTarget(null);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [deleteTarget]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -104,16 +115,20 @@ export default function ClipFlowPage() {
     }
   }
 
-  async function deleteProject(id: string) {
-    await fetch(`/api/clipflow/${id}`, { method: 'DELETE' });
-    setProjects((p) => p.filter((proj) => proj.id !== id));
+  async function confirmDelete() {
+    const target = deleteTarget;
+    if (!target) return;
+    setDeleteTarget(null);
+    setProjects((p) => p.filter((proj) => proj.id !== target.id));
+    await fetch(`/api/clipflow/${target.id}`, { method: 'DELETE' });
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10 space-y-10">
+    <div className="mx-auto max-w-3xl space-y-10 px-4 py-10">
       <div>
-        <h1 className="text-2xl font-semibold text-white">ClipFlow</h1>
-        <p className="text-zinc-500 text-sm mt-1">
+        <p className="eyebrow mb-1">ClipFlow</p>
+        <h1 className="display-h1" style={{ fontSize: 'var(--text-h3)' }}>Turn long videos into clips</h1>
+        <p className="mt-1 text-sm text-muted">
           Paste a YouTube video or channel — get scroll-stopping vertical clips with AI titles,
           captions, and hashtags, ready to post.
         </p>
@@ -121,19 +136,15 @@ export default function ClipFlowPage() {
 
       {/* URL input */}
       <form onSubmit={submit} className="space-y-3">
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <input
             type="text"
             placeholder="https://youtube.com/watch?v=…  or  youtube.com/@channel"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors"
+            className="input flex-1 text-sm"
           />
-          <button
-            type="submit"
-            disabled={submitting || !url.trim()}
-            className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium px-6 py-3 rounded-lg transition-colors whitespace-nowrap"
-          >
+          <button type="submit" disabled={submitting || !url.trim()} className="btn-primary whitespace-nowrap">
             {submitting ? 'Starting…' : 'Generate clips'}
           </button>
         </div>
@@ -142,10 +153,10 @@ export default function ClipFlowPage() {
         <button
           type="button"
           onClick={() => setShowPrefs((v) => !v)}
-          className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-muted transition-colors hover:text-strong"
         >
           <svg
-            className={`w-3.5 h-3.5 transition-transform ${showPrefs ? 'rotate-90' : ''}`}
+            className={`h-3.5 w-3.5 transition-transform ${showPrefs ? 'rotate-90' : ''}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -154,30 +165,30 @@ export default function ClipFlowPage() {
           </svg>
           Preferences &amp; notes
           {(tone.trim() || length !== 'any' || notes.trim()) && (
-            <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-purple-500" aria-hidden />
+            <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-[var(--signature)]" aria-hidden />
           )}
         </button>
 
         {showPrefs && (
-          <div className="space-y-4 bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
-            <p className="text-xs text-zinc-500">
+          <div className="space-y-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)] p-4">
+            <p className="text-xs text-muted">
               Tell ClipFlow what you&apos;re looking for. These guide which moments it picks and how long
               the clips are.
             </p>
 
             {/* Length */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-300">Clip length</label>
+              <label className="field-label" style={{ marginBottom: 0 }}>Clip length</label>
               <div className="flex flex-wrap gap-2">
                 {CLIP_LENGTHS.map((l) => (
                   <button
                     key={l}
                     type="button"
                     onClick={() => setLength(l)}
-                    className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                    className={`rounded-[var(--radius-sm)] border px-3 py-1.5 text-xs transition-colors ${
                       length === l
-                        ? 'bg-purple-600 border-purple-500 text-white'
-                        : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                        ? 'border-[color:var(--signature)] bg-[var(--signature)] text-[color:var(--on-signature)]'
+                        : 'border-[var(--border-default)] bg-surface-card text-muted hover:border-strong'
                     }`}
                   >
                     {CLIP_LENGTH_LABELS[l]}
@@ -188,7 +199,7 @@ export default function ClipFlowPage() {
 
             {/* Tone */}
             <div className="space-y-1.5">
-              <label htmlFor="cf-tone" className="text-xs font-medium text-zinc-300">
+              <label htmlFor="cf-tone" className="field-label" style={{ marginBottom: 0 }}>
                 Tone / style
               </label>
               <input
@@ -198,7 +209,7 @@ export default function ClipFlowPage() {
                 value={tone}
                 onChange={(e) => setTone(e.target.value)}
                 maxLength={200}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors"
+                className="input w-full text-sm"
               />
               <div className="flex flex-wrap gap-1.5 pt-0.5">
                 {TONE_SUGGESTIONS.map((t) => (
@@ -206,7 +217,7 @@ export default function ClipFlowPage() {
                     key={t}
                     type="button"
                     onClick={() => setTone(t)}
-                    className="text-[11px] px-2 py-1 rounded-md bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
+                    className="rounded-md bg-[var(--surface-sunk)] px-2 py-1 text-[11px] text-muted transition-colors hover:text-strong"
                   >
                     {t}
                   </button>
@@ -216,7 +227,7 @@ export default function ClipFlowPage() {
 
             {/* Notes */}
             <div className="space-y-1.5">
-              <label htmlFor="cf-notes" className="text-xs font-medium text-zinc-300">
+              <label htmlFor="cf-notes" className="field-label" style={{ marginBottom: 0 }}>
                 Notes
               </label>
               <textarea
@@ -226,14 +237,14 @@ export default function ClipFlowPage() {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 maxLength={600}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors resize-none"
+                className="input w-full resize-none text-sm"
               />
             </div>
           </div>
         )}
 
         {error && (
-          <p className="text-xs text-red-400 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
+          <p className="rounded-[var(--radius-sm)] bg-[var(--danger-bg)] px-3 py-2 text-xs" style={{ color: 'var(--danger)' }}>
             {error}
           </p>
         )}
@@ -242,74 +253,74 @@ export default function ClipFlowPage() {
       {/* Connect accounts & API keys live in shared Settings */}
       <Link
         href="/settings/connections"
-        className="flex items-center justify-between gap-4 bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition-colors"
+        className="card flex items-center justify-between gap-4 p-4 transition-colors hover:border-strong"
       >
         <div>
-          <p className="text-sm font-semibold text-white">Connect accounts &amp; API keys →</p>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <p className="text-sm font-semibold text-strong">Connect accounts &amp; API keys →</p>
+          <p className="mt-0.5 text-xs text-muted">
             Add your OpenAI / Upload-Post keys and connect TikTok, Instagram, YouTube &amp; X to post
             clips — managed in Settings.
           </p>
         </div>
-        <svg className="w-5 h-5 text-zinc-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-5 w-5 shrink-0 text-[var(--ink-400)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </Link>
 
       {/* Projects */}
       <div>
-        <h2 className="text-base font-semibold text-white mb-4">Your videos</h2>
+        <h2 className="mb-4 text-base font-semibold text-strong">Your videos</h2>
         {loading ? (
           <div className="space-y-3">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl h-24 animate-pulse" />
+              <div key={i} className="h-24 animate-pulse rounded-[var(--radius-md)] bg-[var(--surface-sunk)]" />
             ))}
           </div>
         ) : projects.length === 0 ? (
-          <div className="text-center py-16 bg-zinc-900/40 border border-zinc-800 rounded-xl">
-            <svg className="w-10 h-10 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)] py-16 text-center">
+            <svg className="mx-auto mb-3 h-10 w-10 text-[var(--ink-300)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
-            <p className="text-sm text-zinc-600">No videos yet — paste a YouTube link above to begin.</p>
+            <p className="text-sm text-faint">No videos yet — paste a YouTube link above to begin.</p>
           </div>
         ) : (
           <div className="space-y-3">
             {projects.map((p) => (
               <div
                 key={p.id}
-                className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex items-center gap-4 hover:border-zinc-700 transition-colors"
+                className="card flex items-center gap-4 p-3 transition-colors hover:border-strong"
               >
-                <button onClick={() => router.push(`/clipflow/${p.id}`)} className="flex items-center gap-4 flex-1 text-left min-w-0">
-                  <div className="w-24 h-14 rounded-lg bg-zinc-800 overflow-hidden shrink-0">
+                <button onClick={() => router.push(`/clipflow/${p.id}`)} className="flex min-w-0 flex-1 items-center gap-4 text-left">
+                  <div className="h-14 w-24 shrink-0 overflow-hidden rounded-[var(--radius-sm)] bg-[var(--surface-sunk)]">
                     {p.thumbnail_url && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                      <img src={p.thumbnail_url} alt="" className="h-full w-full object-cover" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-white text-sm font-medium truncate">
+                    <p className="truncate text-sm font-medium text-strong">
                       {p.title || p.source_url}
                     </p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className={`text-xs capitalize ${STATUS_COLOR[p.status] ?? 'text-zinc-500'}`}>
+                    <div className="mt-1 flex items-center gap-3">
+                      <span className={`text-xs capitalize ${STATUS_COLOR[p.status] ?? 'text-muted'}`}>
                         {p.status === 'ready' ? 'Ready' : p.status}
                         {['fetching', 'transcribing', 'analyzing', 'clipping'].includes(p.status)
                           ? ` · ${p.progress}%`
                           : ''}
                       </span>
                       {fmtDuration(p.duration_seconds) && (
-                        <span className="text-xs text-zinc-600">{fmtDuration(p.duration_seconds)}</span>
+                        <span className="text-xs text-faint">{fmtDuration(p.duration_seconds)}</span>
                       )}
-                      <span className="text-xs text-zinc-600">{timeAgo(p.created_at)}</span>
+                      <span className="text-xs text-faint">{timeAgo(p.created_at)}</span>
                     </div>
                   </div>
                 </button>
                 <button
-                  onClick={() => deleteProject(p.id)}
-                  className="p-1 text-zinc-700 hover:text-red-400 transition-colors shrink-0"
+                  onClick={() => setDeleteTarget(p)}
+                  className="shrink-0 p-1 text-faint transition-colors hover:text-[color:var(--danger)]"
                   aria-label="Delete"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 </button>
@@ -318,6 +329,33 @@ export default function ClipFlowPage() {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div className="card w-full max-w-sm p-6" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-2 font-semibold text-strong">Delete video?</h3>
+            <p className="mb-5 text-sm text-muted">
+              &ldquo;{deleteTarget.title || deleteTarget.source_url}&rdquo; and its clips will be permanently
+              deleted. This can&apos;t be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={confirmDelete}
+                className="flex-1 rounded-[var(--radius-sm)] bg-[color:var(--danger)] py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              >
+                Delete
+              </button>
+              <button onClick={() => setDeleteTarget(null)} className="btn-outline flex-1 text-sm">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
