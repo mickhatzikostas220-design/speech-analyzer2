@@ -86,9 +86,9 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
 
   if (notFound) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <p className="text-zinc-500 text-sm">Project not found.</p>
-        <Link href="/clipflow" className="text-purple-400 text-sm hover:text-purple-300 mt-2 inline-block">
+      <div className="mx-auto max-w-3xl px-4 py-20 text-center">
+        <p className="text-sm text-muted">Project not found.</p>
+        <Link href="/clipflow" className="mt-2 inline-block text-sm" style={{ color: 'var(--text-link)' }}>
           ← Back to ClipFlow
         </Link>
       </div>
@@ -97,11 +97,11 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
 
   if (loading || !project) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-10">
-        <div className="h-8 w-48 bg-zinc-900 rounded animate-pulse mb-6" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="mx-auto max-w-5xl px-4 py-10">
+        <div className="mb-6 h-8 w-48 animate-pulse rounded bg-[var(--surface-sunk)]" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl aspect-[9/16] animate-pulse" />
+            <div key={i} className="aspect-[9/16] animate-pulse rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)]" />
           ))}
         </div>
       </div>
@@ -111,23 +111,24 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
   const processing = PROCESSING.includes(project.status);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10 space-y-8">
+    <div className="mx-auto max-w-5xl space-y-8 px-4 py-10">
       <div>
-        <Link href="/clipflow" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+        <Link href="/clipflow" className="text-xs text-muted transition-colors hover:text-strong">
           ← ClipFlow
         </Link>
-        <h1 className="text-2xl font-semibold text-white mt-2">
+        <h1 className="mt-2 text-2xl font-semibold text-strong">
           {project.title || 'Processing…'}
         </h1>
-        <div className="flex items-center gap-3 mt-1">
+        <div className="mt-1 flex items-center gap-3">
           {project.channel_title && (
-            <span className="text-sm text-zinc-500">{project.channel_title}</span>
+            <span className="text-sm text-muted">{project.channel_title}</span>
           )}
           <a
             href={project.source_url}
             target="_blank"
             rel="noreferrer"
-            className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+            className="text-xs transition-colors hover:underline"
+            style={{ color: 'var(--text-link)' }}
           >
             Source ↗
           </a>
@@ -136,19 +137,19 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
         {/* Preferences the clips were generated with */}
         {project.preferences &&
           (project.preferences.tone || project.preferences.length || project.preferences.notes) && (
-            <div className="flex flex-wrap items-center gap-2 mt-3">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               {project.preferences.length && (
-                <span className="text-xs text-zinc-300 bg-zinc-800/80 border border-zinc-700 rounded-full px-2.5 py-1">
+                <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-sunk)] px-2.5 py-1 text-xs text-body">
                   {CLIP_LENGTH_LABELS[project.preferences.length]}
                 </span>
               )}
               {project.preferences.tone && (
-                <span className="text-xs text-zinc-300 bg-zinc-800/80 border border-zinc-700 rounded-full px-2.5 py-1">
+                <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-sunk)] px-2.5 py-1 text-xs text-body">
                   {project.preferences.tone}
                 </span>
               )}
               {project.preferences.notes && (
-                <span className="text-xs text-zinc-400 bg-zinc-800/50 border border-zinc-700 rounded-full px-2.5 py-1 max-w-full truncate">
+                <span className="max-w-full truncate rounded-full border border-[var(--border-default)] bg-[var(--surface-sunk)] px-2.5 py-1 text-xs text-muted">
                   “{project.preferences.notes}”
                 </span>
               )}
@@ -158,20 +159,20 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
 
       {/* Progress */}
       {processing && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm text-white font-medium">
+        <div className="card p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-sm font-medium text-strong">
               {STATUS_LABEL[project.status] ?? 'Working…'}
             </span>
-            <span className="text-xs text-zinc-500">{project.progress}%</span>
+            <span className="text-xs text-muted">{project.progress}%</span>
           </div>
-          <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+          <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-sunk)]">
             <div
-              className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-500"
+              className="h-full bg-[var(--signature)] transition-all duration-500"
               style={{ width: `${project.progress}%` }}
             />
           </div>
-          <p className="text-xs text-zinc-600 mt-3">
+          <p className="mt-3 text-xs text-faint">
             This can take a moment for long videos — you can leave this page and come back.
           </p>
         </div>
@@ -179,15 +180,16 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
 
       {/* Error */}
       {project.status === 'error' && (
-        <div className="bg-red-950/40 border border-red-800 rounded-xl p-5">
-          <p className="text-sm text-red-300 font-medium mb-1">Processing failed</p>
-          <p className="text-xs text-red-400/80">{project.error || 'Unknown error.'}</p>
+        <div className="rounded-[var(--radius-md)] border border-[color:var(--danger)] bg-[var(--danger-bg)] p-5">
+          <p className="mb-1 text-sm font-medium" style={{ color: 'var(--danger)' }}>Processing failed</p>
+          <p className="text-xs" style={{ color: 'var(--danger)' }}>{project.error || 'Unknown error.'}</p>
           <button
             onClick={() => {
               kicked.current = false;
               fetch(`/api/clipflow/${params.id}/process`, { method: 'POST' }).then(() => load());
             }}
-            className="mt-3 text-xs bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+            className="btn-outline mt-3 text-xs"
+            style={{ padding: '6px 12px' }}
           >
             Retry
           </button>
@@ -197,17 +199,17 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
       {/* Clips */}
       {project.clips.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-white">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-strong">
               {project.clips.length} clips
             </h2>
             {connected.length === 0 && (
-              <Link href="/clipflow" className="text-xs text-purple-400 hover:text-purple-300">
+              <Link href="/clipflow" className="text-xs hover:underline" style={{ color: 'var(--text-link)' }}>
                 Connect a platform to post →
               </Link>
             )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {project.clips.map((clip) => (
               <ClipCard
                 key={clip.id}
@@ -222,7 +224,7 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
       )}
 
       {!processing && project.status === 'ready' && project.clips.length === 0 && (
-        <p className="text-sm text-zinc-600 text-center py-10">No clips were generated for this video.</p>
+        <p className="py-10 text-center text-sm text-faint">No clips were generated for this video.</p>
       )}
     </div>
   );

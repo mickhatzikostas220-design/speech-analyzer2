@@ -18,6 +18,10 @@ const PLATFORM_LABELS: Record<Platform, string> = {
 
 const PLATFORMS: Platform[] = ['youtube', 'tiktok', 'instagram', 'twitter'];
 
+// Shared compact input styling, mapped to the brand design tokens.
+const INPUT_CLS =
+  'rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-surface-card px-3 py-2 text-xs text-strong placeholder:text-[var(--text-faint)] focus:border-[color:var(--signature)] focus:outline-none disabled:opacity-50';
+
 // Lets each user bring their own ClipFlow API keys: OpenAI (clip AI), Upload-Post
 // (publish under their own account), and per-platform OAuth client credentials
 // for the direct-posting path. Keys are encrypted server-side; only a 4-char
@@ -122,21 +126,21 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
+    <div className="card">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-2 p-4 text-left"
+        className="flex w-full items-center justify-between gap-2 p-4 text-left"
       >
         <div>
-          <h2 className="text-base font-semibold text-white">Your API keys</h2>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <h2 className="text-base font-semibold text-strong">Your API keys</h2>
+          <p className="mt-0.5 text-xs text-muted">
             Bring your own keys — clip AI and publishing run on your accounts. Optional; the app
             defaults are used otherwise.
           </p>
         </div>
         <svg
-          className={`w-4 h-4 text-zinc-400 transition-transform shrink-0 ${open ? 'rotate-90' : ''}`}
+          className={`h-4 w-4 shrink-0 text-muted transition-transform ${open ? 'rotate-90' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -146,9 +150,9 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
       </button>
 
       {open && (
-        <div className="px-4 pb-4 space-y-5 border-t border-zinc-800 pt-4">
+        <div className="space-y-5 border-t border-[var(--border-subtle)] px-4 pb-4 pt-4">
           {disabled && (
-            <p className="text-[11px] text-amber-400 bg-amber-950/40 border border-amber-900 rounded-lg px-3 py-2">
+            <p className="rounded-[var(--radius-sm)] border border-[var(--warning)]/40 bg-[var(--warning-bg)] px-3 py-2 text-[11px] text-[#8A6D00]">
               Server is missing APP_ENCRYPTION_KEY — keys can&apos;t be stored securely until it&apos;s
               set.
             </p>
@@ -185,8 +189,8 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
           {/* Per-platform OAuth apps */}
           <div className="space-y-3">
             <div>
-              <h3 className="text-sm font-medium text-zinc-200">Per-platform app credentials</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <h3 className="text-sm font-medium text-strong">Per-platform app credentials</h3>
+              <p className="mt-0.5 text-xs text-muted">
                 Advanced: connect a platform directly with your own developer app (client id &amp;
                 secret) instead of Upload-Post.
               </p>
@@ -195,29 +199,29 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
               const k = `oauth_${p}`;
               const set = hints[k];
               return (
-                <div key={p} className="bg-zinc-950/40 border border-zinc-800 rounded-lg p-3 space-y-2">
+                <div key={p} className="space-y-2 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)] p-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-white">{PLATFORM_LABELS[p]}</span>
+                    <span className="text-xs font-medium text-strong">{PLATFORM_LABELS[p]}</span>
                     {set ? (
                       <button
                         onClick={() => remove(k)}
                         disabled={busy === k}
-                        className="text-[11px] text-zinc-500 hover:text-red-400 disabled:opacity-50"
+                        className="text-[11px] text-muted hover:text-[color:var(--danger)] disabled:opacity-50"
                       >
                         Remove (client ••••{set})
                       </button>
                     ) : (
-                      <span className="text-[10px] text-zinc-600">Not set</span>
+                      <span className="text-[10px] text-faint">Not set</span>
                     )}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <input
                       type="text"
                       placeholder="Client ID"
                       value={oauth[p].id}
                       disabled={disabled}
                       onChange={(e) => setOauth((o) => ({ ...o, [p]: { ...o[p], id: e.target.value } }))}
-                      className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500 disabled:opacity-50"
+                      className={INPUT_CLS}
                     />
                     <input
                       type="password"
@@ -227,13 +231,14 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
                       onChange={(e) =>
                         setOauth((o) => ({ ...o, [p]: { ...o[p], secret: e.target.value } }))
                       }
-                      className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500 disabled:opacity-50"
+                      className={INPUT_CLS}
                     />
                   </div>
                   <button
                     onClick={() => saveOAuth(p)}
                     disabled={disabled || busy === k || !oauth[p].id.trim() || !oauth[p].secret.trim()}
-                    className="text-[11px] bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                    className="btn-outline text-[11px]"
+                    style={{ padding: '6px 12px' }}
                   >
                     {busy === k ? 'Saving…' : set ? 'Replace' : 'Save'}
                   </button>
@@ -244,10 +249,10 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
 
           {banner && (
             <p
-              className={`text-[11px] rounded-lg px-3 py-2 ${
+              className={`rounded-[var(--radius-sm)] px-3 py-2 text-[11px] ${
                 banner.kind === 'ok'
-                  ? 'text-green-400 bg-green-950/40 border border-green-800'
-                  : 'text-red-400 bg-red-950/40 border border-red-800'
+                  ? 'border border-[color:var(--success)]/40 bg-[var(--success-bg)] text-[color:var(--success)]'
+                  : 'border border-[color:var(--danger)]/40 bg-[var(--danger-bg)] text-[color:var(--danger)]'
               }`}
             >
               {banner.text}
@@ -274,16 +279,16 @@ function KeyRow(props: {
   return (
     <div className="space-y-2">
       <div>
-        <h3 className="text-sm font-medium text-zinc-200">{props.label}</h3>
-        <p className="text-xs text-zinc-500 mt-0.5">{props.help}</p>
+        <h3 className="text-sm font-medium text-strong">{props.label}</h3>
+        <p className="mt-0.5 text-xs text-muted">{props.help}</p>
       </div>
       {props.hint && (
-        <div className="flex items-center justify-between bg-zinc-950/40 border border-zinc-800 rounded-lg px-3 py-1.5">
-          <span className="text-xs text-zinc-300">Key set ••••{props.hint}</span>
+        <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)] px-3 py-1.5">
+          <span className="text-xs text-body">Key set ••••{props.hint}</span>
           <button
             onClick={props.onRemove}
             disabled={props.busy}
-            className="text-[11px] text-zinc-500 hover:text-red-400 disabled:opacity-50"
+            className="text-[11px] text-muted hover:text-[color:var(--danger)] disabled:opacity-50"
           >
             Remove
           </button>
@@ -296,12 +301,13 @@ function KeyRow(props: {
           disabled={props.disabled}
           onChange={(e) => props.onChange(e.target.value)}
           placeholder={props.placeholder}
-          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500 disabled:opacity-50"
+          className={`${INPUT_CLS} flex-1`}
         />
         <button
           onClick={props.onSave}
           disabled={props.disabled || props.busy || !props.value.trim()}
-          className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
+          className="btn-primary whitespace-nowrap text-xs"
+          style={{ padding: '8px 16px' }}
         >
           {props.busy ? 'Checking…' : props.hint ? 'Replace' : 'Add'}
         </button>

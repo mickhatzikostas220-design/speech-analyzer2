@@ -50,52 +50,52 @@ export function ConnectionsPanel({ refresh = 0 }: { refresh?: number }) {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4">
-        <h2 className="text-base font-semibold text-white">Connected platforms</h2>
+      <div className="mb-4 flex items-center gap-2">
+        <h2 className="text-base font-semibold text-strong">Connected platforms</h2>
         {viaUploadPost && (
-          <span className="text-[10px] uppercase tracking-wide text-purple-300 bg-purple-950/50 border border-purple-800 rounded-full px-2 py-0.5">
+          <span className="rounded-full border border-[color:var(--accent-2)]/30 bg-[var(--info-bg)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[color:var(--accent-2)]">
             via Upload-Post
           </span>
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {(loading ? Array.from({ length: 4 }) : connections).map((c, i) => {
           const conn = c as Connection | undefined;
           if (!conn) {
-            return <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl h-24 animate-pulse" />;
+            return <div key={i} className="h-24 animate-pulse rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)]" />;
           }
           const style = PLATFORM_STYLE[conn.platform];
           return (
             <div
               key={conn.platform}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex flex-col items-center text-center gap-2"
+              className="card flex flex-col items-center gap-2 p-3 text-center"
             >
               <div
-                className={`w-9 h-9 rounded-lg bg-gradient-to-br ${style.dot} flex items-center justify-center text-xs font-bold text-white`}
+                className={`flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br ${style.dot} text-xs font-bold text-white`}
               >
                 {style.glyph}
               </div>
-              <span className="text-xs font-medium text-white leading-tight">{conn.label}</span>
+              <span className="text-xs font-medium leading-tight text-strong">{conn.label}</span>
 
               {conn.provider === 'uploadpost' ? (
                 conn.connected ? (
-                  <span className="text-[10px] text-green-400 truncate max-w-[90px]">
+                  <span className="max-w-[90px] truncate text-[10px] text-[color:var(--success)]">
                     {conn.account_name || 'Connected'}
                   </span>
                 ) : (
-                  <span className="text-[10px] text-zinc-600">Connect above ↑</span>
+                  <span className="text-[10px] text-faint">Connect above ↑</span>
                 )
               ) : !conn.configured ? (
-                <span className="text-[10px] text-zinc-600">Not configured</span>
+                <span className="text-[10px] text-faint">Not configured</span>
               ) : conn.connected ? (
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-[10px] text-green-400 truncate max-w-[90px]">
+                  <span className="max-w-[90px] truncate text-[10px] text-[color:var(--success)]">
                     {conn.account_name || 'Connected'}
                   </span>
                   <button
                     onClick={() => disconnect(conn.platform)}
-                    className="text-[10px] text-zinc-500 hover:text-red-400 transition-colors"
+                    className="text-[10px] text-muted transition-colors hover:text-[color:var(--danger)]"
                   >
                     Disconnect
                   </button>
@@ -103,7 +103,8 @@ export function ConnectionsPanel({ refresh = 0 }: { refresh?: number }) {
               ) : (
                 <a
                   href={`/api/clipflow/connections/${conn.platform}/authorize`}
-                  className="text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
+                  className="text-[10px] transition-colors hover:underline"
+                  style={{ color: 'var(--text-link)' }}
                 >
                   Connect →
                 </a>
