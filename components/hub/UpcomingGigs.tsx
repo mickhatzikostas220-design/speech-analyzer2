@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CalendarPlus, Link2, X, Trash2, MapPin, CalendarDays } from 'lucide-react';
 import type { Gig, GigStatus } from '@/lib/gigs/types';
 
@@ -31,6 +31,17 @@ export function UpcomingGigs({
   const [pane, setPane] = useState<'none' | 'add' | 'calendar'>('none');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Gig | null>(null);
+
+  // Close the delete-confirmation modal on Escape — standard a11y expectation.
+  useEffect(() => {
+    if (!deleteTarget) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setDeleteTarget(null);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [deleteTarget]);
 
   // add-gig form
   const [title, setTitle] = useState('');
@@ -131,10 +142,13 @@ export function UpcomingGigs({
     }
   }
 
-  async function removeGig(id: string) {
-    setGigs((g) => g.filter((x) => x.id !== id));
+  async function confirmRemoveGig() {
+    const target = deleteTarget;
+    if (!target) return;
+    setDeleteTarget(null);
+    setGigs((g) => g.filter((x) => x.id !== target.id));
     try {
-      await fetch(`/api/gigs/${id}`, { method: 'DELETE' });
+      await fetch(`/api/gigs/${target.id}`, { method: 'DELETE' });
     } catch {
       refresh();
     }
@@ -194,7 +208,7 @@ export function UpcomingGigs({
                   </div>
                   {g.source === 'manual' && (
                     <button
-                      onClick={() => removeGig(g.id)}
+                      onClick={() => setDeleteTarget(g)}
                       aria-label="Remove gig"
                       className="h-7 w-7 shrink-0 place-items-center rounded-full text-muted opacity-0 transition hover:bg-[var(--surface-sunk)] hover:text-strong group-hover:opacity-100 grid"
                     >
@@ -271,6 +285,32 @@ export function UpcomingGigs({
 
         {msg && <p className="mt-3 text-xs text-muted">{msg}</p>}
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div className="card w-full max-w-sm p-6" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-2 font-semibold text-strong">Remove gig?</h3>
+            <p className="mb-5 text-sm text-muted">
+              &ldquo;{deleteTarget.title}&rdquo; will be removed from your calendar. This can&apos;t be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={confirmRemoveGig}
+                className="flex-1 rounded-[var(--radius-sm)] bg-[color:var(--danger)] py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              >
+                Remove
+              </button>
+              <button onClick={() => setDeleteTarget(null)} className="btn-outline flex-1 text-sm">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
