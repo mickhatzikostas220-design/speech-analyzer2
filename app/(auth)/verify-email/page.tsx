@@ -60,10 +60,18 @@ export default function VerifyEmailPage() {
     setResending(true);
     setError(null);
     setInfo(null);
-    const { error: resendError } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
-    setResending(false);
-    if (resendError) setError(resendError.message);
-    else setInfo('New code sent — check your inbox.');
+    try {
+      await fetch('/api/auth/resend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      setInfo('New code sent — check your inbox.');
+    } catch {
+      setError('Could not resend the code. Please try again.');
+    } finally {
+      setResending(false);
+    }
   }
 
   return (

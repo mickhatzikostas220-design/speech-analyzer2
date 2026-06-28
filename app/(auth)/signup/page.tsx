@@ -3,11 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
 
 export default function SignupPage() {
   const router = useRouter();
-  const supabase = createClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,30 +14,30 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (password.length < 6) {
-      setError('Use at least 6 characters for your password.');
+    if (password.length < 8) {
+      setError('Use at least 8 characters for your password.');
       return;
     }
     setLoading(true);
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    });
-
-    if (signUpError) {
-      setError(signUpError.message);
+    // Create the account server-side and send the verification code via Resend
+    // (Supabase's built-in confirmation email is unreliable in production).
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Could not create your account. Please try again.');
+        setLoading(false);
+        return;
+      }
+      router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
+    } catch {
+      setError('Network error. Please try again.');
       setLoading(false);
-      return;
-    }
-
-    // If email confirmation is off, we get a session and go straight to setup.
-    if (data.session) {
-      router.push('/onboarding');
-      router.refresh();
-    } else {
-      router.push(`/verify-email?email=${encodeURIComponent(email)}`);
     }
   }
 
@@ -79,7 +77,7 @@ export default function SignupPage() {
             required
             autoComplete="new-password"
             className="input w-full text-sm"
-            placeholder="At least 6 characters"
+            placeholder="At least 8 characters"
           />
         </div>
 
