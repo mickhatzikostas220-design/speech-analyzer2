@@ -38,28 +38,35 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { tip_id?: unknown; scheduled_for?: unknown };
+  let body: { tip_id?: unknown; source?: unknown; title?: unknown; body?: unknown; scheduled_for?: unknown };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
   }
 
-  const tipId = typeof body.tip_id === 'string' ? body.tip_id : '';
-  if (!tipById(tipId)) {
-    return NextResponse.json({ error: 'Unknown tip.' }, { status: 400 });
-  }
   const scheduledFor =
     typeof body.scheduled_for === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.scheduled_for)
       ? body.scheduled_for
       : null;
 
-  const { data, error } = await supabase
-    .from('user_tips')
-    .insert({ user_id: user.id, tip_id: tipId, scheduled_for: scheduledFor })
-    .select()
-    .single();
+  // Two kinds of tips: a coaching tip (by library id) or a custom SEO fix
+  // (saved with its own title/body, since it's generated per analysis).
+  let row: Record<string, unknown>;
+  if (body.source === 'seo') {
+    const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';
+    if (!title) return NextResponse.json({ error: 'Missing tip title.' }, { status: 400 });
+    const text = typeof body.body === 'string' ? body.body.slice(0, 2000) : null;
+    row = { user_id: user.id, source: 'seo', title, body: text, scheduled_for: scheduledFor };
+  } else {
+    const tipId = typeof body.tip_id === 'string' ? body.tip_id : '';
+    if (!tipById(tipId)) {
+      return NextResponse.json({ error: 'Unknown tip.' }, { status: 400 });
+    }
+    row = { user_id: user.id, source: 'coaching', tip_id: tipId, scheduled_for: scheduledFor };
+  }
 
+  const { data, error } = await supabase.from('user_tips').insert(row).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }

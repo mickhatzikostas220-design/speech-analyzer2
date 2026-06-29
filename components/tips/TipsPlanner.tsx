@@ -7,9 +7,20 @@ import { TIPS, tipById } from '@/lib/tips/library';
 
 export interface UserTip {
   id: string;
-  tip_id: string;
+  tip_id: string | null;
+  source?: string;
+  title?: string | null;
+  body?: string | null;
   scheduled_for: string | null;
   completed: boolean;
+}
+
+// Resolve a row's display content: custom SEO tips carry their own title/body;
+// coaching tips resolve from the static library.
+function content(row: UserTip): { title: string; body: string | null } {
+  if (row.source === 'seo') return { title: row.title ?? 'SEO fix', body: row.body ?? null };
+  const tip = row.tip_id ? tipById(row.tip_id) : undefined;
+  return { title: tip?.title ?? row.tip_id ?? 'Tip', body: tip?.body ?? null };
 }
 
 function fmtDate(iso: string | null) {
@@ -95,7 +106,7 @@ export function TipsPlanner({ initialTips }: { initialTips: UserTip[] }) {
         ) : (
           <div className="space-y-3">
             {active.map((row) => {
-              const tip = tipById(row.tip_id);
+              const c = content(row);
               return (
                 <div key={row.id} className="card flex items-start gap-3 p-4">
                   <button
@@ -105,8 +116,8 @@ export function TipsPlanner({ initialTips }: { initialTips: UserTip[] }) {
                     className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border-2 border-[var(--border-strong)] transition-colors hover:bg-[var(--surface-sunk)]"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-strong">{tip?.title ?? row.tip_id}</p>
-                    {tip && <p className="mt-0.5 text-xs text-muted">{tip.body}</p>}
+                    <p className="text-sm font-semibold text-strong">{c.title}</p>
+                    {c.body && <p className="mt-0.5 whitespace-pre-line text-xs text-muted">{c.body}</p>}
                     <p className="mt-1 text-xs text-faint">{fmtDate(row.scheduled_for)}</p>
                   </div>
                   <button
@@ -128,7 +139,7 @@ export function TipsPlanner({ initialTips }: { initialTips: UserTip[] }) {
             <h3 className="eyebrow mb-2">Completed</h3>
             <div className="space-y-2">
               {done.map((row) => {
-                const tip = tipById(row.tip_id);
+                const c = content(row);
                 return (
                   <div key={row.id} className="flex items-center gap-3 rounded-[var(--radius-md)] bg-[var(--surface-sunk)] px-4 py-2.5">
                     <button
@@ -139,7 +150,7 @@ export function TipsPlanner({ initialTips }: { initialTips: UserTip[] }) {
                     >
                       <Check className="h-3.5 w-3.5" strokeWidth={3} />
                     </button>
-                    <span className="flex-1 text-sm text-muted line-through">{tip?.title ?? row.tip_id}</span>
+                    <span className="flex-1 text-sm text-muted line-through">{c.title}</span>
                     <button onClick={() => remove(row.id)} disabled={busy === row.id} aria-label="Remove" className="p-1 text-faint hover:text-[color:var(--danger)]">
                       <Trash2 className="h-4 w-4" />
                     </button>
