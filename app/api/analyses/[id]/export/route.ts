@@ -37,6 +37,15 @@ export async function GET(
     return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   }
 
+  // Neutralize CSV formula injection: a cell starting with = + - @ (or a
+  // tab/CR) is treated as a live formula by Excel/Sheets. Prefix with a quote
+  // and escape embedded quotes, then wrap the cell.
+  function csvCell(value: string) {
+    let v = value ?? '';
+    if (/^[=+\-@\t\r]/.test(v)) v = `'${v}`;
+    return `"${v.replace(/"/g, '""')}"`;
+  }
+
   if (format === 'transcript') {
     const text = [
       `${analysis.title}`,
@@ -64,8 +73,8 @@ export async function GET(
         formatTime(fp.timecode_end_ms),
         String(fp.engagement_score),
         fp.severity,
-        `"${fp.feedback_text.replace(/"/g, '""')}"`,
-        `"${fp.improvement_suggestion.replace(/"/g, '""')}"`,
+        csvCell(fp.feedback_text),
+        csvCell(fp.improvement_suggestion),
       ]),
     ];
 

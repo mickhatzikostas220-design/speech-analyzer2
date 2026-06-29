@@ -21,6 +21,9 @@ create or replace function public.protect_billing_columns()
 returns trigger
 language plpgsql
 security definer
+-- Pin search_path: a SECURITY DEFINER function with a mutable search_path can be
+-- hijacked by a shadowed object on the resolution path (Supabase advisor 0011).
+set search_path = public, pg_catalog
 as $$
 begin
   if current_user <> 'service_role' and (
@@ -38,3 +41,10 @@ drop trigger if exists protect_billing_columns on profiles;
 create trigger protect_billing_columns
   before update on profiles
   for each row execute procedure public.protect_billing_columns();
+
+-- The trigger fires as the table owner regardless of EXECUTE grants, so revoke
+-- the API-exposed roles' ability to call it directly via /rest/v1/rpc
+-- (Supabase advisors 0028/0029).
+revoke execute on function public.protect_billing_columns() from public;
+revoke execute on function public.protect_billing_columns() from anon;
+revoke execute on function public.protect_billing_columns() from authenticated;

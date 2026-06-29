@@ -54,7 +54,10 @@ alter table engagement_timeline enable row level security;
 
 -- Profiles policies
 create policy "Users view own profile" on profiles for select using (auth.uid() = id);
-create policy "Users update own profile" on profiles for update using (auth.uid() = id);
+-- WITH CHECK makes the row-ownership guard explicit; the protect_billing_columns
+-- trigger (subscription.sql) is what stops a user editing their own plan/stripe_* columns.
+create policy "Users update own profile" on profiles
+  for update using (auth.uid() = id) with check (auth.uid() = id);
 
 -- Analyses policies
 create policy "Users view own analyses" on analyses for select using (auth.uid() = user_id);
@@ -62,17 +65,24 @@ create policy "Users insert own analyses" on analyses for insert with check (aut
 create policy "Users update own analyses" on analyses for update using (auth.uid() = user_id);
 create policy "Users delete own analyses" on analyses for delete using (auth.uid() = user_id);
 
--- Feedback points — readable by owner, writable by service role (API routes)
+-- Feedback points — readable AND writable only by the owner. The Modal GPU job
+-- writes results with the service-role key, which bypasses RLS, so these
+-- policies don't need to allow it. A bare WITH CHECK (true) would have let any
+-- authenticated user inject rows onto ANOTHER user's analysis_id.
 create policy "Users view own feedback" on feedback_points for select using (
   analysis_id in (select id from analyses where user_id = auth.uid())
 );
-create policy "Service inserts feedback" on feedback_points for insert with check (true);
+create policy "Owners insert own feedback" on feedback_points for insert with check (
+  analysis_id in (select id from analyses where user_id = auth.uid())
+);
 
 -- Engagement timeline
 create policy "Users view own timeline" on engagement_timeline for select using (
   analysis_id in (select id from analyses where user_id = auth.uid())
 );
-create policy "Service inserts timeline" on engagement_timeline for insert with check (true);
+create policy "Owners insert own timeline" on engagement_timeline for insert with check (
+  analysis_id in (select id from analyses where user_id = auth.uid())
+);
 
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()
@@ -102,6 +112,7 @@ create policy "Users read own speeches" on storage.objects for select using (
 create policy "Users delete own speeches" on storage.objects for delete using (
   bucket_id = 'speeches' and auth.uid()::text = (storage.foldername(name))[1]
 );
-create policy "Service reads speeches" on storage.objects for select using (
-  bucket_id = 'speeches'
-);
+-- NOTE: do NOT add a "Service reads speeches" policy of `using (bucket_id =
+-- 'speeches')`. RLS SELECT policies are OR'd, so that would let ANY
+-- authenticated user read every user's private uploads. The service role
+-- bypasses RLS already; owner reads are covered by "Users read own speeches".
