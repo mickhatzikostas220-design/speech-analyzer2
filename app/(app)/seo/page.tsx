@@ -5,6 +5,7 @@
 // a week; paid users see every tip and can save fixes to their tip plan.
 import { useState } from 'react';
 import { Search, Sparkles, Check, CalendarPlus } from 'lucide-react';
+import { SEO_PLATFORMS, type SeoPlatformId } from '@/lib/seo/platforms';
 
 interface TipItem {
   title: string;
@@ -101,6 +102,7 @@ export default function SeoPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [analyzedUrl, setAnalyzedUrl] = useState('');
   const [plan, setPlan] = useState<string>('free');
+  const [platform, setPlatform] = useState<SeoPlatformId>('custom');
 
   const isPaid = plan !== 'free';
 
@@ -114,7 +116,7 @@ export default function SeoPage() {
       const res = await fetch('/api/seo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: url.trim(), platform }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -140,20 +142,39 @@ export default function SeoPage() {
         answer engines like ChatGPT and Perplexity (AEO).
       </p>
 
-      <form onSubmit={analyze} className="mb-8 flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
-          <input
-            type="text"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="yourwebsite.com"
-            className="input w-full pl-9 text-sm"
-          />
+      <form onSubmit={analyze} className="mb-8 space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+            <input
+              type="text"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="yourwebsite.com"
+              className="input w-full pl-9 text-sm"
+            />
+          </div>
+          <button type="submit" disabled={loading || !url.trim()} className="btn-primary whitespace-nowrap">
+            {loading ? 'Analyzing…' : (<><Sparkles className="h-4 w-4" /> Get tips</>)}
+          </button>
         </div>
-        <button type="submit" disabled={loading || !url.trim()} className="btn-primary whitespace-nowrap">
-          {loading ? 'Analyzing…' : (<><Sparkles className="h-4 w-4" /> Get tips</>)}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="seo-platform" className="text-xs font-semibold text-muted">
+            My site is built with:
+          </label>
+          <select
+            id="seo-platform"
+            value={platform}
+            onChange={(e) => setPlatform(e.target.value as SeoPlatformId)}
+            className="input text-sm"
+            style={{ padding: '6px 10px' }}
+          >
+            {SEO_PLATFORMS.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+          <span className="text-xs text-faint">so the steps match your editor</span>
+        </div>
       </form>
 
       {error && (

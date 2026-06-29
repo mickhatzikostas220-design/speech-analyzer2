@@ -6,6 +6,7 @@ import OpenAI from 'openai';
 import { normalizeUrl, BrandExtractError } from '@/lib/brand/extract';
 import { createClient } from '@/lib/supabase/server';
 import { getUserPlan } from '@/lib/subscription/server';
+import { isPlatform, platformLabel } from '@/lib/seo/platforms';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -136,12 +137,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  let body: { url?: unknown };
+  let body: { url?: unknown; platform?: unknown };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
   }
+
+  const platform = isPlatform(body.platform) ? body.platform : 'custom';
 
   let url: string;
   try {
@@ -174,7 +177,9 @@ ${JSON.stringify(signals, null, 2)}
 
 Give specific, actionable tips tailored to THIS page's signals — reference what's missing or weak (e.g. no meta description, thin word count, no structured data). Don't give generic advice that ignores the data.
 
-Every tip MUST include "steps": a 3–5 item array of short, concrete, do-this-now instructions (imperative, plain language a non-technical speaker can follow). Reference exact tags/fields where relevant.
+The website is built with: ${platformLabel(platform)}. Every "steps" instruction MUST be written for ${platformLabel(platform)} specifically — use that platform's real menu names, panels, and where to paste or edit things (e.g. for Wix: Settings → SEO / the SEO panel on each page; for WordPress: an SEO plugin like Yoast or the block editor; for Squarespace/Webflow/Shopify: their page-settings + custom-code areas; for "Custom code / HTML": editing the actual <head>, tags, and markup). Do not give steps for a different platform.
+
+Every tip MUST include "steps": a 3–5 item array of short, concrete, do-this-now instructions (imperative, plain language a non-technical speaker can follow). Reference exact tags/fields/menus where relevant.
 
 Respond with ONLY valid JSON in this exact shape:
 {
@@ -220,5 +225,5 @@ Aim for 3–5 items in each array. No markdown, no code fences.`;
     report = { summary: report.summary, seo: top ? [top] : [], aeo: [] };
   }
 
-  return NextResponse.json({ url, signals, report, plan });
+  return NextResponse.json({ url, signals, report, plan, platform });
 }
