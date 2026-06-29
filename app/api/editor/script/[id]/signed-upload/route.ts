@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { ownsProject, safeExt } from '@/lib/editor/uploadGuard';
 import { randomUUID } from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -11,12 +12,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    if (!(await ownsProject(supabase, 'script_projects', params.id, user.id))) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
     const rawText = (await request.text()).trim();
     const { fileName } = rawText ? JSON.parse(rawText) : {};
     if (!fileName) return NextResponse.json({ error: 'fileName required' }, { status: 400 });
 
     const clipId = randomUUID();
-    const ext = String(fileName).split('.').pop() || 'mp4';
+    const ext = safeExt(fileName);
     const path = `${user.id}/script/${params.id}/${clipId}.${ext}`;
 
     const admin = createAdminClient();

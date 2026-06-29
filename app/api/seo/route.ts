@@ -6,28 +6,20 @@ import OpenAI from 'openai';
 import { normalizeUrl, BrandExtractError } from '@/lib/brand/extract';
 import { createClient } from '@/lib/supabase/server';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
+import { safeFetch } from '@/lib/ssrf';
 
 export const maxDuration = 60;
 
 const FETCH_TIMEOUT_MS = 9000;
 const MAX_HTML_BYTES = 700_000;
 
-// Block obvious SSRF targets (localhost, link-local, private ranges).
-function isBlockedHost(host: string): boolean {
-  const h = host.toLowerCase();
-  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
-  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
-  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd')) return true;
-  return false;
-}
-
 async function fetchHtml(url: string): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    // safeFetch validates the host (and every redirect hop) against the
+    // private-IP blocklist before connecting — see lib/ssrf.ts.
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent':
@@ -117,10 +109,6 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const msg = err instanceof BrandExtractError ? err.message : 'Enter a valid website address.';
     return NextResponse.json({ error: msg }, { status: 400 });
-  }
-
-  if (isBlockedHost(new URL(url).hostname)) {
-    return NextResponse.json({ error: 'That address is not allowed.' }, { status: 400 });
   }
 
   let html: string;

@@ -1,13 +1,36 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { sendAccessRequestNotification } from '@/lib/email';
+import { rateLimit, clientIp } from '@/lib/rateLimit';
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { name, email, reason } = body;
+  // Public, unauthenticated endpoint that writes to the DB and emails the
+  // admin — cap it to curb spam / inbox-flooding.
+  const limit = rateLimit(`request-access:${clientIp(request)}`, 5, 10 * 60 * 1000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again in a few minutes.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
+    );
+  }
 
-  if (!name?.trim() || !email?.trim() || !reason?.trim()) {
+  let body: { name?: unknown; email?: unknown; reason?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  }
+  const name = typeof body.name === 'string' ? body.name : '';
+  const email = typeof body.email === 'string' ? body.email : '';
+  const reason = typeof body.reason === 'string' ? body.reason : '';
+
+  if (!name.trim() || !email.trim() || !reason.trim()) {
     return NextResponse.json({ error: 'All fields are required.' }, { status: 400 });
+  }
+  if (!EMAIL_RE.test(email.trim())) {
+    return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
   }
 
   const adminSupabase = createAdminClient();
