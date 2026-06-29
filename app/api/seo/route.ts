@@ -5,7 +5,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { normalizeUrl, BrandExtractError } from '@/lib/brand/extract';
 import { createClient } from '@/lib/supabase/server';
+import { getUserPlan } from '@/lib/subscription/server';
+import { isPlatform, platformLabel } from '@/lib/seo/platforms';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const SEVERITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
+interface SeoTip {
+  title: string;
+  detail: string;
+  severity: 'high' | 'medium' | 'low';
+  steps: string[];
+}
 
 export const maxDuration = 60;
 
@@ -104,12 +116,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'The SEO tool is not configured yet.' }, { status: 503 });
   }
 
-  let body: { url?: unknown };
+  // Free tier gets one SEO check per week; paid tiers are unlimited.
+  const plan = await getUserPlan(supabase);
+  const isPaid = plan !== 'free';
+  if (!isPaid) {
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('seo_last_used_at')
+      .eq('id', user.id)
+      .single();
+    const last = (prof as { seo_last_used_at?: string } | null)?.seo_last_used_at;
+    if (last && Date.now() - new Date(last).getTime() < WEEK_MS) {
+      const days = Math.ceil((WEEK_MS - (Date.now() - new Date(last).getTime())) / 86400000);
+      return NextResponse.json(
+        {
+          error: `You've used your free SEO check this week. Upgrade for unlimited checks and to save fixes to your plan — or come back in ${days} day${days === 1 ? '' : 's'}.`,
+        },
+        { status: 403 }
+      );
+    }
+  }
+
+  let body: { url?: unknown; platform?: unknown };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
   }
+
+  const platform = isPlatform(body.platform) ? body.platform : 'custom';
 
   let url: string;
   try {
@@ -142,24 +177,33 @@ ${JSON.stringify(signals, null, 2)}
 
 Give specific, actionable tips tailored to THIS page's signals — reference what's missing or weak (e.g. no meta description, thin word count, no structured data). Don't give generic advice that ignores the data.
 
+The website is built with: ${platformLabel(platform)}. Every "steps" instruction MUST be written for ${platformLabel(platform)} specifically — use that platform's real menu names, panels, and where to paste or edit things (e.g. for Wix: Settings → SEO / the SEO panel on each page; for WordPress: an SEO plugin like Yoast or the block editor; for Squarespace/Webflow/Shopify: their page-settings + custom-code areas; for "Custom code / HTML": editing the actual <head>, tags, and markup). Do not give steps for a different platform.
+
+Every tip MUST include "steps": a 3–5 item array of short, concrete, do-this-now instructions (imperative, plain language a non-technical speaker can follow). Reference exact tags/fields/menus where relevant.
+
 Respond with ONLY valid JSON in this exact shape:
 {
   "summary": "one or two sentence overall read on the page",
-  "seo": [{ "title": "short tip", "detail": "one or two sentences", "severity": "high" | "medium" | "low" }],
-  "aeo": [{ "title": "short tip", "detail": "one or two sentences", "severity": "high" | "medium" | "low" }]
+  "seo": [{ "title": "short tip", "detail": "one or two sentences on why it matters", "severity": "high" | "medium" | "low", "steps": ["step 1", "step 2", "step 3"] }],
+  "aeo": [{ "title": "short tip", "detail": "one or two sentences on why it matters", "severity": "high" | "medium" | "low", "steps": ["step 1", "step 2", "step 3"] }]
 }
 Aim for 3–5 items in each array. No markdown, no code fences.`;
 
-  let report: { summary: string; seo: unknown[]; aeo: unknown[] };
+  let report: { summary: string; seo: SeoTip[]; aeo: SeoTip[] };
   try {
     const completion = await openai().chat.completions.create({
       model: 'gpt-4o',
-      max_tokens: 1600,
+      max_tokens: 2200,
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: prompt }],
     });
     const raw = completion.choices[0]?.message?.content ?? '';
-    report = JSON.parse(raw);
+    const parsed = JSON.parse(raw) as { summary?: string; seo?: SeoTip[]; aeo?: SeoTip[] };
+    report = {
+      summary: parsed.summary ?? '',
+      seo: Array.isArray(parsed.seo) ? parsed.seo : [],
+      aeo: Array.isArray(parsed.aeo) ? parsed.aeo : [],
+    };
   } catch (err) {
     console.error('SEO analysis failed:', err);
     return NextResponse.json(
@@ -168,5 +212,18 @@ Aim for 3–5 items in each array. No markdown, no code fences.`;
     );
   }
 
-  return NextResponse.json({ url, signals, report });
+  // Free tier: record the weekly use and return only the single top-priority tip.
+  if (!isPaid) {
+    await supabase
+      .from('profiles')
+      .update({ seo_last_used_at: new Date().toISOString() })
+      .eq('id', user.id);
+
+    const top = [...report.seo, ...report.aeo].sort(
+      (a, b) => (SEVERITY_RANK[a.severity] ?? 3) - (SEVERITY_RANK[b.severity] ?? 3)
+    )[0];
+    report = { summary: report.summary, seo: top ? [top] : [], aeo: [] };
+  }
+
+  return NextResponse.json({ url, signals, report, plan, platform });
 }
