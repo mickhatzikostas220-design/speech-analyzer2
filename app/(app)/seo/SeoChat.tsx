@@ -74,7 +74,11 @@ export default function SeoChat({ context }: { context: SiteContext }) {
         setMessages((prev) => prev.slice(0, -1));
         return;
       }
-      if (!res.ok || !res.body) throw new Error('Failed');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error || `Error ${res.status}`);
+      }
+      if (!res.body) throw new Error('No response body');
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -88,8 +92,9 @@ export default function SeoChat({ context }: { context: SiteContext }) {
         setMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: assistantText }]);
         endRef.current?.scrollIntoView({ behavior: 'smooth' });
       }
-    } catch {
-      setMessages((prev) => [...prev, { role: 'assistant', content: 'Something went wrong. Please try again.' }]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      setMessages((prev) => [...prev, { role: 'assistant', content: msg }]);
     } finally {
       setLoading(false);
     }
