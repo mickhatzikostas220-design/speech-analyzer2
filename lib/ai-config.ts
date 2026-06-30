@@ -35,10 +35,10 @@ export function aiClientOptions(): { apiKey: string | undefined; baseURL?: strin
   return { apiKey: process.env.OPENAI_API_KEY };
 }
 
-// The model the app uses when running on OpenRouter. Defaults to OpenAI's
-// open-weight gpt-oss-120b; override with OPENROUTER_MODEL (any OpenRouter slug,
-// e.g. "openai/gpt-4o" or "anthropic/claude-3.5-sonnet").
-const DEFAULT_OPENROUTER_MODEL = 'openai/gpt-oss-120b';
+// The model the app uses when running on OpenRouter. Defaults to Meta's free
+// Llama 4 Maverick via OpenRouter's free tier; override with OPENROUTER_MODEL
+// (any OpenRouter slug, e.g. "openai/gpt-4o" or "anthropic/claude-3.5-sonnet").
+const DEFAULT_OPENROUTER_MODEL = 'meta-llama/llama-4-maverick:free';
 
 /**
  * Pick the chat model for the active provider. On OpenRouter we use
