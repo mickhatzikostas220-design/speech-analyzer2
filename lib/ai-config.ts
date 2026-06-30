@@ -35,13 +35,20 @@ export function aiClientOptions(): { apiKey: string | undefined; baseURL?: strin
   return { apiKey: process.env.OPENAI_API_KEY };
 }
 
+// The model the app uses when running on OpenRouter. Defaults to OpenAI's
+// open-weight gpt-oss-120b; override with OPENROUTER_MODEL (any OpenRouter slug,
+// e.g. "openai/gpt-4o" or "anthropic/claude-3.5-sonnet").
+const DEFAULT_OPENROUTER_MODEL = 'openai/gpt-oss-120b';
+
 /**
- * Map an OpenAI model id to the right name for the active provider. OpenRouter
- * namespaces OpenAI models as `openai/<model>`; OpenAI uses the bare id.
+ * Pick the chat model for the active provider. On OpenRouter we use
+ * OPENROUTER_MODEL (default gpt-oss-120b). On a plain OpenAI key we use the bare
+ * model passed in (the OpenAI fallback, e.g. "gpt-4o"), since OpenAI's own API
+ * does not serve gpt-oss.
  */
-export function chatModel(model: string): string {
-  if (process.env.OPENROUTER_API_KEY && !model.includes('/')) {
-    return `openai/${model}`;
+export function chatModel(openaiFallbackModel: string): string {
+  if (process.env.OPENROUTER_API_KEY) {
+    return process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL;
   }
-  return model;
+  return openaiFallbackModel;
 }
