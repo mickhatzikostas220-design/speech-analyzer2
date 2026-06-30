@@ -102,6 +102,11 @@ create policy "Users read own speeches" on storage.objects for select using (
 create policy "Users delete own speeches" on storage.objects for delete using (
   bucket_id = 'speeches' and auth.uid()::text = (storage.foldername(name))[1]
 );
-create policy "Service reads speeches" on storage.objects for select using (
+-- The service role bypasses RLS entirely, so API routes can already read any
+-- object for processing. This policy is therefore scoped to `service_role`
+-- ONLY — without the `to service_role` clause it would also grant every
+-- authenticated user read access to ALL users' private recordings (a broken
+-- access-control bug), since storage policies default to all roles.
+create policy "Service reads speeches" on storage.objects for select to service_role using (
   bucket_id = 'speeches'
 );

@@ -1,23 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { aiClientOptions, chatModel } from '@/lib/ai-config';
+import { createClient } from '@/lib/supabase/server';
+import { rateLimit, clientIp } from '@/lib/rateLimit';
 
 // Created lazily inside the handler — instantiating at module scope throws
 // when OPENAI_API_KEY is missing during `next build`, which breaks the build.
 export const maxDuration = 60;
 
+// Keep free-text choices short so they can't be used to smuggle a huge prompt
+// (cost abuse) or run away with the token budget.
+const clampStr = (v: unknown, max = 60): string =>
+  typeof v === 'string' ? v.replace(/[\r\n]+/g, ' ').trim().slice(0, max) : '';
+
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { labelA, labelB, avgs, choices } = body;
+  // Require a signed-in user: this runs a billed GPT-4o completion, so leaving
+  // it open let anyone use it as a free LLM proxy / drive up our AI bill.
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
 
-  const rows = avgs.map((m: { key: string; a: number; b: number; diff: number }) =>
-    `  ${m.key}: ${labelA}=${m.a}, ${labelB}=${m.b}, difference=${m.diff > 0 ? '+' : ''}${m.diff}`
-  ).join('\n');
+  const limit = rateLimit(`compare-report:${user.id}:${clientIp(request)}`, 10, 10 * 60 * 1000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Too many report requests. Please wait a few minutes.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
+    );
+  }
 
-  const sections = (choices.include as string[]).join(', ');
-  const tone = choices.tone as string;
-  const audience = choices.audience as string;
-  const length = choices.length as string;
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  }
+  const { labelA: rawA, labelB: rawB, avgs: rawAvgs, choices: rawChoices } = body;
+  const choices = (rawChoices ?? {}) as Record<string, unknown>;
+
+  if (!Array.isArray(rawAvgs) || rawAvgs.length === 0) {
+    return NextResponse.json({ error: 'No metrics to compare.' }, { status: 400 });
+  }
+
+  const labelA = clampStr(rawA, 120) || 'Speech A';
+  const labelB = clampStr(rawB, 120) || 'Speech B';
+
+  const rows = (rawAvgs as { key?: unknown; a?: unknown; b?: unknown; diff?: unknown }[])
+    .slice(0, 32)
+    .map((m) => {
+      const diff = Number(m.diff) || 0;
+      return `  ${clampStr(m.key, 40)}: ${labelA}=${Number(m.a) || 0}, ${labelB}=${Number(m.b) || 0}, difference=${diff > 0 ? '+' : ''}${diff}`;
+    })
+    .join('\n');
+
+  const sections = (Array.isArray(choices.include) ? choices.include : [])
+    .map((s) => clampStr(s, 40))
+    .filter(Boolean)
+    .slice(0, 12)
+    .join(', ');
+  const tone = clampStr(choices.tone);
+  const audience = clampStr(choices.audience);
+  const length = clampStr(choices.length);
 
   const systemPrompt = `You are an expert speech coach writing a neural engagement analysis report.
 You have access to Tribe v2 fMRI brain encoding model data that predicts how an audience's brain responds to speech.

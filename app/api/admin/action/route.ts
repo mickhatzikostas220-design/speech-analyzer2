@@ -5,6 +5,17 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3002';
 
+// Escape DB-sourced values (request name/status, originally user-supplied)
+// before reflecting them into this HTML page.
+function escapeHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function htmlPage(title: string, message: string, color: string) {
   return new NextResponse(
     `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${title}</title>
@@ -36,7 +47,7 @@ export async function GET(request: NextRequest) {
   if (req.status !== 'pending') {
     return htmlPage(
       'Already Reviewed',
-      `This request from ${req.name} was already ${req.status}.`,
+      `This request from ${escapeHtml(req.name)} was already ${escapeHtml(req.status)}.`,
       '#f59e0b'
     );
   }
@@ -57,13 +68,13 @@ export async function GET(request: NextRequest) {
 
     await adminSupabase.from('access_requests').update({ status: 'approved' }).eq('id', payload.id);
 
-    return htmlPage('Approved', `${req.name} (${req.email}) has been approved and sent an invite link.`, '#16a34a');
+    return htmlPage('Approved', `${escapeHtml(req.name)} (${escapeHtml(req.email)}) has been approved and sent an invite link.`, '#16a34a');
   }
 
   if (payload.action === 'deny') {
     try { await sendRejectionEmail(req.email, req.name); } catch {}
     await adminSupabase.from('access_requests').update({ status: 'denied' }).eq('id', payload.id);
-    return htmlPage('Denied', `${req.name}'s request has been denied.`, '#3f3f46');
+    return htmlPage('Denied', `${escapeHtml(req.name)}'s request has been denied.`, '#3f3f46');
   }
 
   return htmlPage('Invalid Action', 'Unknown action in token.', '#ef4444');

@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { rateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 // Allow headroom for a Parakeet cold start (Vercel Pro honors up to 300s; Hobby
 // caps at 60s, in which case keep a warm Modal container via min_containers=1).
 export const maxDuration = 300;
+
+// Whisper/Parakeet are billed per audio-minute, so cap both request rate and
+// payload size to stop a signed-in user from running up an unbounded AI bill.
+const MAX_AUDIO_BYTES = 50 * 1024 * 1024; // 50 MB
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,9 +18,23 @@ export async function POST(request: NextRequest) {
     if (authErr) return NextResponse.json({ error: `Auth: ${authErr.message}` }, { status: 401 });
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const limit = rateLimit(`transcribe:${user.id}`, 30, 10 * 60 * 1000);
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: 'Too many transcription requests. Please wait a few minutes.' },
+        { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
+      );
+    }
+
     const formData = await request.formData();
     const audio = formData.get('audio') as Blob | null;
     if (!audio) return NextResponse.json({ error: 'No audio provided' }, { status: 400 });
+    if (audio.size > MAX_AUDIO_BYTES) {
+      return NextResponse.json(
+        { error: 'Audio file is too large (50 MB max).' },
+        { status: 413 }
+      );
+    }
 
     // Prefer the self-hosted Parakeet (parakeet-tdt-0.6b-v3) GPU server when
     // configured; otherwise fall back to OpenAI Whisper. Both return the same

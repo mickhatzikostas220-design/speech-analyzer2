@@ -56,6 +56,15 @@ export async function GET(
     });
   }
 
+  // Guard against CSV/formula injection: a cell beginning with = + - @ (or a
+  // control char) is treated as a formula by Excel/Sheets. Prefix with a quote
+  // and wrap in double-quotes so it's rendered as text.
+  function csvCell(value: string) {
+    let v = String(value);
+    if (/^[=+\-@\t\r]/.test(v)) v = `'${v}`;
+    return `"${v.replace(/"/g, '""')}"`;
+  }
+
   if (format === 'feedback') {
     const rows = [
       ['Start', 'End', 'Score', 'Severity', 'Feedback', 'Suggestion'],
@@ -64,8 +73,8 @@ export async function GET(
         formatTime(fp.timecode_end_ms),
         String(fp.engagement_score),
         fp.severity,
-        `"${fp.feedback_text.replace(/"/g, '""')}"`,
-        `"${fp.improvement_suggestion.replace(/"/g, '""')}"`,
+        csvCell(fp.feedback_text),
+        csvCell(fp.improvement_suggestion),
       ]),
     ];
 
