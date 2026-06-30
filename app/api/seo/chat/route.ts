@@ -125,15 +125,22 @@ export async function POST(request: NextRequest) {
 
   const openai = new OpenAI(aiClientOptions());
 
-  const stream = await openai.chat.completions.create({
-    model: chatModel('gpt-4o'),
-    max_tokens: 1024,
-    stream: true,
-    messages: [
-      { role: 'system', content: buildSystemPrompt(body.context) },
-      ...trimmed,
-    ],
-  });
+  let stream: Awaited<ReturnType<typeof openai.chat.completions.create>>;
+  try {
+    stream = await openai.chat.completions.create({
+      model: chatModel('gpt-4o'),
+      max_tokens: 1024,
+      stream: true,
+      messages: [
+        { role: 'system', content: buildSystemPrompt(body.context) },
+        ...trimmed,
+      ],
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'AI request failed.';
+    console.error('SEO chat stream error:', msg);
+    return NextResponse.json({ error: msg }, { status: 502 });
+  }
 
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
