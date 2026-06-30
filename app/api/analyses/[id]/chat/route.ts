@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { createClient } from '@/lib/supabase/server';
+import { aiClientOptions, chatModel } from '@/lib/ai-config';
 import { NextRequest } from 'next/server';
 
 export const maxDuration = 60;
@@ -93,10 +94,10 @@ export async function POST(
     return new Response('Analysis not complete yet', { status: 422 });
   }
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI(aiClientOptions());
 
   const stream = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: chatModel('gpt-4o'),
     max_tokens: 1024,
     messages: [
       { role: 'system', content: buildSystemPrompt(analysis, feedbackPoints ?? []) },

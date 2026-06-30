@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { aiClientOptions, chatModel } from '@/lib/ai-config';
 
 // Created lazily inside the handler — instantiating at module scope throws
 // when OPENAI_API_KEY is missing during `next build`, which breaks the build.
@@ -47,9 +48,9 @@ Remember: for DMN, lower scores are better (less mind-wandering). For all others
 
 Write the report now.`;
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI(aiClientOptions());
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: chatModel('gpt-4o'),
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },

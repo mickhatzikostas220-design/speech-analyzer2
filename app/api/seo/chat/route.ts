@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getUserPlan } from '@/lib/subscription/server';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
+import { aiClientOptions, chatModel, hasAiKey } from '@/lib/ai-config';
 
 export const maxDuration = 60;
 
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!hasAiKey()) {
     return NextResponse.json({ error: 'The SEO assistant is not configured yet.' }, { status: 503 });
   }
 
@@ -122,10 +123,10 @@ export async function POST(request: NextRequest) {
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .slice(-12);
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI(aiClientOptions());
 
   const stream = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: chatModel('gpt-4o'),
     max_tokens: 1024,
     stream: true,
     messages: [
