@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { Search, Sparkles, Check, CalendarPlus } from 'lucide-react';
 import { SEO_PLATFORMS, type SeoPlatformId } from '@/lib/seo/platforms';
+import SeoChat from './SeoChat';
 
 interface TipItem {
   title: string;
@@ -101,6 +102,7 @@ export default function SeoPage() {
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [analyzedUrl, setAnalyzedUrl] = useState('');
+  const [signals, setSignals] = useState<Record<string, unknown> | null>(null);
   const [plan, setPlan] = useState<string>('free');
   const [platform, setPlatform] = useState<SeoPlatformId>('custom');
 
@@ -124,6 +126,7 @@ export default function SeoPage() {
       } else {
         setReport(data.report as Report);
         setAnalyzedUrl(data.url as string);
+        setSignals((data.signals as Record<string, unknown>) ?? null);
         setPlan((data.plan as string) ?? 'free');
       }
     } catch {
@@ -219,6 +222,9 @@ export default function SeoPage() {
           )}
         </div>
       )}
+
+      {/* SEO/GEO/AEO chatbot — premium-only; locked for free users. */}
+      <SeoChat context={{ url: analyzedUrl, signals, report }} />
     </div>
   );
 }

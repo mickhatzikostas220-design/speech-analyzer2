@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserPlan } from '@/lib/subscription/server';
 import { isPlatform, platformLabel } from '@/lib/seo/platforms';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
+import { aiClientOptions, chatModel, hasAiKey } from '@/lib/ai-config';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const SEVERITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -93,7 +94,7 @@ function extractSignals(html: string) {
 
 let _client: OpenAI | null = null;
 function openai(): OpenAI {
-  if (!_client) _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  if (!_client) _client = new OpenAI(aiClientOptions());
   return _client;
 }
 
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!hasAiKey()) {
     return NextResponse.json({ error: 'The SEO tool is not configured yet.' }, { status: 503 });
   }
 
@@ -192,7 +193,7 @@ Aim for 3–5 items in each array. No markdown, no code fences.`;
   let report: { summary: string; seo: SeoTip[]; aeo: SeoTip[] };
   try {
     const completion = await openai().chat.completions.create({
-      model: 'gpt-4o',
+      model: chatModel('gpt-4o'),
       max_tokens: 2200,
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: prompt }],
