@@ -17,10 +17,17 @@ alter table profiles
 -- it with a trigger instead: only the service role (the Stripe webhook / admin
 -- client) may change the billing columns. Other columns (brand, slug, …) stay
 -- user-editable.
+-- NOTE: this MUST run as SECURITY INVOKER (the default), NOT security definer.
+-- The guard relies on `current_user` being the *caller's* role: a normal user
+-- updating their profile runs as `authenticated` (blocked), while the Stripe
+-- webhook / admin client runs as `service_role` (allowed). Under SECURITY
+-- DEFINER, current_user would be the function owner and the service-role check
+-- would never match — breaking legitimate billing updates. search_path is
+-- pinned to '' to satisfy the Supabase linter (the body uses no schema objects).
 create or replace function public.protect_billing_columns()
 returns trigger
 language plpgsql
-security definer
+set search_path = ''
 as $$
 begin
   if current_user <> 'service_role' and (

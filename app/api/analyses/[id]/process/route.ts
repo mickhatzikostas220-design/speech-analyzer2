@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { rateLimit } from '@/lib/rateLimit';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const maxDuration = 30;
@@ -10,6 +11,16 @@ export async function POST(
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Each call dispatches a GPU job — throttle so processing can't be triggered
+  // in a tight loop.
+  const limit = rateLimit(`analysis-process:${user.id}`, 20, 10 * 60 * 1000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Too many processing requests. Please wait a few minutes.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
+    );
+  }
 
   const { data: analysis } = await supabase
     .from('analyses')

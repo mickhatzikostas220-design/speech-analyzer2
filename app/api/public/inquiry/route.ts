@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getProfileBySlug } from '@/lib/onesheet/server';
+import { rateLimit, clientIp } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 
@@ -10,6 +11,16 @@ export const runtime = 'nodejs';
  * one-sheet. Inserted (service role) into that speaker's Booking Inbox.
  */
 export async function POST(req: NextRequest) {
+  // Public, unauthenticated, service-role insert into a speaker's inbox — the
+  // honeypot alone is trivially bypassed, so throttle per IP too.
+  const limit = rateLimit(`inquiry:${clientIp(req)}`, 8, 10 * 60 * 1000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Too many submissions. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
+    );
+  }
+
   let b: Record<string, unknown> = {};
   try {
     b = await req.json();
@@ -27,6 +38,16 @@ export async function POST(req: NextRequest) {
 
   const slug = str(b.slug, 64);
   if (!slug) return NextResponse.json({ error: 'Missing speaker.' }, { status: 400 });
+
+  // Cap how many inquiries a single speaker can receive in the window, so a
+  // distributed flood can't bury one speaker's inbox.
+  const slugLimit = rateLimit(`inquiry-slug:${slug}`, 30, 10 * 60 * 1000);
+  if (!slugLimit.ok) {
+    return NextResponse.json(
+      { error: 'Too many submissions. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(slugLimit.retryAfter) } }
+    );
+  }
 
   const contact_email = str(b.contact_email, 200);
   const organization = str(b.organization);

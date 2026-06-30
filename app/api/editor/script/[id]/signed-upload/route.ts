@@ -5,6 +5,12 @@ import { randomUUID } from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
+const ALLOWED_EXT = new Set(['mp4', 'mov', 'webm', 'm4v', 'mkv', 'avi', 'mp3', 'wav', 'm4a', 'aac']);
+function safeExt(fileName: string): string {
+  const ext = (fileName.split('.').pop() ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return ALLOWED_EXT.has(ext) ? ext : 'mp4';
+}
+
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const supabase = createClient();
@@ -15,8 +21,17 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const { fileName } = rawText ? JSON.parse(rawText) : {};
     if (!fileName) return NextResponse.json({ error: 'fileName required' }, { status: 400 });
 
+    // Verify project ownership before minting a service-role signed upload URL.
+    const { data: project } = await supabase
+      .from('script_projects')
+      .select('id')
+      .eq('id', params.id)
+      .eq('user_id', user.id)
+      .single();
+    if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
     const clipId = randomUUID();
-    const ext = String(fileName).split('.').pop() || 'mp4';
+    const ext = safeExt(String(fileName));
     const path = `${user.id}/script/${params.id}/${clipId}.${ext}`;
 
     const admin = createAdminClient();

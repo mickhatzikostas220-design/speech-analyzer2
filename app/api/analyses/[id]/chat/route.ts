@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { createClient } from '@/lib/supabase/server';
 import { aiClientOptions, chatModel } from '@/lib/ai-config';
+import { rateLimit } from '@/lib/rateLimit';
 import { NextRequest } from 'next/server';
 
 export const maxDuration = 60;
@@ -79,10 +80,20 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new Response('Unauthorized', { status: 401 });
 
+  const limit = rateLimit(`analysis-chat:${user.id}`, 40, 10 * 60 * 1000);
+  if (!limit.ok) {
+    return new Response('Too many requests. Please wait a moment.', {
+      status: 429,
+      headers: { 'Retry-After': String(limit.retryAfter) },
+    });
+  }
+
   const { messages } = await request.json();
   if (!Array.isArray(messages) || messages.length === 0) {
     return new Response('Bad request', { status: 400 });
   }
+  // Cap conversation history sent to the model to bound input-token cost.
+  const trimmedMessages = messages.slice(-16);
 
   const [{ data: analysis }, { data: feedbackPoints }] = await Promise.all([
     supabase.from('analyses').select('*').eq('id', params.id).eq('user_id', user.id).single(),
@@ -101,7 +112,7 @@ export async function POST(
     max_tokens: 1024,
     messages: [
       { role: 'system', content: buildSystemPrompt(analysis, feedbackPoints ?? []) },
-      ...messages,
+      ...trimmedMessages,
     ],
     stream: true,
   });
