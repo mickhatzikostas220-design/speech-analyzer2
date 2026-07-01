@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import type { PlanId } from '@/lib/subscription/plans';
 
 interface AccessRequest {
   id: string;
@@ -30,6 +31,11 @@ export default function AdminRequestsPage() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+
+  // Grant plan state
+  const [grantEmail, setGrantEmail] = useState('');
+  const [grantPlan, setGrantPlan] = useState<PlanId>('full');
+  const [granting, setGranting] = useState(false);
 
   useEffect(() => { fetchRequests(); }, []);
 
@@ -76,6 +82,32 @@ export default function AdminRequestsPage() {
     setProcessing(null);
   }
 
+  async function handleGrantPlan(e: React.FormEvent) {
+    e.preventDefault();
+    if (!grantEmail.trim()) return;
+    setGranting(true);
+    const res = await fetch('/api/admin/grant-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: grantEmail.trim(), plan: grantPlan }),
+    });
+    const d = await res.json();
+    if (res.ok) {
+      if (d.invited && d.inviteLink) {
+        setInviteLink(d.inviteLink);
+        showToast(`Invited ${grantEmail} with ${grantPlan} plan — send them the link below.`);
+      } else if (d.invited) {
+        showToast(`Invited ${grantEmail} with ${grantPlan} plan — invite email sent.`);
+      } else {
+        showToast(`${grantEmail} granted ${grantPlan} plan.`);
+      }
+      setGrantEmail('');
+    } else {
+      showToast(d.error ?? 'Failed to grant plan.');
+    }
+    setGranting(false);
+  }
+
   const pending = requests.filter((r) => r.status === 'pending');
   const reviewed = requests.filter((r) => r.status !== 'pending');
 
@@ -111,6 +143,45 @@ export default function AdminRequestsPage() {
           </div>
         </div>
       )}
+
+      {/* Grant Plan */}
+      <div className="card p-5 space-y-4">
+        <div>
+          <p className="eyebrow mb-0.5">Admin</p>
+          <h2 className="text-base font-semibold text-strong">Grant plan access</h2>
+          <p className="text-xs text-muted mt-0.5">
+            Instantly grant any email free, core, or full plan — no payment required.
+            If the user has no account they will receive an invite link.
+          </p>
+        </div>
+        <form onSubmit={handleGrantPlan} className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="email"
+            required
+            placeholder="user@example.com"
+            value={grantEmail}
+            onChange={(e) => setGrantEmail(e.target.value)}
+            className="input flex-1"
+          />
+          <select
+            value={grantPlan}
+            onChange={(e) => setGrantPlan(e.target.value as PlanId)}
+            className="input w-36 shrink-0"
+          >
+            <option value="full">Full Premium</option>
+            <option value="core">Core Premium</option>
+            <option value="free">Free</option>
+          </select>
+          <button
+            type="submit"
+            disabled={granting}
+            className="rounded-[var(--radius-pill)] px-4 py-2 text-xs font-bold text-white transition-colors disabled:opacity-50 shrink-0"
+            style={{ background: 'var(--accent)' }}
+          >
+            {granting ? 'Granting…' : 'Grant access'}
+          </button>
+        </form>
+      </div>
 
       <div>
         <p className="eyebrow mb-1">Admin</p>
