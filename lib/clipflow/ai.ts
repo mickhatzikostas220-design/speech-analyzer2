@@ -3,10 +3,10 @@ import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
 import type { ClipCandidate, ClipLength, ClipPreferences, PlatformHashtags, TranscriptCue } from './types';
 
 // All ClipFlow text generation runs on GPT-4o via the `openai` SDK. By default
-// it reuses the app-wide AI key — OpenRouter when OPENROUTER_API_KEY is set,
-// otherwise OPENAI_API_KEY (see lib/ai-config). Callers can also pass a per-user
-// `apiKey` (resolved from clipflow_secrets) so each user's clipping is billed to
-// their own OpenAI account; that path always talks to OpenAI directly.
+// it reuses the app-wide OPENAI_API_KEY (see lib/ai-config). Callers can also
+// pass a per-user `apiKey` (resolved from clipflow_secrets) so each user's
+// clipping is billed to their own OpenAI account; that path talks to OpenAI
+// directly too.
 
 // Minimal metadata shape the generator needs (structurally compatible with
 // youtube.ts's VideoMeta).
@@ -62,7 +62,7 @@ async function callJson<T>(
   // automatically fails over to OpenAI if OpenRouter rate-limits or errors.
   if (!hasAiKey()) {
     throw new ClipAIError(
-      'AI generation is not configured. Add your OpenAI API key in ClipFlow → API keys (or set OPENROUTER_API_KEY / OPENAI_API_KEY) to enable clipping and captions.'
+      'AI generation is not configured. Add your OpenAI API key in ClipFlow → API keys (or set OPENAI_API_KEY) to enable clipping and captions.'
     );
   }
   const res = await createChatCompletion('gpt-4o', {

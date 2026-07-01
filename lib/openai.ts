@@ -1,13 +1,12 @@
 import OpenAI from 'openai';
 import { createChatCompletion } from './ai-config';
 
-// Lazily instantiate the AI clients on first use. Creating them at module load
-// time throws when the key is absent (e.g. during `next build`, which evaluates
-// route modules without runtime env), breaking the build.
+// Lazily instantiate the transcription client on first use. Creating it at
+// module load time throws when the key is absent (e.g. during `next build`,
+// which evaluates route modules without runtime env), breaking the build.
 //
-// Two separate clients: transcription must run on OpenAI directly (Whisper has
-// no OpenRouter equivalent), while chat/completions go through the app-wide
-// client, which is OpenRouter when OPENROUTER_API_KEY is set (see lib/ai-config).
+// Transcription (Whisper) and chat/completions both run on OpenAI; chat goes
+// through the shared app-wide client in lib/ai-config.
 let _transcribe: OpenAI | null = null;
 function getTranscribeClient(): OpenAI {
   if (!_transcribe) {
