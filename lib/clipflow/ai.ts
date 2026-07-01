@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { aiClientOptions, chatModel, hasAiKey } from '@/lib/ai-config';
+import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
 import type { ClipCandidate, ClipLength, ClipPreferences, PlatformHashtags, TranscriptCue } from './types';
 
 // All ClipFlow text generation runs on GPT-4o via the `openai` SDK. By default
@@ -18,21 +18,6 @@ interface VideoMetaLike {
 }
 
 export class ClipAIError extends Error {}
-
-// Returns the client plus the model id to use with it. A per-user key always
-// hits OpenAI directly (model "gpt-4o"); otherwise we use the app-wide client,
-// which is OpenRouter when configured (model "openai/gpt-4o").
-function client(apiKey?: string): { ai: OpenAI; model: string } {
-  if (apiKey) {
-    return { ai: new OpenAI({ apiKey }), model: 'gpt-4o' };
-  }
-  if (!hasAiKey()) {
-    throw new ClipAIError(
-      'AI generation is not configured. Add your OpenAI API key in ClipFlow → API keys (or set OPENROUTER_API_KEY / OPENAI_API_KEY) to enable clipping and captions.'
-    );
-  }
-  return { ai: new OpenAI(aiClientOptions()), model: chatModel('gpt-4o') };
-}
 
 function parseJson<T>(raw: string): T {
   let text = raw.trim();
@@ -57,15 +42,33 @@ async function callJson<T>(
   temperature = 0.7,
   apiKey?: string
 ): Promise<T> {
-  const { ai, model } = client(apiKey);
-  const res = await ai.chat.completions.create({
-    model,
+  const messages = [
+    { role: 'system' as const, content: system },
+    { role: 'user' as const, content: user },
+  ];
+
+  // A per-user (bring-your-own) key always hits OpenAI directly on gpt-4o.
+  if (apiKey) {
+    const res = await new OpenAI({ apiKey }).chat.completions.create({
+      model: 'gpt-4o',
+      max_tokens: maxTokens,
+      temperature,
+      messages,
+    });
+    return parseJson<T>(res.choices[0]?.message?.content ?? '');
+  }
+
+  // Otherwise use the app-wide client (OpenRouter when configured), which
+  // automatically fails over to OpenAI if OpenRouter rate-limits or errors.
+  if (!hasAiKey()) {
+    throw new ClipAIError(
+      'AI generation is not configured. Add your OpenAI API key in ClipFlow → API keys (or set OPENROUTER_API_KEY / OPENAI_API_KEY) to enable clipping and captions.'
+    );
+  }
+  const res = await createChatCompletion('gpt-4o', {
     max_tokens: maxTokens,
     temperature,
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
+    messages,
   });
   return parseJson<T>(res.choices[0]?.message?.content ?? '');
 }

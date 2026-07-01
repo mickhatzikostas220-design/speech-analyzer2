@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { aiClientOptions, chatModel } from './ai-config';
+import { createChatCompletion } from './ai-config';
 
 // Lazily instantiate the AI clients on first use. Creating them at module load
 // time throws when the key is absent (e.g. during `next build`, which evaluates
@@ -14,14 +14,6 @@ function getTranscribeClient(): OpenAI {
     _transcribe = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   }
   return _transcribe;
-}
-
-let _chat: OpenAI | null = null;
-function getChatClient(): OpenAI {
-  if (!_chat) {
-    _chat = new OpenAI(aiClientOptions());
-  }
-  return _chat;
 }
 
 export interface TranscriptWord {
@@ -67,8 +59,7 @@ export async function generateFeedback(params: {
   const seconds = Math.floor(startSeconds % 60);
   const timeLabel = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-  const response = await getChatClient().chat.completions.create({
-    model: chatModel('gpt-4o'),
+  const response = await createChatCompletion('gpt-4o', {
     messages: [
       {
         role: 'system',

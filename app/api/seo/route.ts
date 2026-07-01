@@ -2,13 +2,12 @@
 // GPT-4o for concrete SEO (search) + AEO (answer-engine / AI) improvement tips.
 // Uses the OpenAI key already configured for the rest of the app.
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { normalizeUrl, BrandExtractError } from '@/lib/brand/extract';
 import { createClient } from '@/lib/supabase/server';
 import { getUserPlan } from '@/lib/subscription/server';
 import { isPlatform, platformLabel } from '@/lib/seo/platforms';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
-import { aiClientOptions, chatModel, hasAiKey } from '@/lib/ai-config';
+import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const SEVERITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -90,12 +89,6 @@ function extractSignals(html: string) {
     jsonLdTypes,
     wordCount: text ? text.split(' ').length : 0,
   };
-}
-
-let _client: OpenAI | null = null;
-function openai(): OpenAI {
-  if (!_client) _client = new OpenAI(aiClientOptions());
-  return _client;
 }
 
 export async function POST(request: NextRequest) {
@@ -192,8 +185,7 @@ Aim for 3–5 items in each array. No markdown, no code fences.`;
 
   let report: { summary: string; seo: SeoTip[]; aeo: SeoTip[] };
   try {
-    const completion = await openai().chat.completions.create({
-      model: chatModel('gpt-4o'),
+    const completion = await createChatCompletion('gpt-4o', {
       max_tokens: 2200,
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: prompt }],

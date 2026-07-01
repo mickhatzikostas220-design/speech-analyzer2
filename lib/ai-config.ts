@@ -6,11 +6,21 @@
 // a different base URL, so the same `openai` SDK talks to it by pointing baseURL
 // at OpenRouter and prefixing model ids (gpt-4o -> openai/gpt-4o).
 //
+// Resilience: the OpenRouter default model is a free-tier one, which has strict
+// rate limits and a daily cap. When that cap is hit OpenRouter returns HTTP 429
+// ("Provider returned error"), which would otherwise break EVERY AI feature at
+// once. `createChatCompletion` below runs each call through OpenRouter and, if it
+// rate-limits or errors, automatically retries the same request directly on
+// OpenAI (when OPENAI_API_KEY is set), so a throttled free tier degrades
+// gracefully instead of taking the whole app down.
+//
 // What this does NOT touch:
 //   - Whisper transcription (/api/transcribe, lib/openai.ts): OpenRouter has no
 //     audio endpoint, so transcription always uses OPENAI_API_KEY directly.
 //   - Bring-your-own-key paths (AI Assistant, per-user ClipFlow keys): those are
 //     the user's own provider keys and hit their provider directly.
+
+import OpenAI from 'openai';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
@@ -51,4 +61,74 @@ export function chatModel(openaiFallbackModel: string): string {
     return process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL;
   }
   return openaiFallbackModel;
+}
+
+// True when we can fall back to OpenAI after an OpenRouter failure: we're on
+// OpenRouter now AND a separate OpenAI key exists to retry against.
+function canFallBackToOpenAI(): boolean {
+  return Boolean(process.env.OPENROUTER_API_KEY && process.env.OPENAI_API_KEY);
+}
+
+// Which OpenRouter/OpenAI errors are worth retrying on OpenAI directly. The one
+// that motivated this (free-tier exhaustion) is 429; we also cover 402 (out of
+// credits), request timeouts, and any 5xx from the upstream provider.
+function shouldFallBack(err: unknown): boolean {
+  const status = (err as { status?: number } | null)?.status;
+  if (typeof status !== 'number') return false;
+  return status === 429 || status === 402 || status === 408 || status >= 500;
+}
+
+type NonStreamingParams = Omit<
+  OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
+  'model'
+>;
+type StreamingParams = Omit<
+  OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming,
+  'model'
+>;
+
+/**
+ * Run a chat completion through the app-wide provider with automatic failover.
+ *
+ * Pass the OpenAI model name (e.g. "gpt-4o") plus the usual request params
+ * WITHOUT `model` — this picks the right model for whichever provider actually
+ * serves the request. It first tries the app-wide client (OpenRouter when
+ * configured); if that rate-limits or errors and an OpenAI key is available, it
+ * transparently retries the identical request on OpenAI's own API so a throttled
+ * OpenRouter free tier no longer breaks every AI feature at once.
+ *
+ * Overloaded so streaming callers get a Stream back and non-streaming callers
+ * get a ChatCompletion, exactly like `openai.chat.completions.create`.
+ */
+export async function createChatCompletion(
+  openaiModel: string,
+  params: NonStreamingParams
+): Promise<OpenAI.Chat.Completions.ChatCompletion>;
+export async function createChatCompletion(
+  openaiModel: string,
+  params: StreamingParams
+): Promise<import('openai/streaming').Stream<OpenAI.Chat.Completions.ChatCompletionChunk>>;
+export async function createChatCompletion(
+  openaiModel: string,
+  params: NonStreamingParams | StreamingParams
+): Promise<unknown> {
+  const primary = new OpenAI(aiClientOptions());
+  try {
+    return await primary.chat.completions.create({
+      ...params,
+      model: chatModel(openaiModel),
+    } as OpenAI.Chat.Completions.ChatCompletionCreateParams);
+  } catch (err) {
+    if (!canFallBackToOpenAI() || !shouldFallBack(err)) throw err;
+    // OpenRouter is throttled/erroring — retry the same request on OpenAI.
+    console.warn(
+      `AI call failed on OpenRouter (status ${(err as { status?: number }).status}); ` +
+        `falling back to OpenAI (${openaiModel}).`
+    );
+    const fallback = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    return await fallback.chat.completions.create({
+      ...params,
+      model: openaiModel,
+    } as OpenAI.Chat.Completions.ChatCompletionCreateParams);
+  }
 }
