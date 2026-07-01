@@ -7,12 +7,11 @@
 //
 // Locked behind a paid plan: free users get a 403 from POST and `unlocked:false`
 // from GET, matching the gating already used elsewhere on the SEO page.
-import OpenAI from 'openai';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getUserPlan } from '@/lib/subscription/server';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
-import { aiClientOptions, chatModel, hasAiKey } from '@/lib/ai-config';
+import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
 
 export const maxDuration = 60;
 
@@ -123,12 +122,9 @@ export async function POST(request: NextRequest) {
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .slice(-12);
 
-  const openai = new OpenAI(aiClientOptions());
-
-  let stream: Awaited<ReturnType<typeof openai.chat.completions.create>>;
+  let stream: Awaited<ReturnType<typeof createChatCompletion>>;
   try {
-    stream = await openai.chat.completions.create({
-      model: chatModel('gpt-4o'),
+    stream = await createChatCompletion('gpt-4o', {
       max_tokens: 1024,
       stream: true,
       messages: [
