@@ -1,13 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createChatCompletion } from '@/lib/ai-config';
+import { createClient } from '@/lib/supabase/server';
 
 // Created lazily inside the handler — instantiating at module scope throws
 // when OPENAI_API_KEY is missing during `next build`, which breaks the build.
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { labelA, labelB, avgs, choices } = body;
+  // Require a signed-in user: this endpoint calls a paid AI model, so leaving it
+  // open would let anyone run up cost against our OpenAI key.
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
+
+  let body: {
+    labelA?: unknown;
+    labelB?: unknown;
+    avgs?: unknown;
+    choices?: unknown;
+  };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  }
+
+  const { labelA, labelB, avgs, choices } = body as {
+    labelA: string;
+    labelB: string;
+    avgs: { key: string; a: number; b: number; diff: number }[];
+    choices: { include: string[]; tone: string; audience: string; length: string };
+  };
+
+  if (!Array.isArray(avgs) || !choices || !Array.isArray(choices.include)) {
+    return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  }
 
   const rows = avgs.map((m: { key: string; a: number; b: number; diff: number }) =>
     `  ${m.key}: ${labelA}=${m.a}, ${labelB}=${m.b}, difference=${m.diff > 0 ? '+' : ''}${m.diff}`

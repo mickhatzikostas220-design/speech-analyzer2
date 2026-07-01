@@ -1,6 +1,7 @@
 import type { BrandKit } from './types';
 import { cloneDefaultBrand } from './defaults';
 import { normalizeHex, isNeutral, saturation, readableTextOn, hexToRgb } from './color';
+import { isBlockedHost } from '../ssrf';
 
 /**
  * Auto-extract a brand kit from a speaker's website. Pure server-side:
@@ -31,6 +32,15 @@ export function normalizeUrl(input: string): string {
 }
 
 async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
+  // SSRF guard: refuse to fetch internal/private hosts.
+  try {
+    if (isBlockedHost(new URL(url).hostname)) {
+      throw new BrandExtractError('That address is not allowed.');
+    }
+  } catch (err) {
+    if (err instanceof BrandExtractError) throw err;
+    throw new BrandExtractError("That doesn't look like a valid website address.");
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
