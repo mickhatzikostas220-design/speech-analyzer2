@@ -1,11 +1,16 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { verifyToken } from '@/lib/adminToken';
 import { sendApprovalEmail, sendRejectionEmail } from '@/lib/email';
+import { escapeHtml } from '@/lib/html';
 import { NextRequest, NextResponse } from 'next/server';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3002';
 
-function htmlPage(title: string, message: string, color: string) {
+// Every message rendered here can contain request-form data (name/email), so
+// escape both fields wholesale — callers only ever pass plain text.
+function htmlPage(rawTitle: string, rawMessage: string, color: string) {
+  const title = escapeHtml(rawTitle);
+  const message = escapeHtml(rawMessage);
   return new NextResponse(
     `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${title}</title>
     <style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:system-ui,sans-serif;background:#09090b;color:#fafafa;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}

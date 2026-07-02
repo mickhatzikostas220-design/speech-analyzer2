@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase/client';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  const supabase = createClient();
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,6 +34,9 @@ export default function VerifyEmailPage() {
     }
     setLoading(true);
 
+    // Created here (not at component scope) so the page can prerender without
+    // Supabase env vars at build time.
+    const supabase = createClient();
     // New signups use a "signup" OTP; fall back to the generic "email" type.
     let result = await supabase.auth.verifyOtp({ email: email.trim(), token, type: 'signup' });
     if (result.error) {

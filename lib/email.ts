@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { signToken } from './adminToken';
+import { escapeHtml } from './html';
 
 const FROM = 'ACA <onboarding@resend.dev>';
 const VERIFY_FROM = process.env.EMAIL_FROM ?? 'Speaker Hub <onboarding@resend.dev>';
@@ -26,6 +27,26 @@ export async function sendVerificationCode(to: string, code: string) {
   });
 }
 
+export async function sendPasswordResetCode(to: string, code: string) {
+  if (!process.env.RESEND_API_KEY) return;
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  await resend.emails.send({
+    from: VERIFY_FROM,
+    to,
+    subject: `Your password reset code: ${code}`,
+    html: `
+      <div style="font-family:system-ui,Segoe UI,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#ffffff;color:#111114;border:1px solid #e5e5ea;border-radius:16px;">
+        <div style="width:40px;height:40px;background:#1A2B50;border-radius:10px;margin-bottom:20px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:20px;font-family:system-ui;">S</div>
+        <h1 style="font-size:20px;font-weight:800;margin:0 0 8px;color:#111114;">Reset your password</h1>
+        <p style="color:#6E6E78;margin:0 0 24px;line-height:1.6;font-size:14px;">Enter this 6-digit code in Speaker Hub to set a new password.</p>
+        <div style="font-size:34px;font-weight:800;letter-spacing:10px;color:#1A2B50;background:#F6F6F9;border:1px solid #e5e5ea;border-radius:12px;padding:18px 0;text-align:center;margin-bottom:24px;">${code}</div>
+        <p style="color:#9A9AA4;font-size:12px;margin:0;line-height:1.6;">This code expires in 1 hour. If you didn't ask to reset your password, you can safely ignore this email — your password won't change.</p>
+        <p style="color:#C9C9D1;font-size:11px;margin-top:28px;">Speaker Hub</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendAccessRequestNotification(
   requestId: string,
   name: string,
@@ -38,6 +59,12 @@ export async function sendAccessRequestNotification(
   const denyToken    = signToken(requestId, 'deny');
   const approveUrl   = `${APP_URL}/api/admin/action?token=${approveToken}`;
   const denyUrl      = `${APP_URL}/api/admin/action?token=${denyToken}`;
+
+  // These fields come straight from the public request-access form — escape
+  // them so a malicious submission can't inject HTML into the admin's inbox.
+  const safeName = escapeHtml(name);
+  const safeEmail = escapeHtml(email);
+  const safeReason = escapeHtml(reason);
 
   await resend.emails.send({
     from: FROM,
@@ -52,15 +79,15 @@ export async function sendAccessRequestNotification(
         <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
           <tr>
             <td style="padding:8px 0;color:#71717a;font-size:13px;width:80px;">Name</td>
-            <td style="padding:8px 0;color:#fafafa;font-size:13px;font-weight:500;">${name}</td>
+            <td style="padding:8px 0;color:#fafafa;font-size:13px;font-weight:500;">${safeName}</td>
           </tr>
           <tr>
             <td style="padding:8px 0;color:#71717a;font-size:13px;">Email</td>
-            <td style="padding:8px 0;color:#fafafa;font-size:13px;">${email}</td>
+            <td style="padding:8px 0;color:#fafafa;font-size:13px;">${safeEmail}</td>
           </tr>
           <tr>
             <td style="padding:8px 0;color:#71717a;font-size:13px;vertical-align:top;">Reason</td>
-            <td style="padding:8px 0;color:#fafafa;font-size:13px;line-height:1.5;">${reason}</td>
+            <td style="padding:8px 0;color:#fafafa;font-size:13px;line-height:1.5;">${safeReason}</td>
           </tr>
         </table>
 
@@ -85,7 +112,7 @@ export async function sendApprovalEmail(to: string, name: string, signupUrl: str
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#09090b;color:#fafafa;border-radius:16px;">
         <div style="width:40px;height:40px;background:linear-gradient(135deg,#a855f7,#6366f1);border-radius:10px;margin-bottom:20px;"></div>
-        <h1 style="font-size:20px;font-weight:600;margin:0 0 8px;">You're in, ${name}.</h1>
+        <h1 style="font-size:20px;font-weight:600;margin:0 0 8px;">You're in, ${escapeHtml(name)}.</h1>
         <p style="color:#a1a1aa;margin:0 0 28px;line-height:1.6;">Your access request for ACA has been approved. Click below to create your account — this link expires in 24 hours.</p>
         <a href="${signupUrl}" style="display:inline-block;background:#9333ea;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:500;font-size:14px;">Create my account →</a>
         <p style="color:#3f3f46;font-size:12px;margin-top:32px;">ACA · Neural Speech Analysis</p>
@@ -105,7 +132,7 @@ export async function sendRejectionEmail(to: string, name: string) {
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#09090b;color:#fafafa;border-radius:16px;">
         <div style="width:40px;height:40px;background:linear-gradient(135deg,#a855f7,#6366f1);border-radius:10px;margin-bottom:20px;"></div>
         <h1 style="font-size:20px;font-weight:600;margin:0 0 8px;">Thanks for your interest</h1>
-        <p style="color:#a1a1aa;margin:0 0 16px;line-height:1.6;">Hi ${name}, we reviewed your request for access to ACA but are unable to approve it at this time.</p>
+        <p style="color:#a1a1aa;margin:0 0 16px;line-height:1.6;">Hi ${escapeHtml(name)}, we reviewed your request for access to ACA but are unable to approve it at this time.</p>
         <p style="color:#a1a1aa;margin:0;line-height:1.6;">If you think this was a mistake, you're welcome to submit a new request at <a href="${APP_URL}/request-access" style="color:#a855f7;">${APP_URL}/request-access</a>.</p>
         <p style="color:#3f3f46;font-size:12px;margin-top:32px;">ACA · Neural Speech Analysis</p>
       </div>
