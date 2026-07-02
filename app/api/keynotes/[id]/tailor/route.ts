@@ -69,18 +69,22 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   let tailored = '';
   let changes: string[] = [];
+  let analysis: string[] = [];
   try {
     const completion = await createChatCompletion('gpt-4o', {
-      max_tokens: 2000,
+      max_tokens: 2500,
       temperature: 0.6,
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: prompt }],
     });
     const raw = completion.choices[0]?.message?.content ?? '';
-    const parsed = JSON.parse(raw) as { tailored?: string; changes?: unknown };
+    const parsed = JSON.parse(raw) as { tailored?: string; changes?: unknown; industry_analysis?: unknown };
     tailored = typeof parsed.tailored === 'string' ? parsed.tailored.trim() : '';
     changes = Array.isArray(parsed.changes)
       ? parsed.changes.filter((c): c is string => typeof c === 'string').slice(0, 4)
+      : [];
+    analysis = Array.isArray(parsed.industry_analysis)
+      ? parsed.industry_analysis.filter((a): a is string => typeof a === 'string').slice(0, 5)
       : [];
   } catch (err) {
     console.error('Keynote tailoring failed:', err);
@@ -107,5 +111,5 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     .single();
 
   if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
-  return NextResponse.json({ variant, changes });
+  return NextResponse.json({ variant, changes, industry_analysis: analysis });
 }

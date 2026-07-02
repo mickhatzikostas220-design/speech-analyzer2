@@ -42,8 +42,9 @@ export function KeynoteWorkspace({
   const [audience, setAudience] = useState('');
   const [tailoring, setTailoring] = useState(false);
   const [tailorError, setTailorError] = useState<string | null>(null);
-  // "What I adapted" bullets, per freshly-generated variant (not persisted).
+  // "What I adapted" bullets + industry analysis, per freshly-generated variant (not persisted).
   const [changesById, setChangesById] = useState<Record<string, string[]>>({});
+  const [analysisById, setAnalysisById] = useState<Record<string, string[]>>({});
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -107,8 +108,10 @@ export function KeynoteWorkspace({
       } else {
         const variant = data.variant as KeynoteVariant;
         const changes = Array.isArray(data.changes) ? (data.changes as string[]) : [];
+        const analysis = Array.isArray(data.industry_analysis) ? (data.industry_analysis as string[]) : [];
         setVariants((cur) => [variant, ...cur]);
         setChangesById((cur) => ({ ...cur, [variant.id]: changes }));
+        setAnalysisById((cur) => ({ ...cur, [variant.id]: analysis }));
         setIndustry('');
         setAudience('');
       }
@@ -331,18 +334,33 @@ export function KeynoteWorkspace({
                       {v.tailored_description}
                     </p>
 
-                    {changes && changes.length > 0 && (
-                      <div className="mt-3 rounded-[var(--radius-sm)] bg-[var(--surface-sunk)] px-3 py-2.5">
-                        <p className="mb-1 text-xs font-bold text-strong">What I adapted for {v.industry}</p>
-                        <ul className="space-y-0.5">
-                          {changes.map((c, i) => (
-                            <li key={i} className="text-xs text-muted">
-                              • {c}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    {/* Industry context & adaptation details */}
+                    <div className="mt-4 space-y-2.5">
+                      {analysis && analysis.length > 0 && (
+                        <div className="rounded-[var(--radius-sm)] bg-[var(--surface-sunk)] px-3 py-2.5">
+                          <p className="mb-1 text-xs font-bold text-strong">Industry context that shaped this</p>
+                          <ul className="space-y-0.5">
+                            {analysis.map((a, i) => (
+                              <li key={i} className="text-xs text-muted">
+                                • {a}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {changes && changes.length > 0 && (
+                        <div className="rounded-[var(--radius-sm)] bg-[var(--surface-sunk)] px-3 py-2.5">
+                          <p className="mb-1 text-xs font-bold text-strong">What I adapted for {v.industry}</p>
+                          <ul className="space-y-0.5">
+                            {changes.map((c, i) => (
+                              <li key={i} className="text-xs text-muted">
+                                • {c}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
