@@ -1,6 +1,7 @@
 import type { BrandKit } from './types';
 import { cloneDefaultBrand } from './defaults';
 import { normalizeHex, isNeutral, saturation, readableTextOn, hexToRgb } from './color';
+import { fetchWithSsrfGuard, SsrfError } from '@/lib/ssrf';
 
 /**
  * Auto-extract a brand kit from a speaker's website. Pure server-side:
@@ -34,8 +35,10 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    // SSRF guard: validate the URL (and every redirect hop) resolves to a
+    // public address before fetching. Blocks localhost / private / link-local
+    // (cloud-metadata) targets a signed-in user could otherwise reach.
+    const { response: res, finalUrl: resolvedUrl } = await fetchWithSsrfGuard(url, {
       signal: controller.signal,
       headers: {
         // A normal browser UA — speakers ask us to read their own public
@@ -48,7 +51,7 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
     });
     if (!res.ok) throw new BrandExtractError(`The site responded with ${res.status}.`);
     const reader = res.body?.getReader();
-    if (!reader) return { html: await res.text(), finalUrl: res.url || url };
+    if (!reader) return { html: await res.text(), finalUrl: resolvedUrl || url };
     // Read at most MAX_HTML_BYTES so a huge page can't stall us.
     const chunks: Uint8Array[] = [];
     let total = 0;
@@ -62,9 +65,10 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
     }
     reader.cancel().catch(() => {});
     const html = new TextDecoder('utf-8').decode(concat(chunks));
-    return { html, finalUrl: res.url || url };
+    return { html, finalUrl: resolvedUrl || url };
   } catch (err) {
     if (err instanceof BrandExtractError) throw err;
+    if (err instanceof SsrfError) throw new BrandExtractError(err.message);
     throw new BrandExtractError(
       "Couldn't reach that website. Check the address, or set your brand by hand."
     );

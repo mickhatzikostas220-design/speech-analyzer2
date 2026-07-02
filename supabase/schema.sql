@@ -75,8 +75,10 @@ create policy "Users view own timeline" on engagement_timeline for select using 
 create policy "Service inserts timeline" on engagement_timeline for insert with check (true);
 
 -- Auto-create profile on signup
+-- search_path is pinned so this SECURITY DEFINER function can't be hijacked via
+-- a caller-controlled search_path (Supabase advisor: function_search_path_mutable).
 create or replace function public.handle_new_user()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 begin
   insert into public.profiles (id, email)
   values (new.id, new.email)
