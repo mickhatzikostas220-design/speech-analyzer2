@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { FREE_MONTHLY_ANALYSES } from '@/lib/subscription/plans';
 import { monthlyAnalysisCount } from '@/lib/subscription/usage';
+import { PAYWALLS_ENABLED } from '@/lib/subscription/config';
 import { rateLimit } from '@/lib/rateLimit';
 
 export async function GET() {
@@ -47,7 +48,12 @@ export async function POST(request: NextRequest) {
   // errors for any reason, we let the analysis through rather than block a user
   // (especially a paying one) on an infrastructure hiccup. Only a confirmed
   // free-plan user who is confirmed at/over the limit is stopped.
-  try {
+  //
+  // This is the one paywall that reads profiles.plan directly instead of going
+  // through getUserPlan, so the master switch (lib/subscription/config.ts) is
+  // checked explicitly here: when paywalls are off, the quota is skipped
+  // entirely and analyses are unlimited for everyone.
+  if (PAYWALLS_ENABLED) try {
     const { data: profile, error: planErr } = await supabase
       .from('profiles')
       .select('plan')

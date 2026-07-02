@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Check, ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
-import { getUserPlan } from '@/lib/subscription/server';
+import { getBillingPlan } from '@/lib/subscription/server';
 import { PLANS, PLAN_BY_ID } from '@/lib/subscription/plans';
 import { PlanActions } from '@/components/subscription/PlanActions';
 
@@ -23,7 +23,9 @@ export default async function PlansPage({
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const currentPlan = await getUserPlan(supabase);
+  // Billing display: always show the user's real plan, even while paywalls are
+  // switched off — so this page stays accurate for managing/testing billing.
+  const currentPlan = await getBillingPlan(supabase);
   const justUpgraded = searchParams.upgraded === '1';
 
   return (
