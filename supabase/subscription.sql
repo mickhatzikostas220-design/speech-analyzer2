@@ -21,6 +21,10 @@ create or replace function public.protect_billing_columns()
 returns trigger
 language plpgsql
 security definer
+-- Pin search_path so this SECURITY DEFINER function can't be hijacked by a
+-- caller-controlled search_path resolving objects to a malicious schema
+-- (Supabase advisor: function_search_path_mutable).
+set search_path = public
 as $$
 begin
   if current_user <> 'service_role' and (
