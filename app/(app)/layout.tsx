@@ -9,8 +9,13 @@ export const dynamic = 'force-dynamic';
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const state = await getUserBrandState();
 
+  // Auth gate: every tool in the (app) group is signed-in only. Middleware
+  // normally redirects first, but its path list must name each tool — this
+  // catches any tool the list misses (e.g. a newly added one).
+  if (!state.userId) redirect('/login');
+
   // First-run gate: send un-branded speakers to set up their hub.
-  if (state.userId && !state.onboarded) redirect('/onboarding');
+  if (!state.onboarded) redirect('/onboarding');
 
   const vars = brandToCssVars(state.brand) as CSSProperties;
   const fontHref = brandFontHref(state.brand);

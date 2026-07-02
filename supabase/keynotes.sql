@@ -19,8 +19,9 @@ create index if not exists keynotes_user_idx on keynotes (user_id, created_at de
 
 alter table keynotes enable row level security;
 
+-- (select auth.uid()) evaluates once per statement instead of once per row.
 create policy "Users manage own keynotes" on keynotes
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 -- Industry-tailored versions of a keynote (the "branches"). Deleting the parent
 -- keynote removes its variants via the cascade.
@@ -36,8 +37,10 @@ create table if not exists keynote_variants (
 );
 
 create index if not exists keynote_variants_keynote_idx on keynote_variants (keynote_id, created_at desc);
+-- Covers the user_id foreign key and the RLS filter.
+create index if not exists keynote_variants_user_idx on keynote_variants (user_id);
 
 alter table keynote_variants enable row level security;
 
 create policy "Users manage own keynote variants" on keynote_variants
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
