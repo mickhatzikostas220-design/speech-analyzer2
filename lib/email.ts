@@ -2,20 +2,12 @@ import { Resend } from 'resend';
 import { signToken } from './adminToken';
 
 const FROM = 'ACA <onboarding@resend.dev>';
-// Sender for user-facing transactional email (verification codes). Override
-// EMAIL_FROM with a verified domain in production — the resend.dev test sender
-// only delivers to the Resend account owner, so real signups won't receive it.
 const VERIFY_FROM = process.env.EMAIL_FROM ?? 'Speaker Hub <onboarding@resend.dev>';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3002';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'mickhatzikostas220@gmail.com';
 
-/**
- * Send a 6-digit account-verification code, branded to the Speaker Hub theme.
- * We generate the code ourselves (Supabase admin generateLink) and deliver it
- * through Resend, because Supabase's built-in confirmation email is heavily
- * rate-limited and unreliable in production.
- */
 export async function sendVerificationCode(to: string, code: string) {
+  if (!process.env.RESEND_API_KEY) return;
   const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
     from: VERIFY_FROM,
@@ -40,6 +32,7 @@ export async function sendAccessRequestNotification(
   email: string,
   reason: string
 ) {
+  if (!process.env.RESEND_API_KEY) return;
   const resend = new Resend(process.env.RESEND_API_KEY);
   const approveToken = signToken(requestId, 'approve');
   const denyToken    = signToken(requestId, 'deny');
@@ -83,6 +76,7 @@ export async function sendAccessRequestNotification(
 }
 
 export async function sendApprovalEmail(to: string, name: string, signupUrl: string) {
+  if (!process.env.RESEND_API_KEY) return;
   const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
     from: FROM,
@@ -101,6 +95,7 @@ export async function sendApprovalEmail(to: string, name: string, signupUrl: str
 }
 
 export async function sendRejectionEmail(to: string, name: string) {
+  if (!process.env.RESEND_API_KEY) return;
   const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
     from: FROM,
