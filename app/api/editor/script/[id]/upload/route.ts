@@ -15,8 +15,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const file = formData.get('file') as File | null;
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
 
+    // Both params.id and the extension end up in the storage key — constrain
+    // them so crafted values can't introduce path separators or traversal.
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(params.id)) {
+      return NextResponse.json({ error: 'Invalid project id' }, { status: 400 });
+    }
     const clipId = randomUUID();
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'mp4';
+    const ext =
+      (file.name.split('.').pop() ?? '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10) ||
+      'mp4';
     const path = `${user.id}/script/${params.id}/${clipId}.${ext}`;
 
     const arrayBuffer = await file.arrayBuffer();

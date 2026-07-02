@@ -35,18 +35,35 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
   const [connected, setConnected] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const kicked = useRef(false);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/clipflow/${params.id}`);
-    if (res.status === 404) {
-      setNotFound(true);
+    try {
+      const res = await fetch(`/api/clipflow/${params.id}`);
+      if (res.status === 404) {
+        setNotFound(true);
+        setLoading(false);
+        return null;
+      }
+      if (!res.ok) {
+        // Don't set a malformed project (the render would crash on project.clips)
+        // or leave the page stuck on the loading skeleton.
+        setLoadError(true);
+        setLoading(false);
+        return null;
+      }
+      const data = await res.json();
+      setProject(data);
+      setLoadError(false);
+      setLoading(false);
+      return data as Project;
+    } catch {
+      // Network error — offer a retry instead of hanging on the spinner forever.
+      setLoadError(true);
+      setLoading(false);
       return null;
     }
-    const data = await res.json();
-    setProject(data);
-    setLoading(false);
-    return data as Project;
   }, [params.id]);
 
   // Initial load + load connections.
@@ -91,6 +108,21 @@ export default function ClipFlowProjectPage({ params }: { params: { id: string }
         <Link href="/clipflow" className="mt-2 inline-block text-sm" style={{ color: 'var(--text-link)' }}>
           ← Back to ClipFlow
         </Link>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-20 text-center">
+        <p className="text-sm text-muted">We couldn&apos;t load this project. Check your connection and try again.</p>
+        <button
+          onClick={() => { setLoadError(false); setLoading(true); load(); }}
+          className="mt-3 inline-block text-sm font-semibold"
+          style={{ color: 'var(--text-link)' }}
+        >
+          Retry
+        </button>
       </div>
     );
   }

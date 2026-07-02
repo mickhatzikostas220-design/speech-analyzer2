@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { UploadZone } from '@/components/UploadZone';
 import { AnalysisCard } from '@/components/AnalysisCard';
@@ -10,16 +10,21 @@ export function DashboardHome() {
   const router = useRouter();
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setLoadError(false);
     fetch('/api/analyses')
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((data) => {
         setAnalyses(Array.isArray(data) ? data.slice(0, 5) : []);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => { setLoadError(true); setLoading(false); });
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   return (
     <div className="space-y-12">
@@ -61,9 +66,18 @@ export function DashboardHome() {
         </section>
       )}
 
-      {!loading && analyses.length === 0 && (
+      {!loading && !loadError && analyses.length === 0 && (
         <p className="py-4 text-center text-sm text-faint">
           No talks yet — upload your first one above.
+        </p>
+      )}
+
+      {!loading && loadError && (
+        <p className="py-4 text-center text-sm text-faint">
+          Couldn&apos;t load your recent talks.{' '}
+          <button onClick={load} className="font-semibold" style={{ color: 'var(--text-link)' }}>
+            Retry
+          </button>
         </p>
       )}
     </div>

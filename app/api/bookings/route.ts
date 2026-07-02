@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getBookings } from '@/lib/bookings/server';
 import { BOOKING_STATUSES, type BookingStatus } from '@/lib/bookings/types';
+import { requirePlan } from '@/lib/subscription/requirePlan';
 
 export const runtime = 'nodejs';
 
@@ -22,6 +23,9 @@ export async function POST(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
+
+  const gate = await requirePlan(supabase, 'core');
+  if (gate) return gate;
 
   let b: Record<string, unknown> = {};
   try {

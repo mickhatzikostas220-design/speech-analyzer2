@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requirePlan } from '@/lib/subscription/requirePlan';
 import { mergeBrand } from '@/lib/brand/theme';
 import { slugify } from '@/lib/onesheet/server';
 import type { OneSheet } from '@/lib/brand/types';
@@ -26,6 +27,9 @@ export async function PUT(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
+
+  const gate = await requirePlan(supabase, 'core');
+  if (gate) return gate;
 
   let body: { slug?: string; oneSheet?: OneSheet } = {};
   try {

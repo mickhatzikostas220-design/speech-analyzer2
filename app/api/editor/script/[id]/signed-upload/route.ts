@@ -15,8 +15,17 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const { fileName } = rawText ? JSON.parse(rawText) : {};
     if (!fileName) return NextResponse.json({ error: 'fileName required' }, { status: 400 });
 
+    // Both params.id and the extension end up in the storage key — constrain
+    // them so crafted values can't introduce path separators or traversal.
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(params.id)) {
+      return NextResponse.json({ error: 'Invalid project id' }, { status: 400 });
+    }
     const clipId = randomUUID();
-    const ext = String(fileName).split('.').pop() || 'mp4';
+    const ext =
+      (String(fileName).split('.').pop() ?? '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 10) || 'mp4';
     const path = `${user.id}/script/${params.id}/${clipId}.${ext}`;
 
     const admin = createAdminClient();

@@ -34,15 +34,33 @@ export async function POST(request: NextRequest) {
 
   const adminSupabase = createAdminClient();
 
-  // Look up the user by email in auth.users
-  const { data: listData, error: listError } = await adminSupabase.auth.admin.listUsers();
-  if (listError) {
-    return NextResponse.json({ error: listError.message }, { status: 500 });
+  // Look up the user by email. Check profiles first (indexed, no pagination),
+  // then fall back to paging through auth.users — a bare listUsers() only
+  // returns the first page (~50 users), which silently misses existing users
+  // once the app grows past that.
+  let authUserId: string | null = null;
+  const { data: profileRow } = await adminSupabase
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+  authUserId = (profileRow as { id?: string } | null)?.id ?? null;
+
+  if (!authUserId) {
+    for (let page = 1; page <= 20 && !authUserId; page++) {
+      const { data: listData, error: listError } = await adminSupabase.auth.admin.listUsers({
+        page,
+        perPage: 200,
+      });
+      if (listError) {
+        return NextResponse.json({ error: listError.message }, { status: 500 });
+      }
+      authUserId = listData.users.find((u) => u.email?.toLowerCase() === email)?.id ?? null;
+      if (listData.users.length < 200) break; // last page
+    }
   }
 
-  const authUser = listData.users.find((u) => u.email?.toLowerCase() === email);
-
-  if (!authUser) {
+  if (!authUserId) {
     // User doesn't have an account yet — invite them so they can sign up,
     // then upsert a profile row with the requested plan so it takes effect
     // as soon as they complete sign-up (the handle_new_user trigger will
@@ -79,7 +97,7 @@ export async function POST(request: NextRequest) {
   // User exists — update their profile plan directly via service role.
   const { error: updateError } = await adminSupabase
     .from('profiles')
-    .upsert({ id: authUser.id, email, plan }, { onConflict: 'id' });
+    .upsert({ id: authUserId, email, plan }, { onConflict: 'id' });
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });

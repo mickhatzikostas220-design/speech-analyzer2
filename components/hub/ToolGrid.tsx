@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
   type LucideIcon,
 } from 'lucide-react';
+import { planRank, type PlanId } from '@/lib/subscription/plans';
 
 interface Tool {
   icon: LucideIcon;
@@ -22,10 +23,20 @@ interface Tool {
   bg: string;
   fg: string;
   count?: string;
+  /** Minimum plan required to use the tool (omit for free tools). */
+  tier?: PlanId;
 }
 
 /** Only tools that map to real, working features today. */
-export function ToolGrid({ analysisCount, bookingCount = 0 }: { analysisCount: number; bookingCount?: number }) {
+export function ToolGrid({
+  analysisCount,
+  bookingCount = 0,
+  plan = 'free',
+}: {
+  analysisCount: number;
+  bookingCount?: number;
+  plan?: PlanId;
+}) {
   const tools: Tool[] = [
     {
       icon: Mic,
@@ -43,6 +54,7 @@ export function ToolGrid({ analysisCount, bookingCount = 0 }: { analysisCount: n
       href: '/agent',
       bg: 'var(--accent-2)',
       fg: '#fff',
+      tier: 'full',
     },
     {
       icon: Inbox,
@@ -52,6 +64,7 @@ export function ToolGrid({ analysisCount, bookingCount = 0 }: { analysisCount: n
       bg: 'var(--success)',
       fg: '#fff',
       count: bookingCount > 0 ? `${bookingCount} new` : undefined,
+      tier: 'core',
     },
     {
       icon: PenLine,
@@ -60,6 +73,7 @@ export function ToolGrid({ analysisCount, bookingCount = 0 }: { analysisCount: n
       href: '/editor/script',
       bg: 'var(--red)',
       fg: '#fff',
+      tier: 'core',
     },
     {
       icon: Clapperboard,
@@ -68,6 +82,7 @@ export function ToolGrid({ analysisCount, bookingCount = 0 }: { analysisCount: n
       href: '/editor',
       bg: 'var(--blue)',
       fg: '#fff',
+      tier: 'core',
     },
     {
       icon: GitCompareArrows,
@@ -127,7 +142,14 @@ export function ToolGrid({ analysisCount, bookingCount = 0 }: { analysisCount: n
           >
             <t.icon className="h-6 w-6" strokeWidth={2.25} />
           </span>
-          <h3 className="text-lg font-extrabold text-strong">{t.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-extrabold text-strong">{t.name}</h3>
+            {t.tier && planRank(t.tier) > planRank(plan) && (
+              <span className="rounded-[var(--radius-pill)] border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-faint">
+                {t.tier === 'full' ? 'Full' : 'Core'}
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-sm text-muted">{t.desc}</p>
           {t.count && (
             <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-faint">

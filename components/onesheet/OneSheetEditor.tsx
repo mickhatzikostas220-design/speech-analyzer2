@@ -10,6 +10,7 @@ function slugify(s: string) {
 
 export function OneSheetEditor() {
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [slug, setSlug] = useState('');
   const [name, setName] = useState('');
   const [os, setOs] = useState<OneSheet>({ topics: [], testimonials: [] });
@@ -20,14 +21,16 @@ export function OneSheetEditor() {
   useEffect(() => {
     setOrigin(window.location.origin);
     fetch('/api/onesheet')
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error('load failed'); return r.json(); })
       .then((d) => {
         setName(d.name || '');
         setSlug(d.slug || slugify(d.name || ''));
         setOs({ topics: [], testimonials: [], ...(d.oneSheet || {}) });
         setLoaded(true);
       })
-      .catch(() => setLoaded(true));
+      // Don't silently show an empty editor on failure — the user could save it
+      // and overwrite their real published one-sheet with blanks.
+      .catch(() => { setLoadError(true); setLoaded(true); });
   }, []);
 
   function patch(p: Partial<OneSheet>) {
@@ -65,6 +68,24 @@ export function OneSheetEditor() {
   const publicUrl = slug ? `${origin}/s/${slug}` : '';
 
   if (!loaded) return <p className="text-sm text-muted">Loading…</p>;
+
+  if (loadError) {
+    return (
+      <div className="card p-6 text-center">
+        <p className="mx-auto max-w-md text-sm text-muted">
+          We couldn&apos;t load your one-sheet. To avoid overwriting your published page with blanks,
+          editing is paused — please reload and try again.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-3 inline-block text-sm font-semibold"
+          style={{ color: 'var(--text-link)' }}
+        >
+          Reload
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

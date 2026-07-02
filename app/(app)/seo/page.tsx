@@ -34,12 +34,17 @@ function TipCard({ tip, canSave }: { tip: TipItem; canSave: boolean }) {
   async function save() {
     setState('saving');
     const body = [tip.detail, '', ...tip.steps.map((s, i) => `${i + 1}. ${s}`)].join('\n');
-    const res = await fetch('/api/tips', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source: 'seo', title: tip.title, body, scheduled_for: date || null }),
-    });
-    setState(res.ok ? 'saved' : 'idle');
+    try {
+      const res = await fetch('/api/tips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 'seo', title: tip.title, body, scheduled_for: date || null }),
+      });
+      setState(res.ok ? 'saved' : 'idle');
+    } catch {
+      // Network error — don't leave the button stuck on "Saving…".
+      setState('idle');
+    }
   }
 
   return (

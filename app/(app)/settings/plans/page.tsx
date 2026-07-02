@@ -1,6 +1,7 @@
 // Plans & billing — presents the three subscription tiers and the user's
-// current plan. Online checkout (Stripe) isn't wired yet, so upgrades route to
-// support via email; once Stripe is connected, swap the CTA for a checkout link.
+// current plan. Upgrades start Stripe Checkout (PlanActions → /api/subscription/checkout,
+// applied via webhook). Until the Stripe keys are set, that route returns a clear
+// "billing not configured" message, so the CTA degrades gracefully.
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Check, ArrowLeft } from 'lucide-react';

@@ -81,7 +81,14 @@ export function UploadZone({ onAnalysisCreated }: Props) {
         }),
       });
 
-      if (!createRes.ok) throw new Error('Failed to create analysis record.');
+      if (!createRes.ok) {
+        const data = await createRes.json().catch(() => ({}));
+        // The file is already in storage but no row will reference it (rejected by
+        // the free-tier quota, the rate limiter, or a server error) — remove it so
+        // a blocked upload doesn't leave an orphaned file behind.
+        await supabase.storage.from('speeches').remove([filePath]).catch(() => {});
+        throw new Error(data.error || 'Failed to create analysis record.');
+      }
       const { id } = await createRes.json();
       setProgress(80);
 

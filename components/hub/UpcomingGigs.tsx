@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CalendarPlus, Link2, X, Trash2, MapPin, CalendarDays } from 'lucide-react';
 import type { Gig, GigStatus } from '@/lib/gigs/types';
 
@@ -32,10 +32,13 @@ export function UpcomingGigs({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Gig | null>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Close the delete-confirmation modal on Escape — standard a11y expectation.
+  // Close the delete-confirmation modal on Escape, and move focus onto Cancel
+  // when it opens — standard a11y for a destructive dialog.
   useEffect(() => {
     if (!deleteTarget) return;
+    cancelBtnRef.current?.focus();
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') setDeleteTarget(null);
     }
@@ -133,10 +136,14 @@ export function UpcomingGigs({
 
   async function disconnectCalendar() {
     setBusy(true);
+    setMsg('');
     try {
-      await fetch('/api/gigs/calendar', { method: 'DELETE' });
+      const res = await fetch('/api/gigs/calendar', { method: 'DELETE' });
+      if (!res.ok) { setMsg('Could not disconnect. Try again.'); return; }
       setIcsUrl('');
       await refresh();
+    } catch {
+      setMsg('Could not disconnect. Try again.');
     } finally {
       setBusy(false);
     }
@@ -148,7 +155,8 @@ export function UpcomingGigs({
     setDeleteTarget(null);
     setGigs((g) => g.filter((x) => x.id !== target.id));
     try {
-      await fetch(`/api/gigs/${target.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/gigs/${target.id}`, { method: 'DELETE' });
+      if (!res.ok) refresh(); // server rejected the delete — restore the gig
     } catch {
       refresh();
     }
@@ -304,7 +312,7 @@ export function UpcomingGigs({
               >
                 Remove
               </button>
-              <button onClick={() => setDeleteTarget(null)} className="btn-outline flex-1 text-sm">
+              <button ref={cancelBtnRef} onClick={() => setDeleteTarget(null)} className="btn-outline flex-1 text-sm">
                 Cancel
               </button>
             </div>

@@ -1,13 +1,40 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { sendAccessRequestNotification } from '@/lib/email';
+import { rateLimit, clientIp } from '@/lib/rateLimit';
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { name, email, reason } = body;
+  // Public, unauthenticated write endpoint that also emails the admin — cap it
+  // so a bot can't flood the access_requests table / the admin inbox.
+  const limit = rateLimit(`request-access:${clientIp(request)}`, 3, 10 * 60 * 1000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again in a few minutes.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
+    );
+  }
 
-  if (!name?.trim() || !email?.trim() || !reason?.trim()) {
+  let body: { name?: unknown; email?: unknown; reason?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  }
+
+  // Trim + cap lengths so unbounded input can't bloat the table or the email.
+  const str = (v: unknown, max: number) =>
+    typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : '';
+  const name = str(body.name, 120);
+  const email = str(body.email, 200);
+  const reason = str(body.reason, 2000);
+
+  if (!name || !email || !reason) {
     return NextResponse.json({ error: 'All fields are required.' }, { status: 400 });
+  }
+  if (!EMAIL_RE.test(email)) {
+    return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
   }
 
   const adminSupabase = createAdminClient();

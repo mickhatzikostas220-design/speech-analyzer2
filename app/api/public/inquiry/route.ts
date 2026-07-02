@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getProfileBySlug } from '@/lib/onesheet/server';
+import { rateLimit, clientIp } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 
@@ -20,6 +21,17 @@ export async function POST(req: NextRequest) {
   // Honeypot — silently accept bot submissions without storing them.
   if (typeof b.website === 'string' && b.website.trim()) {
     return NextResponse.json({ ok: true });
+  }
+
+  // Rate-limit by client IP. This is a public, unauthenticated write endpoint, so
+  // cap submissions to keep a speaker's Booking Inbox from being flooded with spam
+  // (a bot that skips the honeypot above). Best-effort per-instance in-memory cap.
+  const rl = rateLimit(`inquiry:${clientIp(req)}`, 5, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'Too many requests — please try again in a minute.' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+    );
   }
 
   const str = (v: unknown, max = 2000) =>

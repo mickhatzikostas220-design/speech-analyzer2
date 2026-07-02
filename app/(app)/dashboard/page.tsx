@@ -9,6 +9,10 @@ import { RecentActivity } from '@/components/hub/RecentActivity';
 import { StatTiles, type Stat } from '@/components/hub/StatTiles';
 import { UpcomingGigs } from '@/components/hub/UpcomingGigs';
 import { TipCard } from '@/components/hub/TipCard';
+import { getUserPlan } from '@/lib/subscription/server';
+import { monthlyAnalysisCount } from '@/lib/subscription/usage';
+import { FREE_MONTHLY_ANALYSES } from '@/lib/subscription/plans';
+import { FreeQuotaBanner } from '@/components/subscription/FreeQuotaBanner';
 import type { Analysis } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -66,6 +70,11 @@ export default async function HubPage() {
 
   const first = (brand.name || 'there').split(' ')[0];
 
+  // Surface the free-plan monthly quota on the hub so free users see it where
+  // they land (not only on the analyzer). Null-safe / fails open.
+  const plan = await getUserPlan(supabase);
+  const freeUsed = plan === 'free' && userId ? await monthlyAnalysisCount(supabase, userId) : null;
+
   return (
     <div className="mx-auto max-w-5xl px-4 pb-20 pt-10 sm:px-6">
       {/* hero */}
@@ -88,9 +97,15 @@ export default async function HubPage() {
         </Link>
       </div>
 
+      {plan === 'free' && freeUsed !== null && (
+        <div className="mt-6">
+          <FreeQuotaBanner used={freeUsed} limit={FREE_MONTHLY_ANALYSES} />
+        </div>
+      )}
+
       {/* tools */}
       <h2 className="eyebrow mb-4 mt-9">Your tools</h2>
-      <ToolGrid analysisCount={totalTalks} bookingCount={newInquiries} />
+      <ToolGrid analysisCount={totalTalks} bookingCount={newInquiries} plan={plan} />
 
       {/* two columns */}
       <div className="mt-9 grid gap-6 lg:grid-cols-[1fr_360px]">
