@@ -22,6 +22,14 @@ const nextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
+  webpack: (config) => {
+    // pdf.js (used by the Keynote Tailoring tool to read uploaded PDFs in the
+    // browser) has an optional Node-only dependency on `canvas` that it never
+    // needs for text extraction. Alias it to false so webpack doesn't try to
+    // bundle it, which would otherwise break the build.
+    config.resolve.alias = { ...config.resolve.alias, canvas: false };
+    return config;
+  },
 };
 
 module.exports = nextConfig;

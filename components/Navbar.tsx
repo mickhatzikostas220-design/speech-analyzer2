@@ -14,6 +14,7 @@ const NAV_ITEMS: Array<[string, string]> = [
   ['/bookings', 'Bookings'],
   ['/history', 'Library'],
   ['/editor', 'Studio'],
+  ['/keynotes', 'Keynotes'],
   ['/clipflow', 'ClipFlow'],
 ];
 
