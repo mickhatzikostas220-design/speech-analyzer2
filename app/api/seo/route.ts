@@ -8,6 +8,7 @@ import { getUserPlan } from '@/lib/subscription/server';
 import { isPlatform, platformLabel } from '@/lib/seo/platforms';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
 import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
+import { isBlockedHost } from '@/lib/ssrf';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const SEVERITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -23,16 +24,6 @@ export const maxDuration = 60;
 
 const FETCH_TIMEOUT_MS = 9000;
 const MAX_HTML_BYTES = 700_000;
-
-// Block obvious SSRF targets (localhost, link-local, private ranges).
-function isBlockedHost(host: string): boolean {
-  const h = host.toLowerCase();
-  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
-  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
-  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd')) return true;
-  return false;
-}
 
 async function fetchHtml(url: string): Promise<string> {
   const controller = new AbortController();

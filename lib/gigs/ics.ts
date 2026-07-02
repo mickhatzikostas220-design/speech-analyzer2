@@ -6,6 +6,8 @@
  * Best-effort: returns [] on any fetch/parse failure so the hub never
  * breaks on a bad feed.
  */
+import { isBlockedHost } from '../ssrf';
+
 export interface IcsEvent {
   title: string;
   location?: string;
@@ -81,6 +83,12 @@ export function parseIcs(raw: string): IcsEvent[] {
 export async function fetchIcsEvents(url: string): Promise<IcsEvent[]> {
   const httpUrl = normalizeIcsUrl(url);
   if (!/^https?:\/\//i.test(httpUrl)) return [];
+  // SSRF guard: never fetch internal/private hosts from a user-supplied feed.
+  try {
+    if (isBlockedHost(new URL(httpUrl).hostname)) return [];
+  } catch {
+    return [];
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9000);
   try {
