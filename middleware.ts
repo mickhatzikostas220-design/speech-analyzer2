@@ -28,7 +28,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isAuthPath = path.startsWith('/login') || path.startsWith('/signup') || path.startsWith('/verify-email');
+  const isAuthPath = path.startsWith('/login') || path.startsWith('/signup') || path.startsWith('/verify-email') || path.startsWith('/forgot-password');
   const isAppPath = path.startsWith('/dashboard') || path.startsWith('/analysis') || path.startsWith('/analyze') || path.startsWith('/history') || path.startsWith('/admin') || path.startsWith('/editor') || path.startsWith('/compare') || path.startsWith('/onboarding') || path.startsWith('/settings') || path.startsWith('/agent') || path.startsWith('/bookings') || path.startsWith('/clipflow') || path.startsWith('/tips') || path.startsWith('/seo');
 
   if (!user && isAppPath) {

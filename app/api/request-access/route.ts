@@ -1,13 +1,37 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { sendAccessRequestNotification } from '@/lib/email';
+import { rateLimit, clientIp } from '@/lib/rateLimit';
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { name, email, reason } = body;
+  // Public endpoint that writes a row and emails the admin — cap attempts the
+  // same way signup/resend do to curb spam.
+  const limit = rateLimit(`request-access:${clientIp(request)}`, 3, 10 * 60 * 1000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again in a few minutes.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
+    );
+  }
 
-  if (!name?.trim() || !email?.trim() || !reason?.trim()) {
+  let body: { name?: unknown; email?: unknown; reason?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  }
+
+  const name = typeof body.name === 'string' ? body.name.slice(0, 120) : '';
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 200) : '';
+  const reason = typeof body.reason === 'string' ? body.reason.slice(0, 2000) : '';
+
+  if (!name || !email || !reason) {
     return NextResponse.json({ error: 'All fields are required.' }, { status: 400 });
+  }
+  if (!EMAIL_RE.test(email)) {
+    return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
   }
 
   const adminSupabase = createAdminClient();
@@ -15,7 +39,7 @@ export async function POST(request: NextRequest) {
   const { data: existing } = await adminSupabase
     .from('access_requests')
     .select('status')
-    .eq('email', email.toLowerCase().trim())
+    .eq('email', email)
     .in('status', ['pending', 'approved'])
     .maybeSingle();
 
@@ -28,7 +52,7 @@ export async function POST(request: NextRequest) {
 
   const { data: inserted, error } = await adminSupabase
     .from('access_requests')
-    .insert({ name: name.trim(), email: email.toLowerCase().trim(), reason: reason.trim() })
+    .insert({ name, email, reason })
     .select('id')
     .single();
 
@@ -38,7 +62,7 @@ export async function POST(request: NextRequest) {
 
   if (process.env.RESEND_API_KEY) {
     try {
-      await sendAccessRequestNotification(inserted.id, name.trim(), email.toLowerCase().trim(), reason.trim());
+      await sendAccessRequestNotification(inserted.id, name, email, reason);
     } catch (emailErr) {
       console.error('Admin notification email failed:', emailErr);
     }
