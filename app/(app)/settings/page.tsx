@@ -3,12 +3,19 @@ import { redirect } from 'next/navigation';
 import { ArrowUpRight } from 'lucide-react';
 import { getUserBrandState } from '@/lib/brand/server';
 import { BrandSettings } from '@/components/brand/BrandSettings';
+import { createClient } from '@/lib/supabase/server';
+import { getUserPlan } from '@/lib/subscription/server';
+import { planRank } from '@/lib/subscription/plans';
+import { UpgradeWall } from '@/components/subscription/UpgradeWall';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
   const state = await getUserBrandState();
   if (!state.userId) redirect('/login');
+
+  const plan = await getUserPlan(createClient());
+  const canBrand = planRank(plan) >= planRank('core');
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -57,7 +64,11 @@ export default async function SettingsPage() {
         <ArrowUpRight className="h-5 w-5 shrink-0 text-muted" />
       </Link>
 
-      <BrandSettings initialBrand={state.brand} />
+      {canBrand ? (
+        <BrandSettings initialBrand={state.brand} />
+      ) : (
+        <UpgradeWall required="core" feature="Brand Kit personalization" />
+      )}
     </div>
   );
 }

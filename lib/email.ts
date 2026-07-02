@@ -16,6 +16,7 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'mickhatzikostas220@gmail.com';
  * rate-limited and unreliable in production.
  */
 export async function sendVerificationCode(to: string, code: string) {
+  if (!process.env.RESEND_API_KEY) return;
   const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
     from: VERIFY_FROM,
@@ -40,6 +41,7 @@ export async function sendAccessRequestNotification(
   email: string,
   reason: string
 ) {
+  if (!process.env.RESEND_API_KEY) return;
   const resend = new Resend(process.env.RESEND_API_KEY);
   const approveToken = signToken(requestId, 'approve');
   const denyToken    = signToken(requestId, 'deny');
@@ -83,6 +85,7 @@ export async function sendAccessRequestNotification(
 }
 
 export async function sendApprovalEmail(to: string, name: string, signupUrl: string) {
+  if (!process.env.RESEND_API_KEY) return;
   const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
     from: FROM,
@@ -101,6 +104,7 @@ export async function sendApprovalEmail(to: string, name: string, signupUrl: str
 }
 
 export async function sendRejectionEmail(to: string, name: string) {
+  if (!process.env.RESEND_API_KEY) return;
   const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
     from: FROM,

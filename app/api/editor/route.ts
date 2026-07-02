@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requirePlan } from '@/lib/subscription/requirePlan';
 import { randomUUID } from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -31,6 +32,9 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
     if (authErr) return NextResponse.json({ error: `Auth: ${authErr.message}` }, { status: 401 });
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const gate = await requirePlan(supabase, 'core');
+    if (gate) return gate;
 
     let title: string | undefined;
     try {

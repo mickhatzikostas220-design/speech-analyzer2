@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CLIP_LENGTHS, CLIP_LENGTH_LABELS, type ClipLength } from '@/lib/clipflow/types';
@@ -56,6 +56,8 @@ export default function ClipFlowPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProjectSummary | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
 
   // Clip preferences — what kind of clips the user is looking for.
   const [showPrefs, setShowPrefs] = useState(false);
@@ -64,10 +66,11 @@ export default function ClipFlowPage() {
   const [notes, setNotes] = useState('');
 
   function load() {
+    setLoadError(false);
     fetch('/api/clipflow')
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((data) => setProjects(Array.isArray(data) ? data : []))
-      .catch(() => {})
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }
 
@@ -75,9 +78,12 @@ export default function ClipFlowPage() {
     load();
   }, []);
 
-  // Close the delete-confirmation modal on Escape — standard a11y expectation.
+  // Close the delete-confirmation modal on Escape, and move focus onto Cancel
+  // when it opens — standard a11y for a destructive dialog, so keyboard/screen-
+  // reader users aren't left focused on the page behind it.
   useEffect(() => {
     if (!deleteTarget) return;
+    cancelBtnRef.current?.focus();
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') setDeleteTarget(null);
     }
@@ -276,6 +282,13 @@ export default function ClipFlowPage() {
               <div key={i} className="h-24 animate-pulse rounded-[var(--radius-md)] bg-[var(--surface-sunk)]" />
             ))}
           </div>
+        ) : loadError ? (
+          <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)] py-16 text-center">
+            <p className="text-sm text-muted">We couldn&apos;t load your videos. Check your connection and try again.</p>
+            <button onClick={() => { setLoading(true); load(); }} className="mt-3 text-sm font-semibold" style={{ color: 'var(--text-link)' }}>
+              Retry
+            </button>
+          </div>
         ) : projects.length === 0 ? (
           <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)] py-16 text-center">
             <svg className="mx-auto mb-3 h-10 w-10 text-[var(--ink-300)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -349,7 +362,7 @@ export default function ClipFlowPage() {
               >
                 Delete
               </button>
-              <button onClick={() => setDeleteTarget(null)} className="btn-outline flex-1 text-sm">
+              <button ref={cancelBtnRef} onClick={() => setDeleteTarget(null)} className="btn-outline flex-1 text-sm">
                 Cancel
               </button>
             </div>

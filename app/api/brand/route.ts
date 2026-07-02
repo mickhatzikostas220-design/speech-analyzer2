@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requirePlan } from '@/lib/subscription/requirePlan';
 import { getUserBrandState } from '@/lib/brand/server';
 import { mergeBrand } from '@/lib/brand/theme';
 import { generateGreeting } from '@/lib/brand/greeting';
@@ -30,6 +31,13 @@ export async function PUT(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  }
+
+  // Brand editing is Core Premium. Onboarding (which sets a new speaker's initial
+  // brand + name) must work on the free plan, so only gate non-onboarding saves.
+  if (!body.onboard) {
+    const gate = await requirePlan(supabase, 'core');
+    if (gate) return gate;
   }
 
   const brand = mergeBrand(body.brand);

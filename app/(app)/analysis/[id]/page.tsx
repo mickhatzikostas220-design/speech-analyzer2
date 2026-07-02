@@ -35,6 +35,15 @@ function formatMs(ms: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+// A quick, non-judgmental read on speaking pace. Public-speaking norm is roughly
+// 130–150 wpm; this lets a speaker see at a glance whether they rushed.
+function paceLabel(wpm: number): string {
+  if (wpm < 110) return 'measured pace';
+  if (wpm <= 150) return 'conversational pace';
+  if (wpm <= 180) return 'energetic pace';
+  return 'fast pace';
+}
+
 function ScorePill({ label, value, description, color }: { label: string; value: number; description: string; color: string }) {
   return (
     <div className="card p-4 flex-1 min-w-0">
@@ -65,8 +74,11 @@ export default function AnalysisPage() {
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [nowTs, setNowTs] = useState(() => Date.now());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
 
   const fetchDetail = useCallback(async () => {
     const res = await fetch(`/api/analyses/${id}`);
@@ -78,21 +90,52 @@ export default function AnalysisPage() {
     }
   }, [id]);
 
-  useEffect(() => {
-    fetchDetail();
-    pollRef.current = setInterval(fetchDetail, POLL_INTERVAL);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  // Poll for status, but skip ticks while the tab is backgrounded — a talk can
+  // process for 10–20 minutes, and there's no reason to hammer the API when
+  // nobody is looking. The visibility listener below refreshes the instant the
+  // tab is focused again, so returning users still see fresh data immediately.
+  const startPoll = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchDetail();
+    }, POLL_INTERVAL);
   }, [fetchDetail]);
 
-  // Close the delete-confirmation modal on Escape — standard a11y expectation.
+  useEffect(() => {
+    fetchDetail();
+    startPoll();
+    function onVisible() { if (!document.hidden) fetchDetail(); }
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [fetchDetail, startPoll]);
+
+  // Close the delete-confirmation modal on Escape, and move focus into it when it
+  // opens (onto Cancel — the safe default for a destructive dialog). Both are
+  // standard a11y expectations for a modal; without the focus move, keyboard and
+  // screen-reader users are left focused on the page behind the dialog.
   useEffect(() => {
     if (!showDeleteConfirm) return;
+    cancelBtnRef.current?.focus();
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') setShowDeleteConfirm(false);
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [showDeleteConfirm]);
+
+  // While the analysis is still running, tick a clock every second so the
+  // processing screen can show live elapsed time. A 10–20 minute wait behind a
+  // frozen spinner reads as "hung"; a moving timer shows it's actually working.
+  useEffect(() => {
+    const status = detail?.analysis.status;
+    if (status !== 'pending' && status !== 'processing') return;
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [detail?.analysis.status]);
 
   async function handleDelete() {
     setDeleting(true);
@@ -119,9 +162,8 @@ export default function AnalysisPage() {
     setRetryError(null);
     const res = await fetch(`/api/analyses/${id}/process`, { method: 'POST' });
     if (res.ok) {
-      if (pollRef.current) clearInterval(pollRef.current);
       await fetchDetail();
-      pollRef.current = setInterval(fetchDetail, POLL_INTERVAL);
+      startPoll();
     } else {
       const body = await res.json().catch(() => ({}));
       setRetryError(body.error ?? 'Retry failed. Please try again.');
@@ -133,30 +175,32 @@ export default function AnalysisPage() {
     window.open(`/api/analyses/${id}/export?format=${format}`, '_blank');
   }
 
-  async function sendChat(e: React.FormEvent) {
-    e.preventDefault();
-    if (!chatInput.trim() || chatLoading) return;
-
-    const userMsg = { role: 'user' as const, content: chatInput.trim() };
-    const newMessages = [...chatMessages, userMsg];
-    setChatMessages(newMessages);
-    setChatInput('');
+  // Sends the given thread and streams the reply. Shared by the input form and
+  // the error-banner Retry button. On failure it surfaces a real error banner
+  // rather than injecting a fake assistant turn — a polluted thread would get
+  // replayed as context on the next question.
+  const streamChat = useCallback(async (messages: { role: 'user' | 'assistant'; content: string }[]) => {
+    setChatError(null);
     setChatLoading(true);
-
+    let addedBubble = false;
     try {
       const res = await fetch(`/api/analyses/${id}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({ messages }),
       });
 
-      if (!res.ok || !res.body) throw new Error('Failed');
+      if (!res.ok || !res.body) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'The assistant is unavailable right now.');
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let assistantText = '';
 
       setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+      addedBubble = true;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -165,11 +209,26 @@ export default function AnalysisPage() {
         setChatMessages(prev => [...prev.slice(0, -1), { role: 'assistant', content: assistantText }]);
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }
-    } catch {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. Try again.' }]);
+
+      if (!assistantText.trim()) throw new Error('The assistant returned an empty reply.');
+    } catch (err) {
+      // Drop the empty/partial assistant bubble so the thread ends cleanly on the
+      // user's question, ready for a one-click retry.
+      if (addedBubble) setChatMessages(prev => prev.slice(0, -1));
+      setChatError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setChatLoading(false);
     }
+  }, [id]);
+
+  function sendChat(e: React.FormEvent) {
+    e.preventDefault();
+    const text = chatInput.trim();
+    if (!text || chatLoading) return;
+    const next = [...chatMessages, { role: 'user' as const, content: text }];
+    setChatMessages(next);
+    setChatInput('');
+    streamChat(next);
   }
 
   if (error) {
@@ -191,7 +250,23 @@ export default function AnalysisPage() {
   const { analysis, feedback_points, engagement_timeline, roi_timeline, file_url } = detail;
   const isPending = analysis.status === 'pending' || analysis.status === 'processing';
   const isError   = analysis.status === 'error';
-  const durationMs = (analysis.duration_seconds ?? 60) * 1000;
+  // Guard the timeline's axis against a bad/placeholder duration. If a file's
+  // metadata couldn't be read at upload, duration defaults to 60s — which would
+  // squash the chart and push feedback markers off the end. Never let the axis
+  // be shorter than the latest data point we actually have.
+  const durationMs = Math.max(
+    (analysis.duration_seconds ?? 60) * 1000,
+    ...engagement_timeline.map((p) => p.timecode_ms),
+    ...feedback_points.map((f) => f.timecode_end_ms),
+    ...roi_timeline.map((p) => p.timecode_ms),
+  );
+
+  // Speaking pace — one of the metrics speakers care about most. Derived from the
+  // transcript word count over the (robust) duration, so it never divides by a
+  // placeholder second-count.
+  const wordCount = analysis.transcript ? analysis.transcript.trim().split(/\s+/).filter(Boolean).length : 0;
+  const paceMinutes = durationMs / 60000;
+  const wpm = paceMinutes > 0 ? Math.round(wordCount / paceMinutes) : 0;
 
   const activeFeedback: FeedbackPoint | undefined = feedback_points.find(
     (fp) => currentTimeMs >= fp.timecode_ms && currentTimeMs < fp.timecode_end_ms + 5000
@@ -214,7 +289,7 @@ export default function AnalysisPage() {
                 style={{ background: 'var(--danger)' }}>
                 {deleting ? 'Deleting…' : 'Delete'}
               </button>
-              <button onClick={() => setShowDeleteConfirm(false)}
+              <button ref={cancelBtnRef} onClick={() => setShowDeleteConfirm(false)}
                 className="flex-1 py-2 hover:bg-[var(--surface-sunk)] text-body text-sm font-medium rounded-lg transition-colors border border-[var(--border-default)]">
                 Cancel
               </button>
@@ -298,6 +373,13 @@ export default function AnalysisPage() {
           </p>
           <p className="text-muted text-sm">
             Running Tribe v2 brain predictions. This takes 10–20 minutes.
+          </p>
+          <p className="text-faint text-xs font-mono">
+            Elapsed {formatMs(Math.max(0, nowTs - new Date(analysis.created_at).getTime()))}
+          </p>
+          <p className="text-faint text-xs mx-auto max-w-sm">
+            You can safely close this tab — the analysis keeps running, and your
+            results will be here when you come back.
           </p>
         </div>
       )}
@@ -463,7 +545,7 @@ export default function AnalysisPage() {
           {/* Transcript */}
           {analysis.transcript && (
             <div className="card p-4">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-1">
                 <h2 className="text-sm font-medium text-body">Transcript</h2>
                 <button onClick={() => downloadExport('transcript')}
                   className="text-xs font-semibold transition-colors flex items-center gap-1"
@@ -475,6 +557,12 @@ export default function AnalysisPage() {
                   Export .txt
                 </button>
               </div>
+              {wordCount > 0 && (
+                <p className="mb-3 text-xs text-faint">
+                  {wordCount.toLocaleString()} words
+                  {wpm > 0 ? ` · ${wpm} wpm · ${paceLabel(wpm)}` : ''}
+                </p>
+              )}
               <p className="text-body text-sm leading-relaxed whitespace-pre-wrap">
                 {analysis.transcript}
               </p>
@@ -619,6 +707,21 @@ export default function AnalysisPage() {
             ))}
             <div ref={chatEndRef} />
           </div>
+
+          {chatError && (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-[var(--radius-sm)] px-3 py-2" style={{ background: 'var(--danger-bg)' }}>
+              <span className="text-xs" style={{ color: 'var(--danger)' }}>{chatError}</span>
+              <button
+                type="button"
+                onClick={() => streamChat(chatMessages)}
+                disabled={chatLoading}
+                className="text-xs font-semibold whitespace-nowrap disabled:opacity-50"
+                style={{ color: 'var(--danger)' }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
           <form onSubmit={sendChat} className="flex gap-2">
             <input

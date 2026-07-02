@@ -84,6 +84,13 @@ export default function SignupPage() {
         <button type="submit" disabled={loading} className="btn-primary w-full">
           {loading ? 'Creating account…' : 'Create account'}
         </button>
+
+        <p className="text-center text-xs text-faint">
+          By creating an account, you agree to our{' '}
+          <Link href="/terms" className="font-semibold" style={{ color: 'var(--text-link)' }}>Terms</Link>{' '}
+          and{' '}
+          <Link href="/privacy" className="font-semibold" style={{ color: 'var(--text-link)' }}>Privacy Policy</Link>.
+        </p>
       </div>
 
       <p className="text-center text-sm text-muted">

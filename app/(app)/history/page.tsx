@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { AnalysisCard } from '@/components/AnalysisCard';
 import type { Analysis } from '@/types';
 
@@ -9,18 +9,23 @@ const PAGE_SIZE = 20;
 export default function HistoryPage() {
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setLoadError(false);
     fetch('/api/analyses')
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((data) => {
         setAnalyses(Array.isArray(data) ? data : []);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => { setLoadError(true); setLoading(false); });
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return analyses;
@@ -84,6 +89,13 @@ export default function HistoryPage() {
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="h-20 animate-pulse rounded-[var(--radius-md)] bg-[var(--surface-sunk)]" />
           ))}
+        </div>
+      ) : loadError ? (
+        <div className="py-20 text-center">
+          <p className="text-sm text-muted">We couldn&apos;t load your talks. Check your connection and try again.</p>
+          <button onClick={load} className="mt-3 inline-block text-sm font-semibold" style={{ color: 'var(--text-link)' }}>
+            Retry
+          </button>
         </div>
       ) : analyses.length === 0 ? (
         <div className="py-20 text-center">

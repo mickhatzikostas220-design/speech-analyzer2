@@ -38,6 +38,7 @@ export default function AgentPage() {
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ConversationSummary | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
 
   const loadConversations = useCallback(async () => {
     const res = await fetch('/api/agent/conversations');
@@ -52,9 +53,11 @@ export default function AgentPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
-  // Close the delete-confirmation modal on Escape — standard a11y expectation.
+  // Close the delete-confirmation modal on Escape, and move focus onto Cancel
+  // when it opens — standard a11y for a destructive dialog.
   useEffect(() => {
     if (!deleteTarget) return;
+    cancelBtnRef.current?.focus();
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') setDeleteTarget(null);
     }
@@ -332,7 +335,7 @@ export default function AgentPage() {
               >
                 Delete
               </button>
-              <button onClick={() => setDeleteTarget(null)} className="btn-outline flex-1 text-sm">
+              <button ref={cancelBtnRef} onClick={() => setDeleteTarget(null)} className="btn-outline flex-1 text-sm">
                 Cancel
               </button>
             </div>

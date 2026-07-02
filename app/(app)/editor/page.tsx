@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface EditorProject {
@@ -72,12 +72,26 @@ const TrashIcon = () => (
   </svg>
 );
 
+// Shown when a list fails to load — a failed fetch used to fall through to the
+// empty state ("no projects yet"), which lies to a user who actually has some.
+function LoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)] py-12 text-center">
+      <p className="text-sm text-muted">We couldn&apos;t load this list. Check your connection and try again.</p>
+      <button onClick={onRetry} className="mt-3 text-sm font-semibold" style={{ color: 'var(--text-link)' }}>
+        Retry
+      </button>
+    </div>
+  );
+}
+
 export default function EditorPage() {
   const router = useRouter();
 
   // ── Silence-removal projects ───────────────────────────────
   const [projects, setProjects] = useState<EditorProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [creating, setCreating] = useState(false);
@@ -86,6 +100,7 @@ export default function EditorPage() {
   // ── Script projects ────────────────────────────────────────
   const [scriptProjects, setScriptProjects] = useState<ScriptProject[]>([]);
   const [scriptLoading, setScriptLoading] = useState(true);
+  const [scriptLoadError, setScriptLoadError] = useState(false);
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [newScriptTitle, setNewScriptTitle] = useState('');
   const [creatingScript, setCreatingScript] = useState(false);
@@ -94,9 +109,11 @@ export default function EditorPage() {
   // ── Timeline projects ──────────────────────────────────────
   const [timelineProjects, setTimelineProjects] = useState<TimelineProject[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(true);
+  const [timelineLoadError, setTimelineLoadError] = useState(false);
 
   // ── Delete confirmation ────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'editor' | 'script' | 'timeline'; id: string; title: string } | null>(null);
+  const deleteCancelRef = useRef<HTMLButtonElement>(null);
 
   // Close any open modal on Escape — a standard accessibility expectation.
   useEffect(() => {
@@ -110,31 +127,59 @@ export default function EditorPage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  // Move focus onto the destructive dialog's Cancel button when it opens, so
+  // keyboard/screen-reader users aren't left focused on the page behind it.
   useEffect(() => {
+    if (deleteTarget) deleteCancelRef.current?.focus();
+  }, [deleteTarget]);
+
+  // Each list loads independently. We honor safeJson's `ok` flag (a 500 that
+  // returns { error } is a failure, not an empty list) and flip an error flag so
+  // the UI can offer a retry instead of pretending the user has nothing.
+  const loadProjects = useCallback(() => {
+    setLoading(true);
+    setLoadError(false);
     fetch('/api/editor')
       .then(safeJson)
-      .then(({ data }) => {
+      .then(({ ok, data }) => {
+        if (!ok) { setLoadError(true); return; }
         setProjects(Array.isArray(data) ? (data as unknown as EditorProject[]) : []);
-        setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
+  }, []);
 
+  const loadScripts = useCallback(() => {
+    setScriptLoading(true);
+    setScriptLoadError(false);
     fetch('/api/editor/script')
       .then(safeJson)
-      .then(({ data }) => {
+      .then(({ ok, data }) => {
+        if (!ok) { setScriptLoadError(true); return; }
         setScriptProjects(Array.isArray(data) ? (data as unknown as ScriptProject[]) : []);
-        setScriptLoading(false);
       })
-      .catch(() => setScriptLoading(false));
+      .catch(() => setScriptLoadError(true))
+      .finally(() => setScriptLoading(false));
+  }, []);
 
+  const loadTimelines = useCallback(() => {
+    setTimelineLoading(true);
+    setTimelineLoadError(false);
     fetch('/api/editor/timeline')
       .then(safeJson)
-      .then(({ data }) => {
+      .then(({ ok, data }) => {
+        if (!ok) { setTimelineLoadError(true); return; }
         setTimelineProjects(Array.isArray(data) ? (data as unknown as TimelineProject[]) : []);
-        setTimelineLoading(false);
       })
-      .catch(() => setTimelineLoading(false));
+      .catch(() => setTimelineLoadError(true))
+      .finally(() => setTimelineLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadProjects();
+    loadScripts();
+    loadTimelines();
+  }, [loadProjects, loadScripts, loadTimelines]);
 
   async function createProject(e: React.FormEvent) {
     e.preventDefault();
@@ -228,6 +273,8 @@ export default function EditorPage() {
               <div key={i} className="h-20 animate-pulse rounded-[var(--radius-md)] bg-[var(--surface-sunk)]" />
             ))}
           </div>
+        ) : loadError ? (
+          <LoadError onRetry={loadProjects} />
         ) : projects.length === 0 ? (
           <div className="py-16 text-center">
             <svg className="mx-auto mb-3 h-10 w-10 text-[var(--ink-300)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -287,6 +334,8 @@ export default function EditorPage() {
               <div key={i} className="h-20 animate-pulse rounded-[var(--radius-md)] bg-[var(--surface-sunk)]" />
             ))}
           </div>
+        ) : scriptLoadError ? (
+          <LoadError onRetry={loadScripts} />
         ) : scriptProjects.length === 0 ? (
           <div className="py-16 text-center">
             <svg className="mx-auto mb-3 h-10 w-10 text-[var(--ink-300)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -336,6 +385,8 @@ export default function EditorPage() {
               <div key={i} className="h-20 animate-pulse rounded-[var(--radius-md)] bg-[var(--surface-sunk)]" />
             ))}
           </div>
+        ) : timelineLoadError ? (
+          <LoadError onRetry={loadTimelines} />
         ) : timelineProjects.length === 0 ? (
           <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)] py-12 text-center">
             <svg className="mx-auto mb-2 h-8 w-8 text-[var(--ink-300)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -375,7 +426,7 @@ export default function EditorPage() {
               <button onClick={confirmDelete} className="flex-1 py-2 bg-[color:var(--danger)] hover:opacity-90 text-white text-sm font-medium rounded-[var(--radius-sm)] transition-opacity">
                 Delete
               </button>
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2 btn-outline text-sm">
+              <button ref={deleteCancelRef} onClick={() => setDeleteTarget(null)} className="flex-1 py-2 btn-outline text-sm">
                 Cancel
               </button>
             </div>

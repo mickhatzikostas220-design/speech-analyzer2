@@ -53,6 +53,8 @@ export function TipsPlanner({ initialTips }: { initialTips: UserTip[] }) {
         setTips((t) => [...t, data as UserTip]);
         setDateByTip((d) => ({ ...d, [tipId]: '' }));
       }
+    } catch {
+      setError('Could not schedule that tip. Please try again.');
     } finally {
       setBusy(null);
     }
@@ -69,6 +71,9 @@ export function TipsPlanner({ initialTips }: { initialTips: UserTip[] }) {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) setTips((t) => t.map((x) => (x.id === row.id ? (data as UserTip) : x)));
+      else setError(data.error || 'Could not update that tip.');
+    } catch {
+      setError('Could not update that tip. Please try again.');
     } finally {
       setBusy(null);
     }
@@ -80,6 +85,9 @@ export function TipsPlanner({ initialTips }: { initialTips: UserTip[] }) {
     try {
       const res = await fetch(`/api/tips/${id}`, { method: 'DELETE' });
       if (res.ok) setTips((t) => t.filter((x) => x.id !== id));
+      else setError('Could not remove that tip. Please try again.');
+    } catch {
+      setError('Could not remove that tip. Please try again.');
     } finally {
       setBusy(null);
     }

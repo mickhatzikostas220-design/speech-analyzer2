@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { requirePlan } from '@/lib/subscription/requirePlan';
 import { getUserAndAdmin } from '@/lib/agent/server';
 import { getApiKey, getSettings } from '@/lib/agent/store';
 import { buildTools } from '@/lib/agent/tools/registry';
@@ -13,6 +15,10 @@ export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   const auth = await getUserAndAdmin();
   if (!auth) return new Response('Unauthorized', { status: 401 });
+
+  // AI Assistant is Full Premium — enforce server-side (the UI is gated too).
+  const gate = await requirePlan(createClient(), 'full');
+  if (gate) return gate;
 
   const body = await request.json().catch(() => ({}));
   const message = typeof body.message === 'string' ? body.message.trim() : '';

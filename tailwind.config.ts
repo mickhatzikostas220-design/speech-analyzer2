@@ -34,12 +34,25 @@ const config: Config = {
           ink: 'var(--surface-ink)',
         },
         strong: 'var(--border-strong)',
+        // Semantic status colors. These map to the same CSS variables the app
+        // already uses everywhere as arbitrary values / inline styles — promoting
+        // them to tokens enables clean, consistent utilities (text-danger,
+        // bg-success-bg, border-danger, …) going forward. Purely additive: none
+        // of these names collide with Tailwind's defaults.
+        success: 'var(--success)',
+        'success-bg': 'var(--success-bg)',
+        warning: 'var(--warning)',
+        'warning-bg': 'var(--warning-bg)',
+        danger: 'var(--danger)',
+        'danger-bg': 'var(--danger-bg)',
+        'info-bg': 'var(--info-bg)',
       },
       textColor: {
         strong: 'var(--text-strong)',
         body: 'var(--text-body)',
         muted: 'var(--text-muted)',
         faint: 'var(--text-faint)',
+        link: 'var(--text-link)',
       },
       fontFamily: {
         display: ['var(--font-display)'],
@@ -49,12 +62,21 @@ const config: Config = {
         sans: ['var(--font-body)', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
+        // sm maps to the brand --radius-sm (10px). Safe to define: no default
+        // `rounded-sm` usages exist in the app, so nothing changes behavior.
+        sm: 'var(--radius-sm)',
         pill: 'var(--radius-pill)',
         md: 'var(--radius-md)',
         lg: 'var(--radius-lg)',
         xl: 'var(--radius-xl)',
       },
       boxShadow: {
+        // Brand shadow scale. sm/md/lg replace verbose shadow-[var(--shadow-*)]
+        // arbitrary values; safe because the app uses no default shadow-sm/md/lg.
+        // `soft` is kept as a legacy alias for --shadow-md.
+        sm: 'var(--shadow-sm)',
+        md: 'var(--shadow-md)',
+        lg: 'var(--shadow-lg)',
         hard: 'var(--shadow-hard)',
         'hard-lg': 'var(--shadow-hard-lg)',
         soft: 'var(--shadow-md)',

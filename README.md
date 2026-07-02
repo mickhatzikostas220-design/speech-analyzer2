@@ -1,8 +1,8 @@
-# Orator — Neural Speech Analysis
+# Speaker Hub — Every tool a speaker needs, in one place
 
-Orator analyzes speeches and presentations using the Tribe v2 fMRI-based neural engagement model. Upload a video or audio file, get a full transcript, and receive timestamped feedback on exactly where audience attention drops — and why.
+Speaker Hub is an all-in-one workspace for professional speakers: analyze your talks with AI, sharpen your scripts, manage bookings, cut shareable clips, and keep everything on-brand. Its flagship **Speech Analyzer** uses the Tribe v2 fMRI-based neural engagement model — upload a video or audio file, get a full transcript, and see timestamped feedback on exactly where audience attention drops, and why.
 
-**Invite-only.** Access is gated behind a request-approval flow managed via the admin panel.
+**Open self-serve signup.** Anyone can create an account at `/signup` and set up their hub in about a minute. A legacy request-access + admin-approval flow still lives in the code (`/request-access`, `/admin/requests`) if you ever want to gate access again — it is no longer the default way in.
 
 ---
 
@@ -206,7 +206,7 @@ system's hub kit:
 ## Personal AI Agent
 
 The **Assistant** tab (and hub tile) is a personal AI agent for each speaker — a
-general assistant that's also aware of their own Orator analyses and can connect to
+general assistant that's also aware of their own Speech Analyzer analyses and can connect to
 outside apps (starting with Gmail).
 
 **Setup**
@@ -272,7 +272,7 @@ Browser
             └─ /api/admin/requests/*            Approve/deny access requests
 
 Supabase
-  ├─ Auth          Email/password + invite links
+  ├─ Auth          Email/password (open signup) + admin invite links
   ├─ PostgreSQL    analyses, feedback_points, engagement_timeline, access_requests
   └─ Storage       speeches bucket (private, per-user RLS)
 
@@ -289,7 +289,7 @@ External Services
 
 - **Tribe v2 ROI indices** in `tribe-server/main.py` are approximate fsaverage5 vertices. For production-accuracy, replace with Glasser 360-parcel atlas indices.
 - **Waveform visualization** for audio files uses a static placeholder, not real frequency data.
-- **No rate limiting** on API routes — consider adding Upstash or similar before opening to many users.
+- **Rate limiting** is in-memory / per-instance best-effort (`lib/rateLimit.ts`), applied to the auth endpoints (signup/resend), analysis creation, and the public booking-inquiry endpoint. On serverless each instance keeps its own counter, so for a hard global limit back it with a shared store (Upstash/Redis or a Supabase table).
 - **Tribe v2 is CC-BY-NC-4.0** — non-commercial use only.
 
 ---

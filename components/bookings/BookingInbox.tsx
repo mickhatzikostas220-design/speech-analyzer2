@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, CalendarPlus, Mail, MapPin, Building2 } from 'lucide-react';
 import {
   type Booking,
@@ -42,10 +42,13 @@ export function BookingInbox({ initialBookings }: { initialBookings: Booking[] }
   const [msg, setMsg] = useState('');
   const [addedGigs, setAddedGigs] = useState<Record<string, boolean>>({});
   const [deleteTarget, setDeleteTarget] = useState<Booking | null>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Close the delete-confirmation modal on Escape — standard a11y expectation.
+  // Close the delete-confirmation modal on Escape, and move focus onto Cancel
+  // when it opens — standard a11y for a destructive dialog.
   useEffect(() => {
     if (!deleteTarget) return;
+    cancelBtnRef.current?.focus();
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') setDeleteTarget(null);
     }
@@ -83,15 +86,20 @@ export function BookingInbox({ initialBookings }: { initialBookings: Booking[] }
   }
 
   async function patch(id: string, body: Partial<Booking>) {
-    setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...body } : b)));
+    const prev = bookings;
+    setBookings((list) => list.map((b) => (b.id === id ? { ...b, ...body } : b)));
     try {
-      await fetch(`/api/bookings/${id}`, {
+      const res = await fetch(`/api/bookings/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      // fetch doesn't reject on 4xx/5xx — without this check a rejected status
+      // change would look saved but silently revert on the next load. Roll the
+      // optimistic update back so the UI never shows an unpersisted status.
+      if (!res.ok) setBookings(prev);
     } catch {
-      /* optimistic; ignore */
+      setBookings(prev);
     }
   }
 
@@ -272,7 +280,7 @@ export function BookingInbox({ initialBookings }: { initialBookings: Booking[] }
               >
                 Remove
               </button>
-              <button onClick={() => setDeleteTarget(null)} className="btn-outline flex-1 text-sm">
+              <button ref={cancelBtnRef} onClick={() => setDeleteTarget(null)} className="btn-outline flex-1 text-sm">
                 Cancel
               </button>
             </div>

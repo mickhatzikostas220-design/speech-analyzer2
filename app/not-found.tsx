@@ -11,10 +11,10 @@ export default function NotFound() {
       </h1>
       <p className="mb-8 max-w-md text-[color:var(--text-muted)]">
         The page you&apos;re looking for doesn&apos;t exist or may have moved.
-        Let&apos;s get you back to your hub.
+        Let&apos;s get you back on track.
       </p>
-      <Link href="/dashboard" className="btn-primary">
-        Back to Hub
+      <Link href="/" className="btn-primary">
+        Back home
       </Link>
     </main>
   );

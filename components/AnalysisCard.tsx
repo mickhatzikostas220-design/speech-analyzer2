@@ -18,8 +18,16 @@ function formatDate(iso: string) {
   });
 }
 
+// Talk length as m:ss. Returns null for missing/zero so the card can omit it.
+function formatDuration(s: number | null) {
+  if (!s || s <= 0) return null;
+  const m = Math.floor(s / 60);
+  return `${m}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
+}
+
 export function AnalysisCard({ analysis }: { analysis: Analysis }) {
   const badge = statusBadge(analysis.status);
+  const duration = formatDuration(analysis.duration_seconds);
 
   return (
     <Link
@@ -46,6 +54,9 @@ export function AnalysisCard({ analysis }: { analysis: Analysis }) {
         <p className="truncate text-sm font-semibold text-strong">{analysis.title}</p>
         <div className="mt-0.5 flex items-center gap-2">
           <span className="text-xs text-muted">{formatDate(analysis.created_at)}</span>
+          {duration && (
+            <span className="text-xs text-faint">{duration}</span>
+          )}
           {analysis.file_type && (
             <span className="text-xs uppercase text-faint">{analysis.file_type}</span>
           )}

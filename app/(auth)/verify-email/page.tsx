@@ -61,12 +61,19 @@ export default function VerifyEmailPage() {
     setError(null);
     setInfo(null);
     try {
-      await fetch('/api/auth/resend', {
+      const res = await fetch('/api/auth/resend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() }),
       });
-      setInfo('New code sent — check your inbox.');
+      if (!res.ok) {
+        // Don't claim success on a server error — the user would wait forever for
+        // a code that never arrives. Surface the real reason instead.
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Could not resend the code. Please try again.');
+      } else {
+        setInfo('New code sent — check your inbox.');
+      }
     } catch {
       setError('Could not resend the code. Please try again.');
     } finally {

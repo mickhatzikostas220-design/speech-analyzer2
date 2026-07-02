@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { parseSourceUrl, YouTubeError } from '@/lib/clipflow/youtube';
 import { enqueue } from '@/lib/clipflow/queue';
 import { CLIP_LENGTHS, type ClipLength, type ClipPreferences } from '@/lib/clipflow/types';
+import { requirePlan } from '@/lib/subscription/requirePlan';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,6 +53,9 @@ export async function POST(request: NextRequest) {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const gate = await requirePlan(supabase, 'full');
+    if (gate) return gate;
 
     const raw = (await request.text()).trim();
     const body = raw ? JSON.parse(raw) : {};
