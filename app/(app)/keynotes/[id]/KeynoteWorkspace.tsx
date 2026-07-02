@@ -296,6 +296,7 @@ export function KeynoteWorkspace({
             <div className="absolute bottom-3 left-[7px] top-3 w-px bg-[var(--border-default)]" />
             {variants.map((v) => {
               const changes = changesById[v.id];
+              const analysis = analysisById[v.id];
               return (
                 <div key={v.id} className="relative">
                   <span className="absolute -left-[21px] top-6 h-2.5 w-2.5 rounded-full bg-[var(--signature)] ring-4 ring-[color:var(--surface-page)]" />
