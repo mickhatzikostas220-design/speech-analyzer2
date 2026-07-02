@@ -53,6 +53,13 @@ export interface BrandVoice {
   greeting?: string;
   /** Raw "about" text pulled from the site — seeds AI copy later. */
   about?: string;
+  /**
+   * Private speaker profile the user brings from their preferred AI during
+   * onboarding (see components/brand/Onboarding.tsx). Never rendered publicly —
+   * unlike `about`, which falls back into the public one-sheet bio. Reserved as
+   * context for the app's AI features (analyzer, agent, tips, keynote tailoring).
+   */
+  aiProfile?: string;
 }
 
 export interface BrandHero {

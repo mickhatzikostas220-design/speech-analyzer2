@@ -39,6 +39,7 @@ export function mergeBrand(input: unknown): BrandKit {
       tone: b.voice?.tone || base.voice.tone,
       greeting: b.voice?.greeting ?? base.voice.greeting,
       about: b.voice?.about ?? base.voice.about,
+      aiProfile: b.voice?.aiProfile ?? base.voice.aiProfile,
     },
     source: b.source || 'custom',
     sourceUrl: b.sourceUrl,
