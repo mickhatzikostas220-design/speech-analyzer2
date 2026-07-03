@@ -1,0 +1,2 @@
+id,created_at,name,dkim_status,spf_status,spf_domain,nameserver,disable_content_storage,open_track,click_track,region
+f4e3b170-cd56-45dd-bd5a-214544fdbc98,2026-07-02 18:30:04.428437+00,speaker-hub.com,verified,verified,send,Vercel,false,false,false,us-east-1
