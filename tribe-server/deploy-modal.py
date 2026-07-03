@@ -1,4 +1,5 @@
 import modal
+from fastapi import Header, HTTPException
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
@@ -327,8 +328,23 @@ def process_analysis(body: dict):
 
 
 # ── HTTP trigger (returns immediately, spawns GPU work async) ─────────────────
-@app.function(timeout=30)
+# SECURITY: this URL is public, and the worker writes to Supabase with the
+# service-role key using the analysis_id from the request body — so without
+# auth, anyone who finds the URL can queue GPU jobs on our dime and overwrite
+# any user's analysis rows. Verify the same TRIBE_SERVER_SECRET bearer token
+# the Next.js app already sends (app/api/analyses/[id]/process/route.ts).
+# Create the secret once:
+#   modal secret create tribe-secret TRIBE_SERVER_SECRET=$(openssl rand -hex 16)
+# and set the SAME value as TRIBE_SERVER_SECRET in Vercel / .env.local.
+@app.function(
+    timeout=30,
+    secrets=[modal.Secret.from_name("tribe-secret")],  # TRIBE_SERVER_SECRET
+)
 @modal.fastapi_endpoint(method="POST", label="tribe-predict")
-def trigger(body: dict):
+def trigger(body: dict, authorization: str | None = Header(default=None)):
+    import os
+    secret = os.environ.get("TRIBE_SERVER_SECRET", "")
+    if secret and authorization != f"Bearer {secret}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
     process_analysis.spawn(body)
     return {"status": "queued"}

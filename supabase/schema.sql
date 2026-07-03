@@ -62,17 +62,24 @@ create policy "Users insert own analyses" on analyses for insert with check (aut
 create policy "Users update own analyses" on analyses for update using (auth.uid() = user_id);
 create policy "Users delete own analyses" on analyses for delete using (auth.uid() = user_id);
 
--- Feedback points — readable by owner, writable by service role (API routes)
+-- Feedback points — readable/deletable by the owner of the parent analysis.
+-- Inserts come only from the GPU worker, which uses the service-role key and
+-- therefore bypasses RLS — no insert policy is needed (an open `with check
+-- (true)` policy would let any signed-in user write into other users' data).
 create policy "Users view own feedback" on feedback_points for select using (
   analysis_id in (select id from analyses where user_id = auth.uid())
 );
-create policy "Service inserts feedback" on feedback_points for insert with check (true);
+create policy "Users delete own feedback" on feedback_points for delete using (
+  analysis_id in (select id from analyses where user_id = auth.uid())
+);
 
--- Engagement timeline
+-- Engagement timeline — same model as feedback points.
 create policy "Users view own timeline" on engagement_timeline for select using (
   analysis_id in (select id from analyses where user_id = auth.uid())
 );
-create policy "Service inserts timeline" on engagement_timeline for insert with check (true);
+create policy "Users delete own timeline" on engagement_timeline for delete using (
+  analysis_id in (select id from analyses where user_id = auth.uid())
+);
 
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()
@@ -102,6 +109,7 @@ create policy "Users read own speeches" on storage.objects for select using (
 create policy "Users delete own speeches" on storage.objects for delete using (
   bucket_id = 'speeches' and auth.uid()::text = (storage.foldername(name))[1]
 );
-create policy "Service reads speeches" on storage.objects for select using (
-  bucket_id = 'speeches'
-);
+-- NOTE: no bucket-wide read policy. The service role bypasses RLS, so server
+-- code using the admin client can already read every object. A `for select
+-- using (bucket_id = 'speeches')` policy with no role restriction would let ANY
+-- user (even the anon key) download every speaker's uploads — never add one.
