@@ -7,6 +7,7 @@ import { Menu, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Logo } from '@/components/brand/Logo';
 import type { BrandKit } from '@/lib/brand/types';
+import { toolByKey, type ToolMeta } from '@/lib/tools/catalog';
 
 const NAV_ITEMS: Array<[string, string]> = [
   ['/dashboard', 'Hub'],
@@ -18,8 +19,12 @@ const NAV_ITEMS: Array<[string, string]> = [
   ['/clipflow', 'ClipFlow'],
 ];
 
-export function Navbar({ brand }: { brand: BrandKit }) {
+export function Navbar({ brand, favorites = [] }: { brand: BrandKit; favorites?: string[] }) {
   const pathname = usePathname();
+  // Resolve pinned tool keys to their catalog metadata (dropping any unknowns).
+  const pinned: ToolMeta[] = favorites
+    .map((key) => toolByKey(key))
+    .filter((t): t is ToolMeta => Boolean(t));
   const router = useRouter();
   const supabase = createClient();
   // Controls the mobile dropdown menu (hidden on >= sm screens).
@@ -56,6 +61,29 @@ export function Navbar({ brand }: { brand: BrandKit }) {
           </Link>
           <nav className="hidden items-center gap-5 sm:flex">
             {NAV_ITEMS.map(([href, label]) => link(href, label))}
+            {/* Pinned tools — the speaker's favorites, as compact icon links. */}
+            {pinned.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="mr-1 h-4 w-px bg-white/15" aria-hidden />
+                {pinned.map((tool) => {
+                  const active = pathname.startsWith(tool.href);
+                  const Icon = tool.icon;
+                  return (
+                    <Link
+                      key={tool.key}
+                      href={tool.href}
+                      title={tool.name}
+                      aria-label={tool.name}
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                        active ? 'bg-white/15 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" strokeWidth={2.25} />
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </nav>
         </div>
 
@@ -107,6 +135,33 @@ export function Navbar({ brand }: { brand: BrandKit }) {
                 </Link>
               );
             })}
+            {/* Pinned tools section — full-width links with the tool icon. */}
+            {pinned.length > 0 && (
+              <>
+                <div className="my-1 border-t border-white/10" />
+                <p className="px-3 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wide text-white/40">
+                  Pinned
+                </p>
+                {pinned.map((tool) => {
+                  const active = pathname.startsWith(tool.href);
+                  const Icon = tool.icon;
+                  return (
+                    <Link
+                      key={tool.key}
+                      href={tool.href}
+                      onClick={() => setMenuOpen(false)}
+                      className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                        active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" strokeWidth={2.25} />
+                      {tool.name}
+                    </Link>
+                  );
+                })}
+                <div className="my-1 border-t border-white/10" />
+              </>
+            )}
             <Link
               href="/settings"
               onClick={() => setMenuOpen(false)}

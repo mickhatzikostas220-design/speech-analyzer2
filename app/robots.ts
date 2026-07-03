@@ -27,6 +27,7 @@ export default function robots(): MetadataRoute.Robots {
         '/clipflow',
         '/tips',
         '/seo',
+        '/stagefinder',
         '/verify-email',
       ],
     },

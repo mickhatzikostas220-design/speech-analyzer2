@@ -1,0 +1,71 @@
+// Shared types and input options for Stage Finder — the tool that takes the
+// speakers a user admires, finds similar speakers, surfaces the kinds of events
+// those speakers appear at, and compiles a pitch pack so the user can approach
+// those events themselves. Imported by both the page (UI) and the API route so
+// the shape can't drift between the two.
+
+/** Speaking formats the user can target. Shapes which events we surface. */
+export const SPEAKING_FORMATS = [
+  { id: 'any', label: 'Any format' },
+  { id: 'keynote', label: 'Keynote stages' },
+  { id: 'panel', label: 'Panels & fireside chats' },
+  { id: 'workshop', label: 'Workshops & breakouts' },
+  { id: 'podcast', label: 'Podcasts & shows' },
+  { id: 'corporate', label: 'Corporate & internal events' },
+] as const;
+
+export type SpeakingFormatId = (typeof SPEAKING_FORMATS)[number]['id'];
+
+const FORMAT_LABELS: Record<string, string> = Object.fromEntries(
+  SPEAKING_FORMATS.map((f) => [f.id, f.label])
+);
+
+export function isSpeakingFormat(id: unknown): id is SpeakingFormatId {
+  return typeof id === 'string' && id in FORMAT_LABELS;
+}
+
+export function speakingFormatLabel(id: string): string {
+  return FORMAT_LABELS[id] ?? 'Any format';
+}
+
+/** A speaker similar to the ones the user admires. */
+export interface SimilarSpeaker {
+  name: string;
+  /** One line: what they're best known for. */
+  knownFor: string;
+  /** Why they resemble the admired set (and, where given, the user's topic). */
+  whySimilar: string;
+}
+
+/** An event / series the user could realistically pitch themselves to. */
+export interface StageEvent {
+  /** Event, conference, series, or show name. */
+  name: string;
+  /** e.g. "Annual conference", "Corporate summit", "Weekly podcast". */
+  format: string;
+  /** Who attends / listens. */
+  audience: string;
+  /** Why this event is a fit for the user specifically. */
+  whyFit: string;
+  /** Admired or similar speakers associated with this event's world. */
+  speakersSeen: string[];
+  /** A tailored talk/topic angle the user could pitch to this event. */
+  pitchAngle: string;
+  /** Practical guidance: where to find the CFP / who to contact / how to apply. */
+  howToApproach: string;
+}
+
+/** A ready-to-adapt outreach email the user can send to an organizer. */
+export interface OutreachTemplate {
+  subject: string;
+  body: string;
+}
+
+/** The full report returned by the Stage Finder API. */
+export interface StageReport {
+  /** One or two sentence overall read on where this speaker fits. */
+  summary: string;
+  similarSpeakers: SimilarSpeaker[];
+  events: StageEvent[];
+  outreach: OutreachTemplate | null;
+}

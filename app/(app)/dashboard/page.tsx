@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getUpcomingGigs } from '@/lib/gigs/server';
 import { getBookings } from '@/lib/bookings/server';
 import { ToolGrid } from '@/components/hub/ToolGrid';
+import { getFavoriteTools } from '@/lib/tools/favorites';
 import { RecentActivity } from '@/components/hub/RecentActivity';
 import { StatTiles, type Stat } from '@/components/hub/StatTiles';
 import { UpcomingGigs } from '@/components/hub/UpcomingGigs';
@@ -75,6 +76,9 @@ export default async function HubPage() {
   const plan = await getUserPlan(supabase);
   const freeUsed = plan === 'free' && userId ? await monthlyAnalysisCount(supabase, userId) : null;
 
+  // Which tools this speaker has pinned — drives the star state on each card.
+  const favorites = await getFavoriteTools();
+
   return (
     <div className="mx-auto max-w-5xl px-4 pb-20 pt-10 sm:px-6">
       {/* hero */}
@@ -105,7 +109,7 @@ export default async function HubPage() {
 
       {/* tools */}
       <h2 className="eyebrow mb-4 mt-9">Your tools</h2>
-      <ToolGrid analysisCount={totalTalks} bookingCount={newInquiries} plan={plan} />
+      <ToolGrid analysisCount={totalTalks} bookingCount={newInquiries} plan={plan} favorites={favorites} />
 
       {/* two columns */}
       <div className="mt-9 grid gap-6 lg:grid-cols-[1fr_360px]">
