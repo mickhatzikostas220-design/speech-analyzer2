@@ -1,34 +1,39 @@
 # Go-Live Checklist — Speaker Hub
 
-**Updated 2026-07-02 (evening).** The code side is done and build-verified.
-Everything below is an owner action — none of it can be done from the repo.
-Work top to bottom; §1 and §2 are the ones blocking the site right now.
+**Updated 2026-07-03.** The site is **LIVE at https://speaker-hub.com** ✅
+(www redirects to the apex; the old `speech-analyzer2-rkgj.vercel.app` alias is
+gone — the custom domain replaced it). Code side is done and build-verified.
+Work top to bottom.
 
 ---
 
-## 1. 🔴 Restore public access (the site is currently unreachable)
+## 1. Merge / close the open PRs
 
-`speech-analyzer2-rkgj.vercel.app` worked earlier today but now returns
-**404 DEPLOYMENT_NOT_FOUND**, and every deployment URL redirects to a Vercel
-login wall (Deployment Protection). Until fixed, nobody can reach the site.
+- [ ] **Merge PR #63** (security hardening: editor IDOR, SSRF guard, storage
+      RLS doc fix, AI cost limits, Next.js 14.2.35). Reviewed line-by-line —
+      sound, clean against main, build passes. Note: its storage-policy SQL was
+      checked against prod — the dangerous policy is **already absent**, so no
+      database action is needed; the SQL file only fixes fresh installs.
+- [ ] **Merge the `production-fixes-jul2` branch** (open PR:
+      <https://github.com/mickhatzikostas220-design/speech-analyzer2/pull/new/production-fixes-jul2>)
+      — contains the Resend domains CSV + email/canonical URL fixes.
+- [ ] **Close PR #62 without merging** — it targets a months-old broken
+      snapshot of main, is unmergeable, and everything it fixed has since been
+      re-fixed on main.
 
-In the Vercel dashboard → **speech-analyzer2-rkgj** project:
+## 2. Vercel environment variables (the one real config gap)
 
-- [ ] **Settings → Domains** — confirm `speech-analyzer2-rkgj.vercel.app` (or
-      your real domain) is listed and attached to Production. Re-add if missing.
-- [ ] **Settings → Deployment Protection** — set to **Standard Protection**
-      (production public, previews protected) or turn off Vercel Authentication
-      for production.
-- [ ] Reload the URL in a private window — the marketing page should render
-      without a Vercel login.
+The production build has **no `NEXT_PUBLIC_APP_URL`** — the sitemap/robots
+currently advertise an SSO-walled deployment URL, and (until the code fix in
+§1 deploys) access-approval emails would link to localhost.
 
-## 2. Merge the pending PR (build already green)
+In Vercel → project → Settings → Environment Variables, add for Production:
 
-- [ ] Open the PR for branch **`production-fixes-jul2`**:
-      <https://github.com/mickhatzikostas220-design/speech-analyzer2/pull/new/production-fixes-jul2>
-      and merge it. Both Vercel projects compiled it successfully, so the merge
-      is safe. It contains: the AI-memory onboarding step, the `/keynotes`
-      login-redirect fix, and the keynote RLS/index migration mirror.
+- [ ] `NEXT_PUBLIC_APP_URL` = `https://speaker-hub.com`
+- [ ] `EMAIL_FROM` = e.g. `Speaker Hub <hello@speaker-hub.com>` — the domain is
+      **already verified in Resend** (DKIM + SPF ✅, see docs/resend-domains.csv),
+      so real signups will receive their codes once this is set.
+- [ ] Redeploy after saving (env vars bake in at build time).
 
 ## 3. Delete the duplicate Vercel project
 

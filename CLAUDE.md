@@ -9,7 +9,7 @@ Read it fully before touching any code.
 
 Speech Analyzer 2 is a web app built for public speakers.
 It is a hub of tools that help speakers prepare, analyze, and improve their performances.
-It is deployed on Vercel at: https://speech-analyzer2-rkgj-98j31c1nf.vercel.app
+It is deployed on Vercel at: https://speaker-hub.com
 
 ---
 

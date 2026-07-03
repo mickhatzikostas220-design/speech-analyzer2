@@ -11,10 +11,12 @@
 export const SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.NEXT_PUBLIC_APP_URL ||
+  // In production the canonical host is the real domain — never VERCEL_URL,
+  // which is a per-deployment *.vercel.app URL behind Vercel SSO. Advertising
+  // that in sitemap/robots/OG/emails would point visitors at a login wall.
+  (process.env.VERCEL_ENV === 'production' ? 'https://speaker-hub.com' : '') ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
-  // The project's public production alias — NOT a deployment-specific URL
-  // (those sit behind Vercel SSO and must never be the canonical host).
-  'https://speech-analyzer2-rkgj.vercel.app'
+  'https://speaker-hub.com'
 ).replace(/\/$/, '');
 
 export const SITE_NAME = 'Speaker Hub';

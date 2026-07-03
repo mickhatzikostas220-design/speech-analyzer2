@@ -1,13 +1,18 @@
 import { Resend } from 'resend';
 import { signToken, adminActionsConfigured } from './adminToken';
 import { escapeHtml } from './escapeHtml';
+import { SITE_URL } from './site';
 
 const FROM = 'ACA <onboarding@resend.dev>';
 // Sender for user-facing transactional email (verification codes). Override
 // EMAIL_FROM with a verified domain in production — the resend.dev test sender
 // only delivers to the Resend account owner, so real signups won't receive it.
 const VERIFY_FROM = process.env.EMAIL_FROM ?? 'Speaker Hub <onboarding@resend.dev>';
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3002';
+// Base URL for links inside emails. On Vercel fall back to the canonical site
+// URL so approval/rejection links never point at localhost when
+// NEXT_PUBLIC_APP_URL is unset; keep localhost only for local dev.
+export const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL ?? (process.env.VERCEL ? SITE_URL : 'http://localhost:3002');
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'mickhatzikostas220@gmail.com';
 
 /**

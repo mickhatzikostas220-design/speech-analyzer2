@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { sendApprovalEmail } from '@/lib/email';
+import { sendApprovalEmail, APP_URL } from '@/lib/email';
 import { NextRequest, NextResponse } from 'next/server';
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'mickhatzikostas220@gmail.com';
@@ -29,8 +29,9 @@ export async function POST(
     return NextResponse.json({ error: 'Request already reviewed' }, { status: 409 });
   }
 
-  // Generate an invite link via Supabase Auth Admin
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3002';
+  // Generate an invite link via Supabase Auth Admin. APP_URL falls back to the
+  // canonical site URL on Vercel so the emailed link never points at localhost.
+  const appUrl = APP_URL;
   const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
     type: 'invite',
     email: req.email,
