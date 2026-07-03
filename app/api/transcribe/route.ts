@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { rateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 // Allow headroom for a Parakeet cold start (Vercel Pro honors up to 300s; Hobby
@@ -12,6 +13,17 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
     if (authErr) return NextResponse.json({ error: `Auth: ${authErr.message}` }, { status: 401 });
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Transcription is the most expensive per-call endpoint (Whisper / GPU
+    // time billed to us). Cap per user to stop a hammering script from running
+    // up the bill; generous enough for real use (one call per recording).
+    const rl = rateLimit(`transcribe:${user.id}`, 12, 10 * 60 * 1000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: 'Too many transcriptions at once — please wait a few minutes and try again.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+      );
+    }
 
     const formData = await request.formData();
     const audio = formData.get('audio') as Blob | null;

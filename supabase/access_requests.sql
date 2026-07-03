@@ -11,8 +11,8 @@ create table if not exists access_requests (
 
 alter table access_requests enable row level security;
 
--- Anyone can submit a request (no auth required)
-create policy "Anyone can submit request" on access_requests
-  for insert with check (true);
-
--- Only service role can read and update (all admin actions go through server-side API)
+-- No policies on purpose: the public request form inserts through the
+-- service-role client in /api/request-access (which rate-limits and validates),
+-- and the service role bypasses RLS. An open anon insert policy would let bots
+-- write straight to this table with the public anon key, skipping those checks.
+-- Reads/updates also happen only through the admin API routes (service role).
