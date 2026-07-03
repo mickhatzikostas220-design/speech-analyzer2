@@ -9,15 +9,10 @@ import { Logo } from '@/components/brand/Logo';
 import type { BrandKit } from '@/lib/brand/types';
 import { toolByKey, type ToolMeta } from '@/lib/tools/catalog';
 
-const NAV_ITEMS: Array<[string, string]> = [
-  ['/dashboard', 'Hub'],
-  ['/agent', 'Assistant'],
-  ['/bookings', 'Bookings'],
-  ['/history', 'Library'],
-  ['/editor', 'Studio'],
-  ['/keynotes', 'Keynotes'],
-  ['/clipflow', 'ClipFlow'],
-];
+// The top bar shows the Hub tab plus the speaker's favorited tools — nothing
+// else. The old fixed tool tabs were removed so each speaker's bar reflects the
+// five tools they picked in onboarding (managed later via the Hub's stars).
+const HUB: [string, string] = ['/dashboard', 'Hub'];
 
 export function Navbar({ brand, favorites = [] }: { brand: BrandKit; favorites?: string[] }) {
   const pathname = usePathname();
@@ -40,6 +35,7 @@ export function Navbar({ brand, favorites = [] }: { brand: BrandKit; favorites?:
     const active = pathname.startsWith(href);
     return (
       <Link
+        key={href}
         href={href}
         className={`border-b-2 pb-0.5 text-sm font-semibold transition-colors ${
           active
@@ -60,30 +56,9 @@ export function Navbar({ brand, favorites = [] }: { brand: BrandKit; favorites?:
             <Logo brand={brand} color="paper" size={20} />
           </Link>
           <nav className="hidden items-center gap-5 sm:flex">
-            {NAV_ITEMS.map(([href, label]) => link(href, label))}
-            {/* Pinned tools — the speaker's favorites, as compact icon links. */}
-            {pinned.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="mr-1 h-4 w-px bg-white/15" aria-hidden />
-                {pinned.map((tool) => {
-                  const active = pathname.startsWith(tool.href);
-                  const Icon = tool.icon;
-                  return (
-                    <Link
-                      key={tool.key}
-                      href={tool.href}
-                      title={tool.name}
-                      aria-label={tool.name}
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
-                        active ? 'bg-white/15 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" strokeWidth={2.25} />
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
+            {link(HUB[0], HUB[1])}
+            {/* The speaker's favorited tools — shown by name, not icon. */}
+            {pinned.map((tool) => link(tool.href, tool.name))}
           </nav>
         </div>
 
@@ -120,48 +95,25 @@ export function Navbar({ brand, favorites = [] }: { brand: BrandKit; favorites?:
       {menuOpen ? (
         <nav className="border-t border-white/10 bg-[color:var(--surface-ink)] px-4 py-3 sm:hidden">
           <div className="flex flex-col gap-1">
-            {NAV_ITEMS.map(([href, label]) => {
-              const active = pathname.startsWith(href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={() => setMenuOpen(false)}
-                  className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
-                    active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  {label}
-                </Link>
-              );
-            })}
-            {/* Pinned tools section — full-width links with the tool icon. */}
-            {pinned.length > 0 && (
-              <>
-                <div className="my-1 border-t border-white/10" />
-                <p className="px-3 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wide text-white/40">
-                  Pinned
-                </p>
-                {pinned.map((tool) => {
-                  const active = pathname.startsWith(tool.href);
-                  const Icon = tool.icon;
-                  return (
-                    <Link
-                      key={tool.key}
-                      href={tool.href}
-                      onClick={() => setMenuOpen(false)}
-                      className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
-                        active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" strokeWidth={2.25} />
-                      {tool.name}
-                    </Link>
-                  );
-                })}
-                <div className="my-1 border-t border-white/10" />
-              </>
+            {/* Hub tab plus the speaker's favorited tools, shown by name. */}
+            {([HUB, ...pinned.map((t) => [t.href, t.name] as [string, string])]).map(
+              ([href, label]) => {
+                const active = pathname.startsWith(href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setMenuOpen(false)}
+                    className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                      active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                );
+              }
             )}
+            <div className="my-1 border-t border-white/10" />
             <Link
               href="/settings"
               onClick={() => setMenuOpen(false)}

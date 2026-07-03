@@ -2,8 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Check } from 'lucide-react';
 import type { BrandKit } from '@/lib/brand/types';
+import { TOOLS } from '@/lib/tools/catalog';
 import { BrandPreview } from './BrandPreview';
+
+// How many tools a speaker may pin during onboarding. They can pick fewer.
+const MAX_FAVORITES = 5;
 
 // The prompt a new speaker copies into their preferred AI (ChatGPT, Claude,
 // Gemini, etc.) to pull that AI's existing "memory" of them. Whatever the AI
@@ -16,8 +21,12 @@ Based on everything you know about me, write a concise profile of me as a speake
 
 Write it as a direct profile I can paste into another tool — not a message back to me.`;
 
-type Step = 'name' | 'ai-memory' | 'website' | 'preview';
-const ORDER: Step[] = ['name', 'ai-memory', 'website', 'preview'];
+type Step = 'name' | 'ai-memory' | 'website' | 'preview' | 'tools';
+const ORDER: Step[] = ['name', 'ai-memory', 'website', 'preview', 'tools'];
+
+// The final step has two phases: a one-by-one tour of every tool, then a grid
+// where the speaker picks the ones to pin.
+type ToolPhase = 'tour' | 'pick';
 
 export function Onboarding({ defaultBrand }: { defaultBrand: BrandKit }) {
   const router = useRouter();
@@ -31,10 +40,39 @@ export function Onboarding({ defaultBrand }: { defaultBrand: BrandKit }) {
   const [aboutMemory, setAboutMemory] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // Tools step (final): which phase we're in, where we are in the tour, the
+  // keys the speaker has picked, and which brand step we arrived from (so the
+  // tour's "Back" on the first card returns there).
+  const [toolPhase, setToolPhase] = useState<ToolPhase>('tour');
+  const [tourIndex, setTourIndex] = useState(0);
+  const [picks, setPicks] = useState<string[]>([]);
+  const [pendingUrl, setPendingUrl] = useState<string | undefined>(undefined);
+  const [toolsFrom, setToolsFrom] = useState<Step>('website');
+
   const stepIndex = ORDER.indexOf(step);
 
+  /** Move to the final tools step, remembering the brand + url to save later. */
+  function goToTools(kit: BrandKit, websiteUrl: string | undefined, from: Step) {
+    setBrand(kit);
+    setPendingUrl(websiteUrl);
+    setToolsFrom(from);
+    setToolPhase('tour');
+    setTourIndex(0);
+    setError('');
+    setStep('tools');
+  }
+
+  /** Add or remove a tool key from the picks, capped at MAX_FAVORITES. */
+  function togglePick(key: string) {
+    setPicks((cur) => {
+      if (cur.includes(key)) return cur.filter((k) => k !== key);
+      if (cur.length >= MAX_FAVORITES) return cur; // at the cap — ignore
+      return [...cur, key];
+    });
+  }
+
   /** Save the kit (applying the entered name) and finish onboarding. */
-  async function finalize(kit: BrandKit, websiteUrl?: string) {
+  async function finalize(kit: BrandKit, websiteUrl?: string, favorites?: string[]) {
     setSaving(true);
     setError('');
     const finalKit: BrandKit = JSON.parse(JSON.stringify(kit));
@@ -52,7 +90,7 @@ export function Onboarding({ defaultBrand }: { defaultBrand: BrandKit }) {
       const res = await fetch('/api/brand', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brand: finalKit, websiteUrl, onboard: true }),
+        body: JSON.stringify({ brand: finalKit, websiteUrl, onboard: true, favoriteTools: favorites }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -260,8 +298,7 @@ export function Onboarding({ defaultBrand }: { defaultBrand: BrandKit }) {
             </button>
             <button
               type="button"
-              onClick={() => finalize(defaultBrand)}
-              disabled={saving}
+              onClick={() => goToTools(defaultBrand, undefined, 'website')}
               className="ml-auto text-sm font-semibold text-muted transition-colors hover:text-strong"
             >
               I don&apos;t have one →
@@ -289,15 +326,163 @@ export function Onboarding({ defaultBrand }: { defaultBrand: BrandKit }) {
           {error && <p className="mt-3 text-sm" style={{ color: 'var(--danger)' }}>{error}</p>}
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
-              onClick={() => finalize(brand, brand.sourceUrl || url)}
-              disabled={saving}
+              onClick={() => goToTools(brand, brand.sourceUrl || url, 'preview')}
               className="btn-primary"
             >
-              {saving ? 'Setting up…' : 'Use this brand'}
+              Use this brand
             </button>
             <button type="button" onClick={() => { setError(''); setStep('website'); }} className="btn-ghost">
               Try another site
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 5 — tools: tour every tool, then pick up to 5 to pin. */}
+      {step === 'tools' && toolPhase === 'tour' && (() => {
+        const tool = TOOLS[tourIndex];
+        const Icon = tool.icon;
+        const isLast = tourIndex === TOOLS.length - 1;
+        return (
+          <div>
+            <p className="eyebrow mb-3">Meet your tools · {tourIndex + 1} of {TOOLS.length}</p>
+            <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-surface-card p-6">
+              <span
+                className="mb-4 flex h-14 w-14 items-center justify-center rounded-[16px]"
+                style={{ background: tool.bg, color: tool.fg }}
+              >
+                <Icon className="h-7 w-7" strokeWidth={2.25} />
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-2xl font-extrabold text-strong">{tool.name}</h2>
+                {tool.tier && (
+                  <span className="rounded-[var(--radius-pill)] border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-faint">
+                    {tool.tier === 'full' ? 'Full' : 'Core'}
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-muted">{tool.desc}</p>
+            </div>
+
+            {/* Tour progress dots */}
+            <div className="mt-5 flex flex-wrap items-center gap-1.5">
+              {TOOLS.map((t, i) => (
+                <span
+                  key={t.key}
+                  className={`h-1.5 rounded-full transition-all ${
+                    i === tourIndex ? 'w-6 bg-[var(--signature)]' : 'w-1.5 bg-[var(--surface-sunk)]'
+                  }`}
+                />
+              ))}
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  tourIndex > 0 ? setTourIndex(tourIndex - 1) : setStep(toolsFrom)
+                }
+                className="btn-ghost"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={() => (isLast ? setToolPhase('pick') : setTourIndex(tourIndex + 1))}
+                className="btn-primary"
+              >
+                {isLast ? 'Choose my favorites' : 'Next'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setToolPhase('pick')}
+                className="ml-auto text-sm font-semibold text-muted transition-colors hover:text-strong"
+              >
+                Skip tour →
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {step === 'tools' && toolPhase === 'pick' && (
+        <div>
+          <h1 className="display-h1 mb-3">
+            Now pick the ones you&apos;re{' '}
+            <span className="script" style={{ fontSize: '1.2em' }}>
+              most excited
+            </span>{' '}
+            to use.
+          </h1>
+          <p className="mb-6 text-muted">
+            Choose up to {MAX_FAVORITES}. They&apos;ll be pinned to your top bar for quick access —
+            you can change them anytime from the Hub.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {TOOLS.map((tool) => {
+              const Icon = tool.icon;
+              const chosen = picks.includes(tool.key);
+              const atCap = picks.length >= MAX_FAVORITES && !chosen;
+              return (
+                <button
+                  key={tool.key}
+                  type="button"
+                  onClick={() => togglePick(tool.key)}
+                  disabled={atCap}
+                  aria-pressed={chosen}
+                  className={`flex items-start gap-3 rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
+                    chosen
+                      ? 'border-[var(--signature)] bg-[var(--surface-sunk)]'
+                      : 'border-[var(--border-subtle)] bg-surface-card hover:border-strong'
+                  } ${atCap ? 'cursor-not-allowed opacity-50' : ''}`}
+                >
+                  <span
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
+                    style={{ background: tool.bg, color: tool.fg }}
+                  >
+                    <Icon className="h-5 w-5" strokeWidth={2.25} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="font-extrabold text-strong">{tool.name}</span>
+                      {chosen && (
+                        <span
+                          className="flex h-4 w-4 items-center justify-center rounded-full"
+                          style={{ background: 'var(--signature)', color: 'var(--on-signature)' }}
+                        >
+                          <Check className="h-3 w-3" strokeWidth={3} />
+                        </span>
+                      )}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted">{tool.desc}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {error && <p className="mt-4 text-sm" style={{ color: 'var(--danger)' }}>{error}</p>}
+
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => { setToolPhase('tour'); setTourIndex(TOOLS.length - 1); }}
+              className="btn-ghost"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              disabled={picks.length < 1 || saving}
+              onClick={() => finalize(brand, pendingUrl, picks)}
+              className="btn-primary"
+            >
+              {saving ? 'Setting up…' : 'Finish setup'}
+            </button>
+            <span className="ml-auto text-sm font-semibold text-muted">
+              {picks.length} of {MAX_FAVORITES} chosen
+            </span>
           </div>
         </div>
       )}
