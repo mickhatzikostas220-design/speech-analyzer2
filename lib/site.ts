@@ -12,7 +12,9 @@ export const SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.NEXT_PUBLIC_APP_URL ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
-  'https://speech-analyzer2-rkgj-98j31c1nf.vercel.app'
+  // The project's public production alias — NOT a deployment-specific URL
+  // (those sit behind Vercel SSO and must never be the canonical host).
+  'https://speech-analyzer2-rkgj.vercel.app'
 ).replace(/\/$/, '');
 
 export const SITE_NAME = 'Speaker Hub';
