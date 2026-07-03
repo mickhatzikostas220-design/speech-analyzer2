@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from '@/lib/site';
+import { TesterFreshStart } from '@/components/TesterFreshStart';
 
 export const metadata: Metadata = {
   title: {
@@ -52,7 +53,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        <TesterFreshStart />
+        {children}
+      </body>
     </html>
   );
 }

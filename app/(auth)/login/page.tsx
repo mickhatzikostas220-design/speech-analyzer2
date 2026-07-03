@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { isTesterEmail, TESTER_RESET_FLAG } from '@/lib/tester';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,6 +25,17 @@ export default function LoginPage() {
       setError(signInError.message);
       setLoading(false);
       return;
+    }
+
+    // The tester demo account is meant to feel brand-new on every login, so
+    // wipe its data before we land it in the app. We await this so the app
+    // never renders with stale data from a previous session. Setting the guard
+    // flag stops <TesterFreshStart /> from wiping a second time on this visit.
+    // The endpoint is a no-op / 403 for every other account, so this only
+    // affects the tester.
+    if (isTesterEmail(email)) {
+      await fetch('/api/tester/reset', { method: 'POST' });
+      sessionStorage.setItem(TESTER_RESET_FLAG, '1');
     }
 
     router.push('/dashboard');
