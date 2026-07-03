@@ -1,88 +1,102 @@
 # Go-Live Checklist — Speaker Hub
 
-The code is feature-complete and statically verified. These are the remaining
-**external** steps to take it fully live. Work top to bottom; nothing here needs
-a local build (Vercel compiles in the cloud), so a full C: drive doesn't block you.
+**Updated 2026-07-02 (evening).** The code side is done and build-verified.
+Everything below is an owner action — none of it can be done from the repo.
+Work top to bottom; §1 and §2 are the ones blocking the site right now.
 
 ---
 
-## 1. Commit & push (VSCode — git isn't on your PATH)
+## 1. 🔴 Restore public access (the site is currently unreachable)
 
-- [ ] Open **Source Control** (`Ctrl+Shift+G`), stage all changes, commit.
-- [ ] **Publish Branch** as `production-readiness` (not straight to `main`).
-- [ ] On GitHub, open a **Pull Request** from that branch.
+`speech-analyzer2-rkgj.vercel.app` worked earlier today but now returns
+**404 DEPLOYMENT_NOT_FOUND**, and every deployment URL redirects to a Vercel
+login wall (Deployment Protection). Until fixed, nobody can reach the site.
 
-> Vercel builds a **Preview** automatically and posts pass/fail on the PR. That
-> preview build is the real TypeScript/Next.js compile — the one verification
-> that can't be done locally here.
+In the Vercel dashboard → **speech-analyzer2-rkgj** project:
 
-## 2. Verify the build
+- [ ] **Settings → Domains** — confirm `speech-analyzer2-rkgj.vercel.app` (or
+      your real domain) is listed and attached to Production. Re-add if missing.
+- [ ] **Settings → Deployment Protection** — set to **Standard Protection**
+      (production public, previews protected) or turn off Vercel Authentication
+      for production.
+- [ ] Reload the URL in a private window — the marketing page should render
+      without a Vercel login.
 
-- [ ] **Green check** on the PR → the build compiled clean. Merge to deploy.
-- [ ] **Red check** → open "Details", copy the build log, and send it to Claude.
-      Real compiler output = fast fix. (The build enforces **TypeScript** errors;
-      ESLint is not run — see `memory` note / next.config.js.)
+## 2. Merge the pending PR (build already green)
 
-## 3. Database migrations (Supabase → SQL Editor)
+- [ ] Open the PR for branch **`production-fixes-jul2`**:
+      <https://github.com/mickhatzikostas220-design/speech-analyzer2/pull/new/production-fixes-jul2>
+      and merge it. Both Vercel projects compiled it successfully, so the merge
+      is safe. It contains: the AI-memory onboarding step, the `/keynotes`
+      login-redirect fix, and the keynote RLS/index migration mirror.
 
-**No new migration this session** — rate limiting is in-memory (`lib/rateLimit.ts`)
-and needs no table. Run the baseline only if this is a fresh project:
+## 3. Delete the duplicate Vercel project
 
-- [ ] `supabase/schema.sql`, `access_requests.sql`, `brand.sql`, `gigs.sql`,
-      `bookings.sql`, `onesheet.sql`, `subscription.sql`, `agent.sql`,
-      `clipflow.sql`, `tips.sql`, `seo_tips.sql`
-- [ ] Storage bucket: `insert into storage.buckets (id, name, public) values ('speeches','speeches',false);`
+Two Vercel projects build this repo on every push: **speech-analyzer2** and
+**speech-analyzer2-rkgj** (the live one).
 
-## 4. Environment variables (Vercel → Project → Settings → Environment Variables)
+- [ ] Delete the **speech-analyzer2** project (Settings → Delete Project) so
+      each push builds once.
 
-Copy from `.env.local.example`. **Required for a real launch:**
+## 4. Environment variables (Vercel → Settings → Environment Variables)
+
+Copy from `.env.local.example`. Required for a real launch:
 
 - [ ] `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - [ ] `OPENAI_API_KEY` (powers analysis, feedback, Whisper, all app AI)
-- [ ] `RESEND_API_KEY` + `EMAIL_FROM` using a **verified domain** (the `resend.dev`
-      default only delivers to you — real signups won't get their verification code)
-- [ ] `NEXT_PUBLIC_APP_URL` (and/or `NEXT_PUBLIC_SITE_URL`) = your real production URL
-- [ ] `ADMIN_EMAIL`
-- [ ] Stripe **live** keys + price IDs when you're ready to charge:
-      `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_CORE`, `STRIPE_PRICE_FULL`
+- [ ] `NEXT_PUBLIC_APP_URL` = your real public URL (the code's fallback is an
+      SSO-protected deployment URL, so sitemap/canonical/emails need this set)
+- [ ] `RESEND_API_KEY` + `EMAIL_FROM` on a **verified domain** (the `resend.dev`
+      default only delivers to you — real signups won't get their code).
+      Note: `speakerhub.app` is currently just registrar parking — the legal
+      pages already use `privacy@`/`support@speakerhub.app`, so either finish
+      setting up that domain or change those addresses.
+- [ ] `ADMIN_EMAIL`, `ADMIN_ACTION_SECRET`
 - [ ] `APP_ENCRYPTION_KEY` (required for the AI Assistant — `openssl rand -hex 32`)
+- [ ] Stripe **live** keys + price IDs when ready to charge: `STRIPE_SECRET_KEY`,
+      `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_CORE`, `STRIPE_PRICE_FULL`
 
-Optional / per-feature (leave blank to disable gracefully): `TRIBE_SERVER_URL`,
+Optional / per-feature (blank = feature disables gracefully): `TRIBE_SERVER_URL`,
 `PARAKEET_SERVER_URL`, `YOUTUBE_API_KEY`, `CLIPFLOW_RENDER_URL`, `UPLOAD_POST_API_KEY`,
 `GOOGLE_CLIENT_ID/SECRET`, `CRON_SECRET`.
 
-## 5. Domain & auth redirects
+## 5. Supabase (one toggle left)
 
-- [ ] Point your custom domain at the Vercel project.
-- [ ] Set `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_SITE_URL` to that domain.
-- [ ] In **Supabase → Authentication → URL Configuration**, add the domain to the
-      redirect allow-list (so email confirmation **and** password reset links work —
-      the reset flow returns to `/auth/callback?next=/reset-password`).
+Database is verified: all 28 tables have RLS, advisors are clean except one:
 
-## 6. Legal
+- [ ] **Authentication → Passwords → enable "Prevent use of leaked passwords"**
+      (the only remaining security advisor warning; dashboard-only setting).
+- [ ] If you point a custom domain at the app: **Authentication → URL
+      Configuration** — add it to the redirect allow-list (email confirmation
+      + password reset return to `/auth/callback?next=/reset-password`).
 
-- [ ] Have counsel review `/privacy` and `/terms` (drafted baselines) before charging.
-- [ ] Set real contact emails in `app/privacy/page.tsx` and `app/terms/page.tsx`
-      (currently `privacy@speakerhub.app` / `support@speakerhub.app`).
+## 6. Paywalls (currently OFF on purpose)
 
-## 7. Post-launch smoke test
+`lib/subscription/config.ts` → `PAYWALLS_DEFAULT = false`: every signed-in user
+gets full access; no quotas. To start enforcing tiers, flip it to `true` or set
+`PAYWALLS_ENABLED=true` in Vercel env (env var wins; no code change needed).
 
-- [ ] Sign up with a real email → verification code arrives → land on onboarding.
-- [ ] Upload a talk → processing screen shows elapsed time → results render.
-- [ ] Results page shows score, engagement timeline, transcript with **words/wpm/pace**.
-- [ ] Free plan: run 3 analyses → 4th is blocked with the upgrade prompt; the
-      quota banner counts down on the analyzer + dashboard.
-- [ ] Tier enforcement (free user): ClipFlow / AI Assistant / Talk Editor /
-      Booking Inbox / public one-sheet / Brand Kit each show an upgrade screen
-      instead of the tool; the dashboard shows Core/Full badges on locked tools.
-      (Free tools stay open: Speech Analyzer, Talk Library, Compare. Onboarding
-      still works on free.)
+## 7. Legal (gates charging money)
+
+- [ ] Counsel review of `/privacy` and `/terms` (drafted baselines).
+- [ ] Real contact emails in `app/privacy/page.tsx` / `app/terms/page.tsx`
+      (currently the parked `speakerhub.app` addresses).
+
+## 8. Post-launch smoke test
+
+- [ ] Sign up with a real email → verification code arrives → onboarding
+      (4 steps now — the new AI-memory step is step 2, skippable).
+- [ ] Upload a talk → processing screen → results with score, timeline,
+      transcript (words/wpm/pace).
+- [ ] Logged out, visit `/keynotes` → redirected to `/login` (the fix in the PR).
 - [ ] Rate limit: 11 rapid `POST /api/analyses` in a minute → 11th returns 429.
-- [ ] Password reset email arrives and the link lets you set a new password.
-- [ ] Marketing page (`/`) renders for logged-out visitors; `/privacy`, `/terms`,
-      `/robots.txt`, `/sitemap.xml` all load.
+- [ ] Password reset email arrives and the link sets a new password.
+- [ ] `/`, `/privacy`, `/terms`, `/robots.txt`, `/sitemap.xml` load logged-out.
+- [ ] When paywalls go ON: free user blocked after 3 analyses; ClipFlow /
+      AI Assistant / Talk Editor / Booking Inbox / one-sheet / Brand Kit show
+      upgrade screens; dashboard shows Core/Full badges on locked tools.
 
 ---
 
-*Once §1–2 are green and §3–5 are set, the site is live and verified. §6 gates
-charging real money; §7 confirms the consumer flows end-to-end.*
+*§1–2 put the verified site back on the public internet. §4–5 make signup and
+email real. §6–7 gate charging money. §8 confirms the flows end-to-end.*
