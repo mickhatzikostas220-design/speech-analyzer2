@@ -102,6 +102,9 @@ create policy "Users read own speeches" on storage.objects for select using (
 create policy "Users delete own speeches" on storage.objects for delete using (
   bucket_id = 'speeches' and auth.uid()::text = (storage.foldername(name))[1]
 );
-create policy "Service reads speeches" on storage.objects for select using (
-  bucket_id = 'speeches'
-);
+-- NOTE: There is deliberately NO bucket-wide read policy here. The service role
+-- (used by API routes that need to read any file) bypasses RLS entirely, so it
+-- needs no policy. A bucket-wide `using (bucket_id = 'speeches')` SELECT policy
+-- would also apply to the anon/authenticated roles, letting any logged-in user
+-- download every other user's private uploads. The per-user
+-- "Users read own speeches" policy above is the only read grant we want.

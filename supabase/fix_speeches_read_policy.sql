@@ -1,0 +1,31 @@
+-- SECURITY FIX — run this once in the Supabase SQL editor
+-- (Dashboard > SQL Editor > New query) against the production database.
+--
+-- Problem: the original schema.sql created this policy on the private
+-- `speeches` bucket:
+--
+--     create policy "Service reads speeches" on storage.objects for select
+--       using (bucket_id = 'speeches');
+--
+-- A storage RLS policy with no `TO <role>` clause applies to the `public`
+-- role, which includes both `anon` and `authenticated`. Its predicate is just
+-- `bucket_id = 'speeches'` with NO per-user check, so ANY logged-in user (and,
+-- with a valid anon key, any client) could download EVERY other user's private
+-- speech uploads simply by requesting their storage path — a cross-user data
+-- disclosure (IDOR).
+--
+-- The policy was intended to let server-side API routes read arbitrary files,
+-- but those routes use the service-role key, which bypasses RLS entirely and
+-- therefore never needed this policy. Legitimate per-user reads are already
+-- covered by the "Users read own speeches" policy.
+--
+-- Fix: drop the over-broad policy. No application behaviour changes — the
+-- service role still reads everything, and users still read their own files.
+
+drop policy if exists "Service reads speeches" on storage.objects;
+
+-- Verify afterwards (should list only the per-user speeches policies):
+--   select policyname, cmd, qual
+--   from pg_policies
+--   where schemaname = 'storage' and tablename = 'objects'
+--     and qual ilike '%speeches%';

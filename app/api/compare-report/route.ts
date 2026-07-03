@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createChatCompletion } from '@/lib/ai-config';
+import { rateLimit } from '@/lib/rateLimit';
 
 // Created lazily inside the handler — instantiating at module scope throws
 // when OPENAI_API_KEY is missing during `next build`, which breaks the build.
@@ -19,6 +20,16 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
+  }
+
+  // SECURITY: cap how often one user can spend GPT-4o tokens here so a signed-in
+  // account can't loop this endpoint to run up the shared OpenAI bill.
+  const limited = rateLimit(`compare:${user.id}`, 15, 10 * 60 * 1000);
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: 'Too many reports. Please wait a moment and try again.' },
+      { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
+    );
   }
 
   let body: Record<string, unknown>;

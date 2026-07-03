@@ -24,9 +24,9 @@ function when(e: GCalEvent): string {
 // Read-only Google Calendar tools, bound to a connected Google account. The
 // connection's Calendar scope is granted via the shared Google consent flow;
 // accounts connected before Calendar was added must reconnect once.
-export function calendarTools(connectionId: string): ToolDef[] {
+export function calendarTools(connectionId: string, userId?: string): ToolDef[] {
   async function token(supabase: SupabaseClient) {
-    return getValidAccessToken(supabase, connectionId);
+    return getValidAccessToken(supabase, connectionId, userId);
   }
 
   return [

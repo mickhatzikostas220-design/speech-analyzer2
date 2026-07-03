@@ -85,16 +85,21 @@ async function refreshAccessToken(refreshToken: string): Promise<TokenResponse> 
   return res.json();
 }
 
-// Returns a valid access token for a connection, refreshing + persisting if expired.
+// Returns a valid access token for a connection, refreshing + persisting if
+// expired. Pass `userId` to bind the lookup to the owner so a connection id can
+// never be used to read another user's Google tokens (defence in depth — every
+// current caller already derives the id from the user's own connection list).
 export async function getValidAccessToken(
   supabase: SupabaseClient,
-  connectionId: string
+  connectionId: string,
+  userId?: string
 ): Promise<string> {
-  const { data } = await supabase
+  let selectQuery = supabase
     .from('agent_connections')
     .select('encrypted_access_token, encrypted_refresh_token, token_expires_at')
-    .eq('id', connectionId)
-    .single();
+    .eq('id', connectionId);
+  if (userId) selectQuery = selectQuery.eq('user_id', userId);
+  const { data } = await selectQuery.single();
   if (!data) throw new Error('Connection not found');
 
   const expiresAt = data.token_expires_at ? new Date(data.token_expires_at).getTime() : 0;
@@ -111,7 +116,7 @@ export async function getValidAccessToken(
 
   const refreshed = await refreshAccessToken(decrypt(data.encrypted_refresh_token));
   const newExpiry = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
-  await supabase
+  let updateQuery = supabase
     .from('agent_connections')
     .update({
       encrypted_access_token: encrypt(refreshed.access_token),
@@ -119,5 +124,7 @@ export async function getValidAccessToken(
       updated_at: new Date().toISOString(),
     })
     .eq('id', connectionId);
+  if (userId) updateQuery = updateQuery.eq('user_id', userId);
+  await updateQuery;
   return refreshed.access_token;
 }

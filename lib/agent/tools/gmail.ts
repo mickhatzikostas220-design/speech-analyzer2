@@ -46,9 +46,9 @@ function extractPlainText(payload: GmailPart | undefined): string {
 
 // Build the Gmail tools bound to a specific connection. autonomy gating happens
 // in the registry — this just declares what each tool does.
-export function gmailTools(connectionId: string): ToolDef[] {
+export function gmailTools(connectionId: string, userId?: string): ToolDef[] {
   async function token(supabase: SupabaseClient) {
-    return getValidAccessToken(supabase, connectionId);
+    return getValidAccessToken(supabase, connectionId, userId);
   }
 
   return [
