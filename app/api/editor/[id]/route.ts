@@ -20,7 +20,9 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     if (error || !project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     let video_url: string | null = null;
-    if (project.video_path) {
+    // Defence in depth: only ever sign a path inside the caller's own folder,
+    // even though PATCH already refuses to store anything else.
+    if (project.video_path && String(project.video_path).startsWith(`${user.id}/`)) {
       const admin = createAdminClient();
       const { data } = await admin.storage
         .from('speeches')
@@ -47,6 +49,20 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const updates = Object.fromEntries(
       Object.entries(body).filter(([k]) => allowed.includes(k))
     );
+
+    // SECURITY: video_path is later handed to the service-role storage client
+    // (createSignedUrl / remove in GET and DELETE), which bypasses Storage RLS.
+    // Owning this project row does NOT entitle the caller to point it at another
+    // user's object, so a client may only ever set a path inside its own folder.
+    // Legitimate uploads always produce `${user.id}/editor/...` (see the upload
+    // and signed-upload routes), so this rejects forged cross-tenant paths
+    // without affecting the normal flow.
+    if ('video_path' in updates) {
+      const vp = updates.video_path;
+      if (typeof vp !== 'string' || !vp.startsWith(`${user.id}/`)) {
+        return NextResponse.json({ error: 'Invalid video_path' }, { status: 400 });
+      }
+    }
 
     const { error } = await supabase
       .from('editor_projects')
@@ -75,7 +91,8 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
       .eq('user_id', user.id)
       .single();
 
-    if (project?.video_path) {
+    // Defence in depth: never let a delete reach outside the caller's folder.
+    if (project?.video_path && String(project.video_path).startsWith(`${user.id}/`)) {
       const admin = createAdminClient();
       await admin.storage.from('speeches').remove([project.video_path]);
     }

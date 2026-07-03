@@ -8,6 +8,7 @@ import { getUserPlan } from '@/lib/subscription/server';
 import { isPlatform, platformLabel } from '@/lib/seo/platforms';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
 import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
+import { safeFetchHtml, SafeFetchError } from '@/lib/safeFetch';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const SEVERITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -24,35 +25,14 @@ export const maxDuration = 60;
 const FETCH_TIMEOUT_MS = 9000;
 const MAX_HTML_BYTES = 700_000;
 
-// Block obvious SSRF targets (localhost, link-local, private ranges).
-function isBlockedHost(host: string): boolean {
-  const h = host.toLowerCase();
-  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
-  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
-  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd')) return true;
-  return false;
-}
-
+// SSRF protection (DNS resolution + per-redirect-hop host checks) lives in
+// lib/safeFetch.ts so the SEO scraper and the brand extractor share one guard.
 async function fetchHtml(url: string): Promise<string> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, {
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml',
-      },
-    });
-    if (!res.ok) throw new BrandExtractError(`The site responded with ${res.status}.`);
-    const buf = await res.arrayBuffer();
-    return new TextDecoder('utf-8').decode(buf.slice(0, MAX_HTML_BYTES));
-  } finally {
-    clearTimeout(timer);
-  }
+  const { html } = await safeFetchHtml(url, {
+    timeoutMs: FETCH_TIMEOUT_MS,
+    maxBytes: MAX_HTML_BYTES,
+  });
+  return html;
 }
 
 function extractSignals(html: string) {
@@ -148,14 +128,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  if (isBlockedHost(new URL(url).hostname)) {
-    return NextResponse.json({ error: 'That address is not allowed.' }, { status: 400 });
-  }
-
   let html: string;
   try {
     html = await fetchHtml(url);
-  } catch {
+  } catch (err) {
+    // A blocked (private/link-local/redirected-internal) target is a client
+    // error, not an upstream failure — surface it distinctly from unreachable.
+    if (err instanceof SafeFetchError) {
+      return NextResponse.json({ error: 'That address is not allowed.' }, { status: 400 });
+    }
     return NextResponse.json(
       { error: "Couldn't reach that website. Check the address and try again." },
       { status: 502 }

@@ -29,7 +29,7 @@ export async function buildTools(
     if (conn.provider === 'google') {
       const allowed = ALLOWED_EFFECTS[conn.autonomy];
       // A Google connection unlocks both Gmail and (read-only) Calendar.
-      const googleTools = [...gmailTools(conn.id), ...calendarTools(conn.id)];
+      const googleTools = [...gmailTools(conn.id, userId), ...calendarTools(conn.id, userId)];
       const usable = googleTools.filter((t) => allowed.includes(t.sideEffect));
       tools.push(...usable);
       notes.push(

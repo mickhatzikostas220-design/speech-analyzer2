@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { createChatCompletion } from '@/lib/ai-config';
+import { rateLimit } from '@/lib/rateLimit';
 import { NextRequest } from 'next/server';
 
 export const maxDuration = 60;
@@ -78,8 +79,36 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new Response('Unauthorized', { status: 401 });
 
-  const { messages } = await request.json();
-  if (!Array.isArray(messages) || messages.length === 0) {
+  // SECURITY: throttle per user so this streaming GPT-4o endpoint can't be
+  // looped to run up the shared OpenAI bill.
+  const limited = rateLimit(`analysis-chat:${user.id}`, 30, 5 * 60 * 1000);
+  if (!limited.ok) {
+    return new Response('Too many messages. Please slow down.', {
+      status: 429,
+      headers: { 'Retry-After': String(limited.retryAfter) },
+    });
+  }
+
+  const { messages: rawMessages } = await request.json();
+  if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
+    return new Response('Bad request', { status: 400 });
+  }
+
+  // Bound what gets forwarded to the model: only user/assistant turns, each
+  // capped in length, and only the most recent 12 — the client can't inflate
+  // token spend by sending a huge or deeply padded conversation.
+  const messages = rawMessages
+    .filter(
+      (m: unknown): m is { role: 'user' | 'assistant'; content: string } =>
+        !!m &&
+        ((m as { role?: unknown }).role === 'user' ||
+          (m as { role?: unknown }).role === 'assistant') &&
+        typeof (m as { content?: unknown }).content === 'string'
+    )
+    .slice(-12)
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+
+  if (messages.length === 0) {
     return new Response('Bad request', { status: 400 });
   }
 

@@ -17,6 +17,22 @@ export async function POST(request: NextRequest) {
     const audio = formData.get('audio') as Blob | null;
     if (!audio) return NextResponse.json({ error: 'No audio provided' }, { status: 400 });
 
+    // SECURITY / cost control: bound the upload before forwarding it to the
+    // Whisper / Parakeet backends. 25 MB is OpenAI Whisper's own hard limit, and
+    // an audio/video MIME check stops arbitrary blobs being sent to the GPU
+    // transcription backend. Without this, a signed-in user could push huge or
+    // many files to run up OpenAI/GPU spend.
+    const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+    if (audio.size > MAX_AUDIO_BYTES) {
+      return NextResponse.json(
+        { error: 'Audio file is too large (max 25 MB).' },
+        { status: 413 }
+      );
+    }
+    if (audio.type && !/^(audio|video)\//.test(audio.type)) {
+      return NextResponse.json({ error: 'Unsupported file type.' }, { status: 415 });
+    }
+
     // Prefer the self-hosted Parakeet (parakeet-tdt-0.6b-v3) GPU server when
     // configured; otherwise fall back to OpenAI Whisper. Both return the same
     // { words: [{ word, start, end }], text } shape the script matcher consumes.

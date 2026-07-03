@@ -1,6 +1,7 @@
 import type { BrandKit } from './types';
 import { cloneDefaultBrand } from './defaults';
 import { normalizeHex, isNeutral, saturation, readableTextOn, hexToRgb } from './color';
+import { safeFetchHtml, SafeFetchError } from '@/lib/safeFetch';
 
 /**
  * Auto-extract a brand kit from a speaker's website. Pure server-side:
@@ -31,57 +32,24 @@ export function normalizeUrl(input: string): string {
 }
 
 async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  // SSRF protection (DNS resolution + per-redirect-hop host checks) is shared
+  // with the SEO scraper — see lib/safeFetch.ts.
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        // A normal browser UA — speakers ask us to read their own public
-        // site, and many hosts reject obvious bot agents.
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
+    return await safeFetchHtml(url, {
+      timeoutMs: FETCH_TIMEOUT_MS,
+      maxBytes: MAX_HTML_BYTES,
+      headers: { 'Accept-Language': 'en-US,en;q=0.9' },
     });
-    if (!res.ok) throw new BrandExtractError(`The site responded with ${res.status}.`);
-    const reader = res.body?.getReader();
-    if (!reader) return { html: await res.text(), finalUrl: res.url || url };
-    // Read at most MAX_HTML_BYTES so a huge page can't stall us.
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    while (total < MAX_HTML_BYTES) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value) {
-        chunks.push(value);
-        total += value.length;
-      }
-    }
-    reader.cancel().catch(() => {});
-    const html = new TextDecoder('utf-8').decode(concat(chunks));
-    return { html, finalUrl: res.url || url };
   } catch (err) {
-    if (err instanceof BrandExtractError) throw err;
+    if (err instanceof SafeFetchError) {
+      throw new BrandExtractError(
+        "Couldn't reach that website. Check the address, or set your brand by hand."
+      );
+    }
     throw new BrandExtractError(
       "Couldn't reach that website. Check the address, or set your brand by hand."
     );
-  } finally {
-    clearTimeout(timer);
   }
-}
-
-function concat(chunks: Uint8Array[]): Uint8Array {
-  const len = chunks.reduce((n, c) => n + c.length, 0);
-  const out = new Uint8Array(len);
-  let off = 0;
-  for (const c of chunks) {
-    out.set(c, off);
-    off += c.length;
-  }
-  return out;
 }
 
 // --- tiny HTML helpers -------------------------------------------------
