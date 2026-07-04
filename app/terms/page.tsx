@@ -3,8 +3,9 @@
 // before charging real customers.
 //
 // NOTE for Mick: this is a solid, honest baseline that matches the app's plans
-// and features. Have it reviewed by counsel, set your governing-law location,
-// and set your real contact email before you rely on it in production.
+// and features. Operator (Michael Hatzikostas), governing law (Connecticut),
+// and the contact email are now set. Still have it reviewed by counsel before
+// you rely on it in production.
 
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/marketing/LegalPage';
@@ -16,13 +17,13 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const CONTACT_EMAIL = 'support@speakerhub.app';
+const CONTACT_EMAIL = 'mickhatzikostas220@gmail.com';
 
 const sections: LegalSection[] = [
   {
     heading: 'Acceptance of terms',
     paragraphs: [
-      `By creating an account or using ${SITE_NAME} (the "Service"), you agree to these Terms of Service. If you do not agree, please do not use the Service.`,
+      `${SITE_NAME} (the "Service") is operated by Michael Hatzikostas ("we", "us", or "our"), based in Connecticut, United States. By creating an account or using the Service, you agree to these Terms of Service. If you do not agree, please do not use the Service.`,
       'You must be at least 18 years old, or the age of majority where you live, to use the Service.',
     ],
   },
@@ -72,6 +73,13 @@ const sections: LegalSection[] = [
     heading: 'Termination',
     paragraphs: [
       'You may stop using the Service and delete your account at any time. We may suspend or end your access if you violate these terms or if we discontinue the Service.',
+    ],
+  },
+  {
+    heading: 'Governing law and disputes',
+    paragraphs: [
+      'These terms and any dispute arising out of or relating to them or the Service are governed by the laws of the State of Connecticut, United States, without regard to its conflict-of-laws principles.',
+      'You agree that any legal action or proceeding relating to these terms or the Service will be brought exclusively in the state or federal courts located in Connecticut, and you consent to the personal jurisdiction of those courts.',
     ],
   },
   {

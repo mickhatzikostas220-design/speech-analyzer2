@@ -4,8 +4,8 @@
 // accommodations. Publishing a statement like this is a recognized best
 // practice for demonstrating a good-faith ADA / Section 508 commitment.
 //
-// NOTE for Mick: set your real accessibility contact email below, and update
-// the "last reviewed" date whenever you re-audit the site.
+// NOTE for Mick: the accessibility contact email is set below. Update the
+// "last reviewed" date whenever you re-audit the site.
 
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/marketing/LegalPage';
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const CONTACT_EMAIL = 'accessibility@speakerhub.app';
+const CONTACT_EMAIL = 'mickhatzikostas220@gmail.com';
 
 const sections: LegalSection[] = [
   {

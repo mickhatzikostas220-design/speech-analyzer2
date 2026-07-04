@@ -4,8 +4,8 @@
 //
 // NOTE for Mick: this is a solid, honest baseline written to match how the app
 // actually works (Supabase auth/storage, OpenAI/Anthropic for AI, Stripe for
-// payments, Resend for email). Have it reviewed by counsel and set your real
-// contact email before you rely on it in production.
+// payments, Resend for email). The operator and contact email are now set;
+// still have it reviewed by counsel before you rely on it in production.
 
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/marketing/LegalPage';
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const CONTACT_EMAIL = 'privacy@speakerhub.app';
+const CONTACT_EMAIL = 'mickhatzikostas220@gmail.com';
 
 const sections: LegalSection[] = [
   {
@@ -99,7 +99,7 @@ export default function PrivacyPage() {
     <LegalPage
       title="Privacy Policy"
       updated="July 1, 2026"
-      intro={`This Privacy Policy explains what information ${SITE_NAME} collects, how we use it, and the choices you have. By using the service, you agree to the practices described here.`}
+      intro={`${SITE_NAME} is operated by Michael Hatzikostas, based in Connecticut, United States. This Privacy Policy explains what information ${SITE_NAME} collects, how we use it, and the choices you have. By using the service, you agree to the practices described here.`}
       sections={sections}
     />
   );
