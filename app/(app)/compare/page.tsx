@@ -445,8 +445,9 @@ export default function ComparePage() {
       {/* Selection */}
       <div className="card p-5 flex flex-col sm:flex-row gap-4 items-end">
         <div className="flex-1">
-          <label className="text-xs text-muted block mb-1.5">Speech A <span className="text-strong">(solid line)</span></label>
+          <label htmlFor="compare-speech-a" className="text-xs text-muted block mb-1.5">Speech A <span className="text-strong">(solid line)</span></label>
           <select
+            id="compare-speech-a"
             value={idA}
             onChange={e => { setIdA(e.target.value); setSameError(false); }}
             className="input w-full text-sm"
@@ -458,8 +459,9 @@ export default function ComparePage() {
           </select>
         </div>
         <div className="flex-1">
-          <label className="text-xs text-muted block mb-1.5">Speech B <span className="text-muted">(dashed line)</span></label>
+          <label htmlFor="compare-speech-b" className="text-xs text-muted block mb-1.5">Speech B <span className="text-muted">(dashed line)</span></label>
           <select
+            id="compare-speech-b"
             value={idB}
             onChange={e => { setIdB(e.target.value); setSameError(false); }}
             className="input w-full text-sm"
@@ -478,7 +480,7 @@ export default function ComparePage() {
           >
             {loading ? 'Loading…' : 'Compare'}
           </button>
-          {sameError && <p className="text-xs text-[color:var(--danger)] text-center">Select two different speeches to compare.</p>}
+          {sameError && <p role="alert" className="text-xs text-[color:var(--danger-text)] text-center">Select two different speeches to compare.</p>}
         </div>
       </div>
 

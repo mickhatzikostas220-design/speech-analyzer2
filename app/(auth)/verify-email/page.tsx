@@ -97,19 +97,20 @@ export default function VerifyEmailPage() {
         </div>
 
         {error && (
-          <div className="rounded-[var(--radius-sm)] bg-[var(--danger-bg)] px-3 py-2 text-sm" style={{ color: 'var(--danger)' }}>
+          <div role="alert" className="rounded-[var(--radius-sm)] bg-[var(--danger-bg)] px-3 py-2 text-sm" style={{ color: 'var(--danger-text)' }}>
             {error}
           </div>
         )}
         {info && (
-          <div className="rounded-[var(--radius-sm)] bg-[var(--success-bg)] px-3 py-2 text-sm" style={{ color: 'var(--success)' }}>
+          <div role="status" className="rounded-[var(--radius-sm)] bg-[var(--success-bg)] px-3 py-2 text-sm" style={{ color: 'var(--success-text)' }}>
             {info}
           </div>
         )}
 
         <div className="space-y-1.5 text-left">
-          <label className="field-label" style={{ marginBottom: 0 }}>Email</label>
+          <label htmlFor="verify-email" className="field-label" style={{ marginBottom: 0 }}>Email</label>
           <input
+            id="verify-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -120,8 +121,9 @@ export default function VerifyEmailPage() {
         </div>
 
         <div className="space-y-1.5 text-left">
-          <label className="field-label" style={{ marginBottom: 0 }}>Verification code</label>
+          <label htmlFor="verify-code" className="field-label" style={{ marginBottom: 0 }}>Verification code</label>
           <input
+            id="verify-code"
             inputMode="numeric"
             autoComplete="one-time-code"
             maxLength={6}

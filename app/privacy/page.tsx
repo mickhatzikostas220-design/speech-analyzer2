@@ -4,8 +4,8 @@
 //
 // NOTE for Mick: this is a solid, honest baseline written to match how the app
 // actually works (Supabase auth/storage, OpenAI/Anthropic for AI, Stripe for
-// payments, Resend for email). Have it reviewed by counsel and set your real
-// contact email before you rely on it in production.
+// payments, Resend for email). The operator and contact email are now set;
+// still have it reviewed by counsel before you rely on it in production.
 
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/marketing/LegalPage';
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const CONTACT_EMAIL = 'privacy@speakerhub.app';
+const CONTACT_EMAIL = 'mickhatzikostas220@gmail.com';
 
 const sections: LegalSection[] = [
   {
@@ -52,6 +52,27 @@ const sections: LegalSection[] = [
     ],
   },
   {
+    heading: 'Cookies and similar technologies',
+    paragraphs: [
+      'We use strictly necessary, first-party cookies to keep you signed in and to keep the service secure — for example, the session cookies set by our authentication provider (Supabase). These are required for the app to function and cannot be turned off from within the app.',
+      'We do not use advertising cookies, and we do not sell or share your information with advertising networks. If we add optional analytics or other non-essential cookies in the future, we will update this policy and, where the law requires it, ask for your consent first.',
+      'Most browsers let you block or delete cookies in their settings. Blocking strictly necessary cookies may stop you from signing in or using parts of the service.',
+    ],
+  },
+  {
+    heading: "Children's privacy",
+    paragraphs: [
+      'The service is intended for adults and is not directed to children. We do not knowingly collect personal information from anyone under 16 (or under 13 in the United States).',
+      'If you believe a child has provided us with personal information, contact us at the address below and we will delete it.',
+    ],
+  },
+  {
+    heading: 'International data transfers',
+    paragraphs: [
+      'We and our service providers may process and store your information in countries other than the one you live in, including the United States. Where required, we rely on appropriate safeguards for these transfers.',
+    ],
+  },
+  {
     heading: 'Data retention and security',
     paragraphs: [
       'We keep your information for as long as your account is active or as needed to provide the service. You can delete your content, and you may request deletion of your account and associated data.',
@@ -78,7 +99,7 @@ export default function PrivacyPage() {
     <LegalPage
       title="Privacy Policy"
       updated="July 1, 2026"
-      intro={`This Privacy Policy explains what information ${SITE_NAME} collects, how we use it, and the choices you have. By using the service, you agree to the practices described here.`}
+      intro={`${SITE_NAME} is operated by Michael Hatzikostas, based in Connecticut, United States. This Privacy Policy explains what information ${SITE_NAME} collects, how we use it, and the choices you have. By using the service, you agree to the practices described here.`}
       sections={sections}
     />
   );

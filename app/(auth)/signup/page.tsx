@@ -50,14 +50,15 @@ export default function SignupPage() {
         </div>
 
         {error && (
-          <div className="rounded-[var(--radius-sm)] bg-[var(--danger-bg)] px-3 py-2 text-sm" style={{ color: 'var(--danger)' }}>
+          <div role="alert" className="rounded-[var(--radius-sm)] bg-[var(--danger-bg)] px-3 py-2 text-sm" style={{ color: 'var(--danger-text)' }}>
             {error}
           </div>
         )}
 
         <div className="space-y-1.5">
-          <label className="field-label" style={{ marginBottom: 0 }}>Email</label>
+          <label htmlFor="signup-email" className="field-label" style={{ marginBottom: 0 }}>Email</label>
           <input
+            id="signup-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -69,8 +70,9 @@ export default function SignupPage() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="field-label" style={{ marginBottom: 0 }}>Password</label>
+          <label htmlFor="signup-password" className="field-label" style={{ marginBottom: 0 }}>Password</label>
           <input
+            id="signup-password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

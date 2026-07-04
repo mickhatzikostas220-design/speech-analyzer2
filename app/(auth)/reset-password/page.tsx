@@ -88,14 +88,15 @@ export default function ResetPasswordPage() {
         </div>
 
         {error && (
-          <div className="rounded-[var(--radius-sm)] bg-[var(--danger-bg)] px-3 py-2 text-sm" style={{ color: 'var(--danger)' }}>
+          <div role="alert" className="rounded-[var(--radius-sm)] bg-[var(--danger-bg)] px-3 py-2 text-sm" style={{ color: 'var(--danger-text)' }}>
             {error}
           </div>
         )}
 
         <div className="space-y-1.5">
-          <label className="field-label" style={{ marginBottom: 0 }}>New password</label>
+          <label htmlFor="reset-password" className="field-label" style={{ marginBottom: 0 }}>New password</label>
           <input
+            id="reset-password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -107,8 +108,9 @@ export default function ResetPasswordPage() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="field-label" style={{ marginBottom: 0 }}>Confirm password</label>
+          <label htmlFor="reset-confirm" className="field-label" style={{ marginBottom: 0 }}>Confirm password</label>
           <input
+            id="reset-confirm"
             type="password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}

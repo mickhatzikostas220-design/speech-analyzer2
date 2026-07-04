@@ -163,7 +163,7 @@ export function UploadZone({ onAnalysisCreated }: Props) {
       </div>
 
       {(error || rejectionMsg) && (
-        <p className="mt-2 text-center text-xs" style={{ color: 'var(--danger)' }}>{error ?? rejectionMsg}</p>
+        <p role="alert" className="mt-2 text-center text-xs" style={{ color: 'var(--danger-text)' }}>{error ?? rejectionMsg}</p>
       )}
     </div>
   );

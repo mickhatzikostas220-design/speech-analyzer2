@@ -23,8 +23,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div style={vars} className="brand-scope flex min-h-screen flex-col bg-surface-page text-body">
       {fontHref && <link rel="stylesheet" href={fontHref} />}
+      <a
+        href="#main"
+        className="sr-only rounded-md px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"
+        style={{ background: 'var(--surface-ink)' }}
+      >
+        Skip to content
+      </a>
       <Navbar brand={state.brand} />
-      <main className="flex-1">{children}</main>
+      <main id="main" className="flex-1">{children}</main>
     </div>
   );
 }
