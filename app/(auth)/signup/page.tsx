@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import GoogleAuthButton from '@/components/GoogleAuthButton';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -84,6 +85,8 @@ export default function SignupPage() {
         <button type="submit" disabled={loading} className="btn-primary w-full">
           {loading ? 'Creating account…' : 'Create account'}
         </button>
+
+        <GoogleAuthButton label="Sign up with Google" onError={setError} />
 
         <p className="text-center text-xs text-faint">
           By creating an account, you agree to our{' '}

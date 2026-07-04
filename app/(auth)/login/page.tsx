@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { isTesterEmail, TESTER_RESET_FLAG } from '@/lib/tester';
+import GoogleAuthButton from '@/components/GoogleAuthButton';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -87,6 +88,8 @@ export default function LoginPage() {
         <button type="submit" disabled={loading} className="btn-primary w-full">
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
+
+        <GoogleAuthButton label="Sign in with Google" onError={setError} />
       </div>
 
       <p className="text-center text-sm text-muted">
