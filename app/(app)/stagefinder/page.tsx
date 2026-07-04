@@ -25,6 +25,10 @@ export default function StageFinderPage() {
   const [speakers, setSpeakers] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
   const [topic, setTopic] = useState('');
+  // Fee is the only level-signal we don't already have from onboarding — the
+  // user's name/site/bio are read server-side from their brand kit. Together
+  // they calibrate recommendations to the user's own level.
+  const [rate, setRate] = useState('');
   const [format, setFormat] = useState<SpeakingFormatId>('any');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +79,12 @@ export default function StageFinderPage() {
       const res = await fetch('/api/stagefinder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ speakers: list, topic: topic.trim(), format }),
+        body: JSON.stringify({
+          speakers: list,
+          topic: topic.trim(),
+          rate: rate.trim(),
+          format,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -150,6 +159,23 @@ export default function StageFinderPage() {
             placeholder="e.g. Leadership through burnout for healthcare teams"
             className="input w-full text-sm"
           />
+        </div>
+
+        <div>
+          <label htmlFor="sf-rate" className="mb-1.5 block text-xs font-semibold text-muted">
+            Your speaking fee <span className="text-faint">(optional)</span>
+          </label>
+          <input
+            id="sf-rate"
+            type="text"
+            value={rate}
+            onChange={(e) => setRate(e.target.value)}
+            placeholder="e.g. Free, $1,500, $5k+ per talk"
+            className="input w-full text-sm"
+          />
+          <p className="mt-1 text-xs text-faint">
+            We use your profile to find where you&apos;ve spoken and calibrate the picks to your level — your fee sharpens it.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -235,7 +261,7 @@ export default function StageFinderPage() {
           {report.similarSpeakers.length > 0 && (
             <section>
               <h2 className="section-title mb-3 flex items-center gap-2">
-                <Users className="h-4 w-4 text-muted" /> Speakers like the ones you admire
+                <Users className="h-4 w-4 text-muted" /> Speakers at your level to follow
               </h2>
               <div className="grid gap-3 sm:grid-cols-2">
                 {report.similarSpeakers.map((s, i) => (
