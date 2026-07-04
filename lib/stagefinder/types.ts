@@ -28,6 +28,31 @@ export function speakingFormatLabel(id: string): string {
   return FORMAT_LABELS[id] ?? 'Any format';
 }
 
+/** A single real event / stage where an admired speaker has publicly appeared. */
+export interface SpeakerAppearanceEvent {
+  /** Event, conference, series, show, or platform name. */
+  name: string;
+  /** e.g. "Annual conference", "Podcast", "Corporate keynote". */
+  format: string;
+  /** Short context — talk title, role, or year if known. May be empty. */
+  note: string;
+  /** Web source backing this appearance (from live search). May be empty. */
+  sourceUrl: string;
+}
+
+/**
+ * The real speaking footprint of one speaker the user admires: the actual
+ * events that speaker appears at, as opposed to the events we recommend the
+ * user pitch (see StageEvent). Surfaced so the user can see where their idols
+ * genuinely take the stage.
+ */
+export interface SpeakerAppearance {
+  /** The admired speaker (one of the names the user entered). */
+  speaker: string;
+  /** Notable, real events / stages this speaker has genuinely appeared at. */
+  events: SpeakerAppearanceEvent[];
+}
+
 /** A speaker similar to the ones the user admires. */
 export interface SimilarSpeaker {
   name: string;
@@ -53,6 +78,8 @@ export interface StageEvent {
   pitchAngle: string;
   /** Practical guidance: where to find the CFP / who to contact / how to apply. */
   howToApproach: string;
+  /** Web source backing this event — its site, CFP, or a listing. May be empty. */
+  sourceUrl: string;
 }
 
 /** A ready-to-adapt outreach email the user can send to an organizer. */
@@ -65,6 +92,8 @@ export interface OutreachTemplate {
 export interface StageReport {
   /** One or two sentence overall read on where this speaker fits. */
   summary: string;
+  /** Where each admired speaker actually appears — their real footprint. */
+  speakerAppearances: SpeakerAppearance[];
   similarSpeakers: SimilarSpeaker[];
   events: StageEvent[];
   outreach: OutreachTemplate | null;

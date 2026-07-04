@@ -10,6 +10,8 @@ import {
   Sparkles,
   Users,
   MapPin,
+  Mic,
+  ExternalLink,
   Send,
   Copy,
   Check,
@@ -198,6 +200,38 @@ export default function StageFinderPage() {
             </div>
           )}
 
+          {report.speakerAppearances.length > 0 && (
+            <section>
+              <h2 className="section-title mb-3 flex items-center gap-2">
+                <Mic className="h-4 w-4 text-muted" /> Where your idols actually speak
+              </h2>
+              <p className="mb-3 text-xs text-faint">
+                Pulled from a live web search — follow the source links to verify before you pitch.
+              </p>
+              <div className="space-y-3">
+                {report.speakerAppearances.map((sa, i) => (
+                  <div key={i} className="card p-5">
+                    <p className="text-sm font-bold text-strong">{sa.speaker}</p>
+                    <ul className="mt-3 space-y-2">
+                      {sa.events.map((ev, j) => (
+                        <li key={j} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="text-sm font-semibold text-body">{ev.name}</span>
+                          {ev.format && (
+                            <span className="rounded-[var(--radius-pill)] bg-[var(--surface-sunk)] px-2 py-0.5 text-[11px] font-semibold text-muted">
+                              {ev.format}
+                            </span>
+                          )}
+                          {ev.sourceUrl && <SourceLink url={ev.sourceUrl} />}
+                          {ev.note && <span className="w-full text-xs text-faint">{ev.note}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {report.similarSpeakers.length > 0 && (
             <section>
               <h2 className="section-title mb-3 flex items-center gap-2">
@@ -283,7 +317,28 @@ function EventCard({ event }: { event: StageReport['events'][number] }) {
           <p className="mt-0.5 text-sm text-body">{event.howToApproach}</p>
         </div>
       )}
+
+      {event.sourceUrl && (
+        <div className="mt-3">
+          <SourceLink url={event.sourceUrl} />
+        </div>
+      )}
     </div>
+  );
+}
+
+// A small "Source" link out to where a fact was found on the web. Opens in a new
+// tab; rel keeps us safe from tab-nabbing and passing referrer/rank to the target.
+function SourceLink({ url }: { url: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+      className="inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--accent-2)] hover:underline"
+    >
+      <ExternalLink className="h-3 w-3" /> Source
+    </a>
   );
 }
 
