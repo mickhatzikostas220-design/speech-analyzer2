@@ -99,6 +99,7 @@ export function OneSheetEditor() {
             value={slug}
             onChange={(e) => setSlug(slugify(e.target.value))}
             placeholder="your-name"
+            aria-label="Public one-sheet URL slug"
             className="input flex-1 text-sm"
           />
           {publicUrl && (
@@ -118,16 +119,16 @@ export function OneSheetEditor() {
       <section className="card space-y-4 p-5">
         <h2 className="section-title">One-sheet content</h2>
         <div>
-          <label className="field-label">Headline</label>
-          <input className="input w-full" value={os.headline ?? ''} onChange={(e) => patch({ headline: e.target.value })} placeholder={`Book ${name || 'me'} to speak.`} />
+          <label htmlFor="os-headline" className="field-label">Headline</label>
+          <input id="os-headline" className="input w-full" value={os.headline ?? ''} onChange={(e) => patch({ headline: e.target.value })} placeholder={`Book ${name || 'me'} to speak.`} />
         </div>
         <div>
-          <label className="field-label">Bio</label>
-          <textarea rows={4} className="input w-full resize-none" value={os.bio ?? ''} onChange={(e) => patch({ bio: e.target.value })} placeholder="A short, punchy bio in your voice…" />
+          <label htmlFor="os-bio" className="field-label">Bio</label>
+          <textarea id="os-bio" rows={4} className="input w-full resize-none" value={os.bio ?? ''} onChange={(e) => patch({ bio: e.target.value })} placeholder="A short, punchy bio in your voice…" />
         </div>
         <div>
-          <label className="field-label">Contact email</label>
-          <input type="email" className="input w-full" value={os.contactEmail ?? ''} onChange={(e) => patch({ contactEmail: e.target.value })} placeholder="you@yourdomain.com" />
+          <label htmlFor="os-contact" className="field-label">Contact email</label>
+          <input id="os-contact" type="email" className="input w-full" value={os.contactEmail ?? ''} onChange={(e) => patch({ contactEmail: e.target.value })} placeholder="you@yourdomain.com" />
         </div>
       </section>
 
@@ -143,12 +144,12 @@ export function OneSheetEditor() {
         {(os.topics ?? []).map((t, i) => (
           <div key={i} className="space-y-2 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] p-3">
             <div className="flex gap-2">
-              <input className="input flex-1 text-sm" value={t.title} onChange={(e) => setTopic(i, { title: e.target.value })} placeholder="Talk title" />
-              <button onClick={() => patch({ topics: (os.topics ?? []).filter((_, j) => j !== i) })} className="text-faint hover:text-[color:var(--danger)]">
-                <Trash2 className="h-4 w-4" />
+              <input className="input flex-1 text-sm" value={t.title} onChange={(e) => setTopic(i, { title: e.target.value })} placeholder="Talk title" aria-label={`Talk ${i + 1} title`} />
+              <button type="button" aria-label={`Remove talk ${i + 1}`} onClick={() => patch({ topics: (os.topics ?? []).filter((_, j) => j !== i) })} className="text-faint hover:text-[color:var(--danger)]">
+                <Trash2 className="h-4 w-4" aria-hidden />
               </button>
             </div>
-            <textarea rows={2} className="input w-full resize-none text-sm" value={t.description ?? ''} onChange={(e) => setTopic(i, { description: e.target.value })} placeholder="One or two sentences on the talk and its takeaways." />
+            <textarea rows={2} className="input w-full resize-none text-sm" value={t.description ?? ''} onChange={(e) => setTopic(i, { description: e.target.value })} placeholder="One or two sentences on the talk and its takeaways." aria-label={`Talk ${i + 1} description`} />
           </div>
         ))}
       </section>
@@ -165,14 +166,14 @@ export function OneSheetEditor() {
         {(os.testimonials ?? []).map((t, i) => (
           <div key={i} className="space-y-2 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] p-3">
             <div className="flex gap-2">
-              <textarea rows={2} className="input flex-1 resize-none text-sm" value={t.quote} onChange={(e) => setTestimonial(i, { quote: e.target.value })} placeholder="“She brought the house down…”" />
-              <button onClick={() => patch({ testimonials: (os.testimonials ?? []).filter((_, j) => j !== i) })} className="text-faint hover:text-[color:var(--danger)]">
-                <Trash2 className="h-4 w-4" />
+              <textarea rows={2} className="input flex-1 resize-none text-sm" value={t.quote} onChange={(e) => setTestimonial(i, { quote: e.target.value })} placeholder="“She brought the house down…”" aria-label={`Testimonial ${i + 1} quote`} />
+              <button type="button" aria-label={`Remove testimonial ${i + 1}`} onClick={() => patch({ testimonials: (os.testimonials ?? []).filter((_, j) => j !== i) })} className="text-faint hover:text-[color:var(--danger)]">
+                <Trash2 className="h-4 w-4" aria-hidden />
               </button>
             </div>
             <div className="flex gap-2">
-              <input className="input flex-1 text-sm" value={t.author ?? ''} onChange={(e) => setTestimonial(i, { author: e.target.value })} placeholder="Author" />
-              <input className="input flex-1 text-sm" value={t.role ?? ''} onChange={(e) => setTestimonial(i, { role: e.target.value })} placeholder="Title, Company" />
+              <input className="input flex-1 text-sm" value={t.author ?? ''} onChange={(e) => setTestimonial(i, { author: e.target.value })} placeholder="Author" aria-label={`Testimonial ${i + 1} author`} />
+              <input className="input flex-1 text-sm" value={t.role ?? ''} onChange={(e) => setTestimonial(i, { role: e.target.value })} placeholder="Title, Company" aria-label={`Testimonial ${i + 1} author title and company`} />
             </div>
           </div>
         ))}
@@ -184,7 +185,7 @@ export function OneSheetEditor() {
           {saving ? 'Publishing…' : 'Publish one-sheet'}
         </button>
         {msg && (
-          <span className="text-sm" style={{ color: msg.kind === 'ok' ? 'var(--success)' : 'var(--danger)' }}>
+          <span role={msg.kind === 'ok' ? 'status' : 'alert'} className="text-sm" style={{ color: msg.kind === 'ok' ? 'var(--success-text)' : 'var(--danger-text)' }}>
             {msg.text}
           </span>
         )}

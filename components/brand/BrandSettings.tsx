@@ -227,6 +227,7 @@ export function BrandSettings({ initialBrand }: { initialBrand: BrandKit }) {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="yourname.com"
+              aria-label="Your website URL to import brand from"
               className="input flex-1"
             />
             <button onClick={reimport} disabled={importing} className="btn-ink">
@@ -239,8 +240,9 @@ export function BrandSettings({ initialBrand }: { initialBrand: BrandKit }) {
         <section className="card p-5 space-y-4">
           <h2 className="section-title">Identity</h2>
           <div>
-            <label className="field-label">Name</label>
+            <label htmlFor="brand-name" className="field-label">Name</label>
             <input
+              id="brand-name"
               value={brand.name}
               onChange={(e) =>
                 patch((b) => {
@@ -254,8 +256,9 @@ export function BrandSettings({ initialBrand }: { initialBrand: BrandKit }) {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="field-label">Logo style</label>
+              <label htmlFor="brand-logo-style" className="field-label">Logo style</label>
               <select
+                id="brand-logo-style"
                 value={brand.logo.type}
                 onChange={(e) =>
                   patch((b) => {
@@ -271,8 +274,9 @@ export function BrandSettings({ initialBrand }: { initialBrand: BrandKit }) {
             </div>
             {brand.logo.type === 'image' && (
               <div>
-                <label className="field-label">Logo image URL</label>
+                <label htmlFor="brand-logo-url" className="field-label">Logo image URL</label>
                 <input
+                  id="brand-logo-url"
                   value={brand.logo.imageUrl ?? ''}
                   onChange={(e) => patch((b) => ((b.logo.imageUrl = e.target.value), b))}
                   placeholder="https://…/logo.png"
@@ -282,8 +286,9 @@ export function BrandSettings({ initialBrand }: { initialBrand: BrandKit }) {
             )}
           </div>
           <div>
-            <label className="field-label">Hero / headshot image URL</label>
+            <label htmlFor="brand-hero-url" className="field-label">Hero / headshot image URL</label>
             <input
+              id="brand-hero-url"
               value={brand.hero.imageUrl ?? ''}
               onChange={(e) => patch((b) => ((b.hero.imageUrl = e.target.value), b))}
               placeholder="https://…/you-on-stage.jpg"
@@ -313,17 +318,20 @@ export function BrandSettings({ initialBrand }: { initialBrand: BrandKit }) {
           <div className="grid gap-4 sm:grid-cols-2">
             {colorFields.map((f) => (
               <div key={f.key}>
-                <label className="field-label">{f.label}</label>
+                <label htmlFor={`color-${f.key}`} className="field-label">{f.label}</label>
                 <div className="flex items-center gap-2">
                   <input
+                    id={`color-${f.key}`}
                     type="color"
                     value={normalizeHex(brand.colors[f.key]) ?? '#000000'}
                     onChange={(e) => setColor(f.key, e.target.value)}
+                    aria-label={`${f.label} color picker`}
                     className="h-10 w-12 cursor-pointer rounded-md border-2 border-[var(--border-strong)] bg-transparent"
                   />
                   <input
                     value={brand.colors[f.key]}
                     onChange={(e) => setColor(f.key, e.target.value)}
+                    aria-label={`${f.label} hex value`}
                     className="input flex-1 font-mono text-sm"
                   />
                 </div>
@@ -346,8 +354,9 @@ export function BrandSettings({ initialBrand }: { initialBrand: BrandKit }) {
         <section className="card p-5 space-y-4">
           <h2 className="section-title">Type &amp; voice</h2>
           <div>
-            <label className="field-label">Fonts</label>
+            <label htmlFor="brand-fonts" className="field-label">Fonts</label>
             <select
+              id="brand-fonts"
               value={FONT_PRESETS.find((p) => p.display === brand.fonts.display)?.label ?? 'custom'}
               onChange={(e) => {
                 const p = FONT_PRESETS.find((x) => x.label === e.target.value);
@@ -364,8 +373,9 @@ export function BrandSettings({ initialBrand }: { initialBrand: BrandKit }) {
             </select>
           </div>
           <div>
-            <label className="field-label">Voice / tone</label>
+            <label htmlFor="brand-voice" className="field-label">Voice / tone</label>
             <select
+              id="brand-voice"
               value={brand.voice.tone}
               onChange={(e) =>
                 patch((b) => {
@@ -398,11 +408,12 @@ export function BrandSettings({ initialBrand }: { initialBrand: BrandKit }) {
         <BrandPreview brand={brand} />
         {msg && (
           <p
-            className={`rounded-[var(--radius-sm)] px-4 py-2.5 text-sm ${
-              msg.kind === 'ok'
-                ? 'bg-[var(--success-bg)] text-[var(--success)]'
-                : 'bg-[var(--danger-bg)] text-[var(--danger)]'
-            }`}
+            role={msg.kind === 'ok' ? 'status' : 'alert'}
+            className="rounded-[var(--radius-sm)] px-4 py-2.5 text-sm"
+            style={{
+              background: msg.kind === 'ok' ? 'var(--success-bg)' : 'var(--danger-bg)',
+              color: msg.kind === 'ok' ? 'var(--success-text)' : 'var(--danger-text)',
+            }}
           >
             {msg.text}
           </p>

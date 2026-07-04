@@ -175,7 +175,7 @@ export function BookingInbox({ initialBookings }: { initialBookings: Booking[] }
               <button type="button" onClick={() => { setAdding(false); setForm({ ...EMPTY }); }} className="btn-ghost" style={{ padding: '9px 14px', fontSize: 'var(--text-sm)' }}>
                 Cancel
               </button>
-              {msg && <span className="text-sm" style={{ color: 'var(--danger)' }}>{msg}</span>}
+              {msg && <span role="alert" className="text-sm" style={{ color: 'var(--danger-text)' }}>{msg}</span>}
             </div>
           </form>
         )}
@@ -234,6 +234,7 @@ export function BookingInbox({ initialBookings }: { initialBookings: Booking[] }
                     <select
                       value={b.status}
                       onChange={(e) => patch(b.id, { status: e.target.value as BookingStatus })}
+                      aria-label={`Status for ${b.event_name || 'this inquiry'}`}
                       className={`rounded-[var(--radius-pill)] border-0 px-2.5 py-1 text-xs font-bold ${STATUS_STYLE[b.status].chip}`}
                     >
                       {BOOKING_STATUSES.map((s) => (
