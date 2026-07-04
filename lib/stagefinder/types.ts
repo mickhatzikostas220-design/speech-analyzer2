@@ -60,6 +60,8 @@ export interface SimilarSpeaker {
   knownFor: string;
   /** Why they resemble the admired set (and, where given, the user's topic). */
   whySimilar: string;
+  /** Real events this peer has spoken at (web-searched where possible). */
+  events: SpeakerAppearanceEvent[];
 }
 
 /** An event / series the user could realistically pitch themselves to. */

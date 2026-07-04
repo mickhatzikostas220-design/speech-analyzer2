@@ -269,6 +269,24 @@ export default function StageFinderPage() {
                     <p className="text-sm font-bold text-strong">{s.name}</p>
                     {s.knownFor && <p className="mt-0.5 text-xs text-faint">{s.knownFor}</p>}
                     {s.whySimilar && <p className="mt-2 text-sm text-muted">{s.whySimilar}</p>}
+                    {s.events.length > 0 && (
+                      <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-faint">Speaks at</p>
+                        <ul className="mt-1.5 space-y-1.5">
+                          {s.events.map((ev, j) => (
+                            <li key={j} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                              <span className="text-xs font-semibold text-body">{ev.name}</span>
+                              {ev.format && (
+                                <span className="rounded-[var(--radius-pill)] bg-[var(--surface-sunk)] px-1.5 py-0.5 text-[10px] font-semibold text-muted">
+                                  {ev.format}
+                                </span>
+                              )}
+                              {ev.sourceUrl && <SourceLink url={ev.sourceUrl} />}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

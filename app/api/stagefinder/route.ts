@@ -27,6 +27,7 @@ import {
   type StageReport,
   type SimilarSpeaker,
   type SpeakerAppearance,
+  type SpeakerAppearanceEvent,
   type StageEvent,
   type OutreachTemplate,
 } from '@/lib/stagefinder/types';
@@ -46,6 +47,17 @@ function cleanUrl(raw: unknown): string {
   if (typeof raw !== 'string') return '';
   const u = raw.trim();
   return /^https?:\/\//i.test(u) ? u : '';
+}
+
+/** Coerce one raw appearance/event entry into a clean SpeakerAppearanceEvent. */
+function normalizeAppearanceEvent(raw: unknown): SpeakerAppearanceEvent {
+  const e = (raw ?? {}) as Record<string, unknown>;
+  return {
+    name: typeof e.name === 'string' ? e.name : '',
+    format: typeof e.format === 'string' ? e.format : '',
+    note: typeof e.note === 'string' ? e.note : '',
+    sourceUrl: cleanUrl(e.sourceUrl),
+  };
 }
 
 /** Coerce whatever the model returned into a clean StageEvent. */
@@ -71,28 +83,20 @@ function normalizeSpeaker(raw: unknown): SimilarSpeaker {
     name: typeof s.name === 'string' ? s.name : '',
     knownFor: typeof s.knownFor === 'string' ? s.knownFor : '',
     whySimilar: typeof s.whySimilar === 'string' ? s.whySimilar : '',
+    events: Array.isArray(s.events)
+      ? s.events.map(normalizeAppearanceEvent).filter((e) => e.name)
+      : [],
   };
 }
 
 /** Coerce one admired speaker's real appearances into a clean SpeakerAppearance. */
 function normalizeAppearance(raw: unknown): SpeakerAppearance {
   const a = (raw ?? {}) as Record<string, unknown>;
-  const events = Array.isArray(a.events)
-    ? a.events
-        .map((ev) => {
-          const e = (ev ?? {}) as Record<string, unknown>;
-          return {
-            name: typeof e.name === 'string' ? e.name : '',
-            format: typeof e.format === 'string' ? e.format : '',
-            note: typeof e.note === 'string' ? e.note : '',
-            sourceUrl: cleanUrl(e.sourceUrl),
-          };
-        })
-        .filter((e) => e.name)
-    : [];
   return {
     speaker: typeof a.speaker === 'string' ? a.speaker : '',
-    events,
+    events: Array.isArray(a.events)
+      ? a.events.map(normalizeAppearanceEvent).filter((e) => e.name)
+      : [],
   };
 }
 
@@ -183,7 +187,7 @@ ${profileContext ? `About the user (from their profile):\n${profileContext}` : '
 Preferred speaking format: ${speakingFormatLabel(format)}.
 
 Find and report, citing your sources:
-1. For EACH admired speaker, real, documented events / conferences / stages / podcasts / shows they have actually spoken at or appeared on — recent and notable. Give the event name and, when available, the talk title, role, or year.
+1. For EACH admired speaker, AT LEAST TWO real, documented events / conferences / stages / podcasts / shows they have actually spoken at or appeared on — recent and notable. Give the event name and, when available, the talk title, role, or year. Also do the same, more briefly, for a few OTHER notable speakers working in this same space and tier (peers we may recommend the user follow) and where they have recently spoken.
 2. Real, currently-running events, conferences, series, or shows in this same world that book outside speakers — especially ones with an open Call for Speakers (CFP) or a public speaker-application path. Note what the event is and how a speaker gets on it.${userName ? `
 3. Where the user "${userName}" has personally spoken before — their own real speaking footprint (events, podcasts, panels)${userSite ? `; their site ${userSite} may list past talks` : ''}, so we can gauge their current level and reach. If you cannot confidently find this specific person, say so plainly rather than guessing; do not confuse them with a more famous person of a similar name.` : ''}
 
@@ -222,8 +226,8 @@ ${profileContext ? `The speaker's profile (from onboarding):\n${profileContext}`
 Preferred speaking format: ${speakingFormatLabel(format)}.
 ${groundingBlock}
 Do four things:
-1. For EACH speaker the user admires (${speakers.map((s) => `"${s}"`).join(', ')}), list the notable, REAL events / conferences / stages / podcasts / platforms where that specific speaker has genuinely and publicly appeared. These are the events those speakers actually speak at — their real footprint — not events you are recommending. ${findings.text ? 'Base these strictly on the WEB FINDINGS above and attach a matching "sourceUrl" where one supports the appearance.' : 'Only include appearances you are reasonably confident are real and publicly documented; if you are unsure about a particular speaker, include fewer (or none) rather than guessing.'} For each appearance give a short note (talk title, role, or year) only when you actually know it — otherwise leave the note empty. Do NOT fabricate appearances, dates, or talk titles.
-2. Recommend 4–6 real speakers TO FOLLOW who work in this same topic world but are at a SIMILAR level of popularity and reach to the speaker themselves — realistic peers and role models roughly one step ahead, NOT the megastars they admire (do not just re-list famous household names). Calibrate to the speaker's current level from their footprint and fee: if they are early-stage, suggest rising/mid-tier speakers, not global A-listers. For each, one line on what they're known for and one line on why they're a good peer to follow and learn from at this stage.
+1. For EACH speaker the user admires (${speakers.map((s) => `"${s}"`).join(', ')}), list AT LEAST TWO (aim for 2–4) notable, REAL events / conferences / stages / podcasts / platforms where that specific speaker has genuinely and publicly appeared. These are the events those speakers actually speak at — their real footprint — not events you are recommending. ${findings.text ? 'Base these strictly on the WEB FINDINGS above and attach a matching "sourceUrl" where one supports the appearance.' : 'Only include appearances you are reasonably confident are real and publicly documented; if you genuinely cannot find two for a speaker, include what you can rather than guessing.'} For each appearance give a short note (talk title, role, or year) only when you actually know it — otherwise leave the note empty. Do NOT fabricate appearances, dates, or talk titles.
+2. Recommend 4–6 real speakers TO FOLLOW who work in this same topic world but are at a SIMILAR level of popularity and reach to the speaker themselves — realistic peers and role models roughly one step ahead, NOT the megastars they admire (do not just re-list famous household names). Calibrate to the speaker's current level from their footprint and fee: if they are early-stage, suggest rising/mid-tier speakers, not global A-listers. For each, one line on what they're known for and one line on why they're a good peer to follow and learn from at this stage. ALSO, for these peers, include the REAL events where they have spoken so that ACROSS all the recommended peers there are AT LEAST 5 events in total (they need not be spread evenly — some peers may have more than others). ${findings.text ? 'Prefer events supported by the WEB FINDINGS above and attach a matching "sourceUrl"; leave "sourceUrl" empty when you have no supporting source.' : 'Only include events you are reasonably confident are real.'} Do NOT fabricate these events.
 3. Find 5–8 real EVENTS, conferences, series, or shows the speaker could REALISTICALLY land right now — stages within their current ability and appropriate for their fee, not aspirational stages far above their level. ${findings.text ? 'Prefer the events surfaced in the WEB FINDINGS above and attach a matching "sourceUrl" where one supports the event.' : 'Prefer real, well-known event series and communities over invented names.'} For each event give: its typical audience, why it fits THIS speaker at their level, which admired/similar speakers are genuinely associated with that world (only names you're confident belong there — do not fabricate specific appearances), a concrete talk/topic ANGLE this speaker could pitch, and practical guidance on HOW to approach it (e.g. look for its Call for Speakers / CFP page, apply through its speaker form, or contact the organizer/programming team — be specific about the realistic path).
 4. Write one short, adaptable OUTREACH email the speaker could send to an event organizer to propose themselves — warm, specific, and easy to personalize.
 
@@ -233,7 +237,7 @@ Respond with ONLY valid JSON in this exact shape:
 {
   "summary": "one or two sentences on where this speaker fits and the opportunity",
   "speakerAppearances": [{ "speaker": "the admired speaker's name", "events": [{ "name": "...", "format": "e.g. Annual conference / Podcast / Corporate keynote", "note": "talk title, role, or year if known — else empty string", "sourceUrl": "a matching URL from the SOURCE URLS list, or empty string" }] }],
-  "similarSpeakers": [{ "name": "...", "knownFor": "one line", "whySimilar": "one line" }],
+  "similarSpeakers": [{ "name": "...", "knownFor": "one line", "whySimilar": "one line", "events": [{ "name": "...", "format": "e.g. Annual conference / Podcast", "note": "talk title, role, or year if known — else empty string", "sourceUrl": "a matching URL from the SOURCE URLS list, or empty string" }] }],
   "events": [{
     "name": "...",
     "format": "e.g. Annual conference / Corporate summit / Weekly podcast",
@@ -251,9 +255,9 @@ No markdown, no code fences.`;
   let report: StageReport;
   try {
     const completion = await createChatCompletion('gpt-4o', {
-      // Bumped from 3000 to fit the added per-speaker appearances section without
-      // risking a truncated (unparseable) JSON response.
-      max_tokens: 4000,
+      // Sized for the fuller report (2+ appearances per admired speaker, peer
+      // events, recommended events) so the JSON doesn't truncate and fail to parse.
+      max_tokens: 4500,
       temperature: 0.7,
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: prompt }],
