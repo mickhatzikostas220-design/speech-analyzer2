@@ -77,21 +77,22 @@ export function InquiryForm({ slug, speakerName }: { slug: string; speakerName: 
         aria-hidden
       />
       <div className="grid gap-3 sm:grid-cols-2">
-        <input className="input w-full text-sm" placeholder="Your name" value={form.contact_name} onChange={(e) => set('contact_name', e.target.value)} />
-        <input type="email" required className="input w-full text-sm" placeholder="Your email *" value={form.contact_email} onChange={(e) => set('contact_email', e.target.value)} />
-        <input className="input w-full text-sm" placeholder="Organization" value={form.organization} onChange={(e) => set('organization', e.target.value)} />
-        <input className="input w-full text-sm" placeholder="Event name" value={form.event_name} onChange={(e) => set('event_name', e.target.value)} />
-        <input type="date" className="input w-full text-sm" value={form.event_date} onChange={(e) => set('event_date', e.target.value)} />
-        <input className="input w-full text-sm" placeholder="Location" value={form.location} onChange={(e) => set('location', e.target.value)} />
+        <input aria-label="Your name" className="input w-full text-sm" placeholder="Your name" value={form.contact_name} onChange={(e) => set('contact_name', e.target.value)} />
+        <input type="email" required aria-label="Your email (required)" className="input w-full text-sm" placeholder="Your email *" value={form.contact_email} onChange={(e) => set('contact_email', e.target.value)} />
+        <input aria-label="Organization" className="input w-full text-sm" placeholder="Organization" value={form.organization} onChange={(e) => set('organization', e.target.value)} />
+        <input aria-label="Event name" className="input w-full text-sm" placeholder="Event name" value={form.event_name} onChange={(e) => set('event_name', e.target.value)} />
+        <input type="date" aria-label="Event date" className="input w-full text-sm" value={form.event_date} onChange={(e) => set('event_date', e.target.value)} />
+        <input aria-label="Location" className="input w-full text-sm" placeholder="Location" value={form.location} onChange={(e) => set('location', e.target.value)} />
       </div>
       <textarea
         rows={4}
+        aria-label="Message about your event"
         className="input w-full resize-none text-sm"
         placeholder={`Tell ${first} about your event — audience, goals, budget…`}
         value={form.message}
         onChange={(e) => set('message', e.target.value)}
       />
-      {error && <p className="text-sm" style={{ color: 'var(--danger)' }}>{error}</p>}
+      {error && <p role="alert" className="text-sm" style={{ color: 'var(--danger-text)' }}>{error}</p>}
       <button type="submit" disabled={busy} className="btn-primary w-full justify-center">
         {busy ? 'Sending…' : `Send inquiry to ${first}`}
       </button>

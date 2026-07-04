@@ -36,14 +36,15 @@ export default function LoginPage() {
         <h1 className="section-title">Sign in</h1>
 
         {error && (
-          <div className="rounded-[var(--radius-sm)] bg-[var(--danger-bg)] px-3 py-2 text-sm" style={{ color: 'var(--danger)' }}>
+          <div role="alert" className="rounded-[var(--radius-sm)] bg-[var(--danger-bg)] px-3 py-2 text-sm" style={{ color: 'var(--danger-text)' }}>
             {error}
           </div>
         )}
 
         <div className="space-y-1.5">
-          <label className="field-label" style={{ marginBottom: 0 }}>Email</label>
+          <label htmlFor="login-email" className="field-label" style={{ marginBottom: 0 }}>Email</label>
           <input
+            id="login-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -56,12 +57,13 @@ export default function LoginPage() {
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="field-label" style={{ marginBottom: 0 }}>Password</label>
+            <label htmlFor="login-password" className="field-label" style={{ marginBottom: 0 }}>Password</label>
             <Link href="/forgot-password" className="text-xs font-semibold" style={{ color: 'var(--text-link)' }}>
               Forgot?
             </Link>
           </div>
           <input
+            id="login-password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

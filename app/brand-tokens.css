@@ -76,7 +76,11 @@
   --text-strong:   var(--ink-900);
   --text-body:     var(--ink-800);
   --text-muted:    var(--ink-500);
-  --text-faint:    var(--ink-400);
+  /* text-faint is used for small helper/meta text. #70707A keeps it visibly
+     lighter than --text-muted while still clearing WCAG 2.1 AA (4.5:1) on both
+     the page (#F6F6F9 → 4.54:1) and card (#FFFFFF → 4.9:1) surfaces. The old
+     value (--ink-400 #9A9AA4) only reached ~2.6:1 and failed AA. */
+  --text-faint:    #70707A;
   --text-on-dark:  var(--paper);
   --text-on-brand: var(--on-signature);
   --text-link:     var(--navy-accent);
@@ -109,6 +113,15 @@
   --danger-bg:     var(--red-100);
   --info:          var(--blue-500);
   --info-bg:       var(--blue-100);
+
+  /* Readable text variants of the status colors. The base --success/--danger
+     hues are tuned for fills, dots, and bars; as small text on white or on
+     their own tinted backgrounds they fall below WCAG AA (~3.5:1 and ~2.9:1).
+     Use these darker variants whenever the status color is applied to TEXT.
+       --danger-text  #B83309 → 5.97:1 on card, 4.85:1 on --danger-bg
+       --success-text #15703B → 6.15:1 on card, 5.41:1 on --success-bg */
+  --danger-text:   #B83309;
+  --success-text:  #15703B;
 
   /* ---- Engagement scale (Orator) ---- */
   --score-high:    #1F9D55;

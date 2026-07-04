@@ -72,6 +72,7 @@ export function LegalPage({
           <span className="flex items-center gap-4">
             <Link href="/privacy" className="transition-colors hover:text-strong">Privacy</Link>
             <Link href="/terms" className="transition-colors hover:text-strong">Terms</Link>
+            <Link href="/accessibility" className="transition-colors hover:text-strong">Accessibility</Link>
             <Link href="/login" className="transition-colors hover:text-strong">Log in</Link>
           </span>
         </div>

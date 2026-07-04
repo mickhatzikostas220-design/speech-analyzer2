@@ -26,6 +26,35 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--on-signature);
 }
 
+/* ------------------------------------------------------------------
+   Keyboard focus (WCAG 2.4.7 Focus Visible).
+   A single, high-contrast focus ring for every interactive element,
+   shown only for keyboard/AT users (:focus-visible) so it never
+   appears on mouse click. --focus-ring is navy-accent, which clears
+   3:1 against the page and card surfaces.
+   ------------------------------------------------------------------ */
+:where(a, button, input, textarea, select, summary, [role='button'], [tabindex]):focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* ------------------------------------------------------------------
+   Reduced motion (WCAG 2.3.3 / 2.2.2). Respect the OS setting by
+   collapsing animations, transitions, and smooth scrolling for users
+   who ask for less movement.
+   ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Custom scrollbar (warm neutral) */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }

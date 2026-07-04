@@ -75,14 +75,15 @@ export default function ForgotPasswordPage() {
         </div>
 
         {error && (
-          <div className="rounded-[var(--radius-sm)] bg-[var(--danger-bg)] px-3 py-2 text-sm" style={{ color: 'var(--danger)' }}>
+          <div role="alert" className="rounded-[var(--radius-sm)] bg-[var(--danger-bg)] px-3 py-2 text-sm" style={{ color: 'var(--danger-text)' }}>
             {error}
           </div>
         )}
 
         <div className="space-y-1.5">
-          <label className="field-label" style={{ marginBottom: 0 }}>Email</label>
+          <label htmlFor="forgot-email" className="field-label" style={{ marginBottom: 0 }}>Email</label>
           <input
+            id="forgot-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}

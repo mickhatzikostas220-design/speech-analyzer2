@@ -49,15 +49,16 @@ export default function RequestAccessPage() {
           </p>
 
           {error && (
-            <div className="mb-4 rounded-[var(--radius-sm)] bg-[var(--danger-bg)] px-3 py-2 text-sm" style={{ color: 'var(--danger)' }}>
+            <div role="alert" className="mb-4 rounded-[var(--radius-sm)] bg-[var(--danger-bg)] px-3 py-2 text-sm" style={{ color: 'var(--danger-text)' }}>
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="field-label" style={{ marginBottom: 0 }}>Full name</label>
+              <label htmlFor="ra-name" className="field-label" style={{ marginBottom: 0 }}>Full name</label>
               <input
+                id="ra-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -68,8 +69,9 @@ export default function RequestAccessPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="field-label" style={{ marginBottom: 0 }}>Email address</label>
+              <label htmlFor="ra-email" className="field-label" style={{ marginBottom: 0 }}>Email address</label>
               <input
+                id="ra-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -80,8 +82,9 @@ export default function RequestAccessPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="field-label" style={{ marginBottom: 0 }}>What are you hoping to do?</label>
+              <label htmlFor="ra-reason" className="field-label" style={{ marginBottom: 0 }}>What are you hoping to do?</label>
               <textarea
+                id="ra-reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 required
