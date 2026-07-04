@@ -4,6 +4,7 @@ export function buildSystemPrompt(opts: {
   userEmail: string | null;
   toolNotes: string[];
   custom: string | null;
+  memories: string | null;
 }): string {
   const lines: string[] = [
     'You are a personal AI assistant inside Orator, a neural speech-analysis app.',
@@ -33,8 +34,13 @@ export function buildSystemPrompt(opts: {
     '- Be concise, direct, and practical.',
     '- Use tools instead of guessing when real data would help.',
     '- Before any irreversible action (like sending an email), confirm the details with the user in your reply unless they have clearly already asked you to do it.',
-    '- When you draft something, show it to the user.'
+    '- When you draft something, show it to the user.',
+    '- When the user shares a durable fact about themselves (a goal, an upcoming talk, a lasting preference for how they want help), OR explicitly asks you to remember something, call the remember_fact tool to save it. Do not save one-off requests or transient details.'
   );
+
+  if (opts.memories && opts.memories.trim()) {
+    lines.push('', opts.memories.trim());
+  }
 
   if (opts.userEmail) lines.push('', `The user's email is ${opts.userEmail}.`);
   if (opts.custom && opts.custom.trim()) {

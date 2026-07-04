@@ -7,6 +7,8 @@ import { buildTools } from '@/lib/agent/tools/registry';
 import { buildSystemPrompt } from '@/lib/agent/prompt';
 import { runAgent } from '@/lib/agent/providers';
 import { PROVIDER_LABEL } from '@/lib/agent/models';
+import { getMemoryContext } from '@/lib/memory/store';
+import { captureMemories } from '@/lib/memory/extract';
 import type { AgentEvent, ChatMessage } from '@/lib/agent/types';
 
 export const runtime = 'nodejs';
@@ -80,10 +82,12 @@ export async function POST(request: NextRequest) {
   }));
 
   const { tools, notes } = await buildTools(admin, user.id);
+  const memories = await getMemoryContext(admin, user.id);
   const system = buildSystemPrompt({
     userEmail: user.email ?? null,
     toolNotes: notes,
     custom: settings.system_prompt,
+    memories,
   });
 
   const finalConversationId: string = conversationId!;
@@ -119,6 +123,11 @@ export async function POST(request: NextRequest) {
           .from('agent_conversations')
           .update({ updated_at: new Date().toISOString() })
           .eq('id', finalConversationId);
+
+        // Quietly remember durable facts from what the user just said. Runs on
+        // the app key (not the user's), never throws, and only after the reply
+        // is already streamed — so it can't slow down or break the chat.
+        await captureMemories(admin, user.id, message);
 
         send({ type: 'done', conversationId: finalConversationId, title });
       } catch (e) {

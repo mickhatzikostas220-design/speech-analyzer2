@@ -20,6 +20,7 @@ import { rateLimit, clientIp } from '@/lib/rateLimit';
 import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
 import { getUserBrandState } from '@/lib/brand/server';
 import { DEFAULT_BRAND } from '@/lib/brand/defaults';
+import { getMemoryFacts } from '@/lib/memory/store';
 import { runWebSearch, type WebSearchFindings } from '@/lib/stagefinder/webSearch';
 import {
   isSpeakingFormat,
@@ -171,6 +172,10 @@ export async function POST(request: NextRequest) {
     if (brand.voice?.aiProfile) profileBits.push(`Speaker profile: ${brand.voice.aiProfile}`);
     else if (brand.voice?.about) profileBits.push(`About: ${brand.voice.about}`);
   }
+  // Fold in anything the app has remembered about this speaker (goals, style,
+  // audience) so recommendations calibrate to them, not just their public bio.
+  const memoryFacts = await getMemoryFacts(supabase, user.id);
+  for (const fact of memoryFacts) profileBits.push(`Remembered: ${fact}`);
   const profileContext = profileBits.join('\n').slice(0, 1500);
 
   // Step 1 — gather REAL, current facts via web search so the appearances and the

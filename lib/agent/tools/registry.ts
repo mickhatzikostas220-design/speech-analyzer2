@@ -5,6 +5,7 @@ import { analysesTools } from './analyses';
 import { gmailTools } from './gmail';
 import { calendarTools } from './calendar';
 import { socialTools } from './social';
+import { memoryTools } from './memory';
 
 // Which side effects each autonomy level permits. "whatever the user allows" —
 // the user picks the level per connection.
@@ -21,7 +22,7 @@ export async function buildTools(
   supabase: SupabaseClient,
   userId: string
 ): Promise<{ tools: ToolDef[]; notes: string[] }> {
-  const tools: ToolDef[] = [...analysesTools, ...socialTools];
+  const tools: ToolDef[] = [...analysesTools, ...socialTools, ...memoryTools];
   const notes: string[] = [];
 
   const connections = await listConnections(supabase, userId);

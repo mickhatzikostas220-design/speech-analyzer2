@@ -39,6 +39,19 @@ export default async function SettingsPage() {
       </Link>
 
       <Link
+        href="/settings/memory"
+        className="card mb-4 flex items-center justify-between gap-4 p-4 transition hover:border-strong"
+      >
+        <div>
+          <p className="font-bold text-strong">Memory →</p>
+          <p className="text-sm text-muted">
+            See, edit, or delete what the app remembers about you — and use it to personalize your AI.
+          </p>
+        </div>
+        <ArrowUpRight className="h-5 w-5 shrink-0 text-muted" />
+      </Link>
+
+      <Link
         href="/settings/one-sheet"
         className="card mb-4 flex items-center justify-between gap-4 p-4 transition hover:border-strong"
       >

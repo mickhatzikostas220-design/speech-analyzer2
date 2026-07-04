@@ -13,9 +13,14 @@ export function buildTailorPrompt(params: {
   description: string;
   industry: string;
   audience?: string;
+  /** Remembered facts about the speaker — helps keep their authentic voice. */
+  speakerContext?: string;
 }): string {
-  const { title, description, industry, audience } = params;
+  const { title, description, industry, audience, speakerContext } = params;
   const audienceLine = audience ? `\n- Specific audience within ${industry}: ${audience}` : '';
+  const speakerBlock = speakerContext
+    ? `\n\nABOUT THIS SPEAKER (things they've told us — use to keep their authentic voice and priorities; never invent credentials or facts beyond these):\n${speakerContext}`
+    : '';
 
   return `You are an expert keynote copywriter specializing in meaningful, authentic industry-specific adaptations.
 
@@ -29,7 +34,7 @@ Description:
 ${description}
 """
 
-TARGET INDUSTRY: ${industry}${audienceLine}
+TARGET INDUSTRY: ${industry}${audienceLine}${speakerBlock}
 
 ---
 

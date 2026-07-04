@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserPlan } from '@/lib/subscription/server';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
 import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
+import { getMemoryContext } from '@/lib/memory/store';
 
 export const maxDuration = 60;
 
@@ -122,6 +123,9 @@ export async function POST(request: NextRequest) {
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .slice(-12);
 
+  // Fold in what we remember about this speaker so tips fit their site & goals.
+  const memoryContext = await getMemoryContext(supabase, user.id);
+
   let stream: Awaited<ReturnType<typeof createChatCompletion>>;
   try {
     stream = await createChatCompletion('gpt-4o', {
@@ -129,6 +133,7 @@ export async function POST(request: NextRequest) {
       stream: true,
       messages: [
         { role: 'system', content: buildSystemPrompt(body.context) },
+        ...(memoryContext ? [{ role: 'system' as const, content: memoryContext }] : []),
         ...trimmed,
       ],
     });

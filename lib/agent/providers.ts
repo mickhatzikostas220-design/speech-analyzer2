@@ -256,6 +256,8 @@ function describeCall(tool: ToolDef, call: ToolCall): string {
       return a.query ? `Checking your calendar: "${a.query}"` : 'Checking your calendar';
     case 'social_media_overview':
       return 'Reviewing your social media activity';
+    case 'remember_fact':
+      return 'Remembering that for you';
     default:
       return tool.name;
   }
