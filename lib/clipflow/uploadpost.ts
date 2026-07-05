@@ -32,9 +32,11 @@ const PLATFORM_ID: Record<Platform, string> = {
   tiktok: 'tiktok',
   youtube: 'youtube',
   twitter: 'x',
+  linkedin: 'linkedin',
+  facebook: 'facebook',
 };
 
-const SUPPORTED_IDS = ['tiktok', 'instagram', 'youtube', 'x'];
+const SUPPORTED_IDS = ['tiktok', 'instagram', 'youtube', 'x', 'linkedin', 'facebook'];
 
 function platformForId(id: string): Platform | null {
   switch ((id || '').toLowerCase()) {
@@ -47,6 +49,10 @@ function platformForId(id: string): Platform | null {
     case 'x':
     case 'twitter':
       return 'twitter';
+    case 'linkedin':
+      return 'linkedin';
+    case 'facebook':
+      return 'facebook';
     default:
       return null;
   }

@@ -33,6 +33,8 @@ const PLATFORM_LABELS: Record<string, string> = {
   tiktok: 'TikTok',
   youtube: 'YouTube',
   twitter: 'X',
+  linkedin: 'LinkedIn',
+  facebook: 'Facebook',
 };
 
 const POST_STATUS_COLOR: Record<string, string> = {
@@ -270,7 +272,7 @@ export function ClipCard({
         {/* Platform toggles */}
         <div className="space-y-2 border-t border-[var(--border-subtle)] pt-3">
           <div className="flex flex-wrap gap-1.5">
-            {(['instagram', 'tiktok', 'youtube', 'twitter'] as const).map((p) => {
+            {(['instagram', 'tiktok', 'youtube', 'twitter', 'linkedin', 'facebook'] as const).map((p) => {
               const connected = connectedPlatforms.includes(p);
               const on = selected.includes(p);
               return (

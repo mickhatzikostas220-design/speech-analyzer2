@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AgentConnectionsPanel } from '@/components/settings/AgentConnectionsPanel';
 import { ApiKeysPanel } from '@/components/clipflow/ApiKeysPanel';
-import { UploadPostPanel } from '@/components/clipflow/UploadPostPanel';
 import { ConnectionsPanel } from '@/components/clipflow/ConnectionsPanel';
 
 // Shared "Connections & API keys" page. Both the Assistant and ClipFlow manage
@@ -80,12 +79,11 @@ export default function ConnectionsSettingsPage() {
         <div>
           <h2 className="text-base font-semibold text-strong">ClipFlow</h2>
           <p className="mt-0.5 text-xs text-muted">
-            Keys for clip generation and the accounts your clips publish to.
+            Connect the accounts your clips publish to — just sign in, no API key needed.
           </p>
         </div>
-        <ApiKeysPanel onChanged={bump} />
-        <UploadPostPanel onChanged={bump} />
         <ConnectionsPanel refresh={connRefresh} />
+        <ApiKeysPanel onChanged={bump} />
       </section>
     </div>
   );

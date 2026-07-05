@@ -56,6 +56,25 @@ const CONFIG: Record<Platform, PlatformConfig> = {
     tokenUrl: 'https://graph.facebook.com/v19.0/oauth/access_token',
     scopes: 'instagram_basic,instagram_content_publish,pages_show_list',
   },
+  linkedin: {
+    label: 'LinkedIn',
+    clientIdEnv: 'LINKEDIN_OAUTH_CLIENT_ID',
+    clientSecretEnv: 'LINKEDIN_OAUTH_CLIENT_SECRET',
+    authorizeUrl: 'https://www.linkedin.com/oauth/v2/authorization',
+    tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
+    // openid+profile identify the member; w_member_social lets us post on their
+    // behalf (requires LinkedIn's "Share on LinkedIn" product on the app).
+    scopes: 'openid profile w_member_social',
+  },
+  facebook: {
+    label: 'Facebook',
+    clientIdEnv: 'FACEBOOK_OAUTH_CLIENT_ID',
+    clientSecretEnv: 'FACEBOOK_OAUTH_CLIENT_SECRET',
+    // Facebook uses the same Meta OAuth endpoints as Instagram, different scopes.
+    authorizeUrl: 'https://www.facebook.com/v19.0/dialog/oauth',
+    tokenUrl: 'https://graph.facebook.com/v19.0/oauth/access_token',
+    scopes: 'pages_show_list,pages_manage_posts,pages_read_engagement',
+  },
 };
 
 export function platformLabel(platform: Platform): string {
@@ -154,6 +173,11 @@ export async function exchangeCodeForTokens(
     body.set('client_key', clientId);
     body.set('code_verifier', 'challenge');
   }
+  // X/Twitter authorizes with a PKCE code_challenge (see authParams), so the
+  // token exchange must echo the matching code_verifier or it's rejected.
+  if (platform === 'twitter') {
+    body.set('code_verifier', 'challenge');
+  }
 
   const res = await fetch(c.tokenUrl, {
     method: 'POST',
@@ -230,6 +254,21 @@ async function fetchAccount(
       const page = d.data?.[0];
       return { accountName: page?.name ?? null, accountId: page?.id ?? null };
     }
+    case 'linkedin': {
+      // OpenID userinfo returns the member's name and stable id (`sub`), which
+      // becomes the author URN (urn:li:person:{sub}) when publishing.
+      const r = await fetch('https://api.linkedin.com/v2/userinfo', { headers: auth });
+      const d = await r.json();
+      return { accountName: d.name ?? null, accountId: d.sub ?? null };
+    }
+    case 'facebook': {
+      const r = await fetch(
+        `https://graph.facebook.com/v19.0/me/accounts?access_token=${accessToken}`
+      );
+      const d = await r.json();
+      const page = d.data?.[0];
+      return { accountName: page?.name ?? null, accountId: page?.id ?? null };
+    }
   }
 }
 
@@ -270,6 +309,10 @@ export async function publishClip(
       return publishTikTok(input);
     case 'instagram':
       return publishInstagram(input);
+    case 'linkedin':
+      return publishLinkedIn(input);
+    case 'facebook':
+      return publishFacebook(input);
   }
 }
 
@@ -424,5 +467,137 @@ async function publishInstagram(input: PublishInput): Promise<PublishResult> {
   return {
     externalId: published.id ?? null,
     externalUrl: published.id ? `https://www.instagram.com/reel/${published.id}` : null,
+  };
+}
+
+async function publishLinkedIn(input: PublishInput): Promise<PublishResult> {
+  // Videos API: initialize an upload, PUT the bytes to the returned URL(s),
+  // finalize, then create a Post that references the uploaded video URN.
+  // Requires the "Share on LinkedIn" product (w_member_social) on the app.
+  if (!input.accountId) {
+    throw new PlatformError('LinkedIn publishing needs a connected member account.');
+  }
+  const author = `urn:li:person:${input.accountId}`;
+  const headers = {
+    Authorization: `Bearer ${input.accessToken}`,
+    'Content-Type': 'application/json',
+    'LinkedIn-Version': '202401',
+    'X-Restli-Protocol-Version': '2.0.0',
+  };
+
+  const videoRes = await fetch(input.videoUrl);
+  const videoBuf = Buffer.from(await videoRes.arrayBuffer());
+
+  const init = await fetch('https://api.linkedin.com/rest/videos?action=initializeUpload', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      initializeUploadRequest: {
+        owner: author,
+        fileSizeBytes: videoBuf.length,
+        uploadCaptions: false,
+        uploadThumbnail: false,
+      },
+    }),
+  });
+  const initData = await init.json().catch(() => ({}));
+  if (!init.ok) throw new PlatformError(`LinkedIn upload init failed: ${JSON.stringify(initData)}`);
+  const videoUrn: string | undefined = initData.value?.video;
+  const instructions: Array<{ uploadUrl: string; firstByte?: number; lastByte?: number }> =
+    initData.value?.uploadInstructions ?? [];
+  if (!videoUrn || instructions.length === 0) {
+    throw new PlatformError(`LinkedIn upload init returned no upload URL: ${JSON.stringify(initData)}`);
+  }
+
+  // Upload each instructed byte range, collecting the ETag each part returns.
+  const uploadedPartIds: string[] = [];
+  for (const instr of instructions) {
+    const first = Number(instr.firstByte ?? 0);
+    const last = Number(instr.lastByte ?? videoBuf.length - 1);
+    const part = videoBuf.subarray(first, last + 1);
+    const put = await fetch(instr.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${input.accessToken}`,
+        'Content-Type': 'application/octet-stream',
+      },
+      body: part,
+    });
+    if (!put.ok) throw new PlatformError(`LinkedIn video part upload failed: ${await put.text()}`);
+    const etag = put.headers.get('etag');
+    if (etag) uploadedPartIds.push(etag.replace(/"/g, ''));
+  }
+
+  const finalize = await fetch('https://api.linkedin.com/rest/videos?action=finalizeUpload', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      finalizeUploadRequest: { video: videoUrn, uploadToken: '', uploadedPartIds },
+    }),
+  });
+  if (!finalize.ok) throw new PlatformError(`LinkedIn finalize failed: ${await finalize.text()}`);
+
+  const post = await fetch('https://api.linkedin.com/rest/posts', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      author,
+      commentary: caption(input),
+      visibility: 'PUBLIC',
+      distribution: {
+        feedDistribution: 'MAIN_FEED',
+        targetEntities: [],
+        thirdPartyDistributionChannels: [],
+      },
+      content: { media: { title: input.title.slice(0, 200), id: videoUrn } },
+      lifecycleState: 'PUBLISHED',
+      isReshareDisabledByAuthor: false,
+    }),
+  });
+  if (!post.ok) throw new PlatformError(`LinkedIn post failed: ${await post.text()}`);
+  const postId = post.headers.get('x-restli-id') ?? post.headers.get('x-linkedin-id');
+  return {
+    externalId: postId,
+    externalUrl: postId ? `https://www.linkedin.com/feed/update/${postId}` : null,
+  };
+}
+
+async function publishFacebook(input: PublishInput): Promise<PublishResult> {
+  // Graph API — post the rendered clip to a Facebook Page from its public URL.
+  // Posting to a Page needs a Page access token, which we derive from the
+  // connected user token via /me/accounts.
+  if (!input.accountId) {
+    throw new PlatformError('Facebook publishing needs a connected Page.');
+  }
+  let pageToken = input.accessToken;
+  try {
+    const pagesRes = await fetch(
+      `https://graph.facebook.com/v19.0/me/accounts?access_token=${input.accessToken}`
+    );
+    const pages = await pagesRes.json();
+    const match = (pages.data ?? []).find(
+      (p: { id: string; access_token?: string }) => p.id === input.accountId
+    );
+    if (match?.access_token) pageToken = match.access_token;
+  } catch {
+    /* fall back to the user token */
+  }
+
+  const res = await fetch(`https://graph.facebook.com/v19.0/${input.accountId}/videos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      file_url: input.videoUrl,
+      description: caption(input),
+      access_token: pageToken,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.id) {
+    throw new PlatformError(`Facebook publish failed: ${JSON.stringify(data)}`);
+  }
+  return {
+    externalId: data.id,
+    externalUrl: `https://www.facebook.com/${data.id}`,
   };
 }

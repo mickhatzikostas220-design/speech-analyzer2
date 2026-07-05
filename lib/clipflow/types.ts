@@ -1,14 +1,29 @@
 // Shared types for ClipFlow — long-form → short-form clipping & publishing.
 
-export type Platform = 'instagram' | 'tiktok' | 'youtube' | 'twitter';
+export type Platform =
+  | 'instagram'
+  | 'tiktok'
+  | 'youtube'
+  | 'twitter'
+  | 'linkedin'
+  | 'facebook';
 
-export const PLATFORMS: Platform[] = ['instagram', 'tiktok', 'youtube', 'twitter'];
+export const PLATFORMS: Platform[] = [
+  'instagram',
+  'tiktok',
+  'youtube',
+  'twitter',
+  'linkedin',
+  'facebook',
+];
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   instagram: 'Instagram Reels',
   tiktok: 'TikTok',
   youtube: 'YouTube Shorts',
   twitter: 'X (Twitter)',
+  linkedin: 'LinkedIn',
+  facebook: 'Facebook',
 };
 
 export type ProjectStatus =
@@ -62,6 +77,8 @@ export interface PlatformHashtags {
   tiktok?: string[];
   youtube?: string[];
   twitter?: string[];
+  linkedin?: string[];
+  facebook?: string[];
 }
 
 export interface ClipFlowProject {

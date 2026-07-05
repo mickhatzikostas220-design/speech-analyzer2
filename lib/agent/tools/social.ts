@@ -14,6 +14,8 @@ const PLATFORM_LABEL: Record<string, string> = {
   tiktok: 'TikTok',
   youtube: 'YouTube',
   twitter: 'X',
+  linkedin: 'LinkedIn',
+  facebook: 'Facebook',
 };
 
 // Social-media analytics tools: let the agent read the user's own ClipFlow

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-type Platform = 'youtube' | 'tiktok' | 'instagram' | 'twitter';
+type Platform = 'youtube' | 'tiktok' | 'instagram' | 'twitter' | 'linkedin' | 'facebook';
 
 interface KeysData {
   hints: Record<string, string>;
@@ -14,18 +14,21 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   tiktok: 'TikTok',
   instagram: 'Instagram',
   twitter: 'X (Twitter)',
+  linkedin: 'LinkedIn',
+  facebook: 'Facebook',
 };
 
-const PLATFORMS: Platform[] = ['youtube', 'tiktok', 'instagram', 'twitter'];
+const PLATFORMS: Platform[] = ['youtube', 'tiktok', 'instagram', 'twitter', 'linkedin', 'facebook'];
 
 // Shared compact input styling, mapped to the brand design tokens.
 const INPUT_CLS =
   'rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-surface-card px-3 py-2 text-xs text-strong placeholder:text-[var(--text-faint)] focus:border-[color:var(--signature)] focus:outline-none disabled:opacity-50';
 
-// Lets each user bring their own ClipFlow API keys: OpenAI (clip AI), Upload-Post
-// (publish under their own account), and per-platform OAuth client credentials
-// for the direct-posting path. Keys are encrypted server-side; only a 4-char
-// hint is ever returned.
+// Advanced/optional: lets a user bring their own ClipFlow API keys — OpenAI (clip
+// AI) and per-platform OAuth client credentials (use their own developer app
+// instead of the app's shared one). Keys are encrypted server-side; only a 4-char
+// hint is ever returned. End users never need any of this — the app supplies the
+// defaults and social accounts connect by signing in (see ConnectionsPanel).
 export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
   const [data, setData] = useState<KeysData | null>(null);
   const [open, setOpen] = useState(false);
@@ -34,13 +37,14 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
 
   // Simple-key inputs.
   const [openaiKey, setOpenaiKey] = useState('');
-  const [uploadPostKey, setUploadPostKey] = useState('');
   // Per-platform OAuth inputs.
   const [oauth, setOauth] = useState<Record<Platform, { id: string; secret: string }>>({
     youtube: { id: '', secret: '' },
     tiktok: { id: '', secret: '' },
     instagram: { id: '', secret: '' },
     twitter: { id: '', secret: '' },
+    linkedin: { id: '', secret: '' },
+    facebook: { id: '', secret: '' },
   });
 
   async function load() {
@@ -59,7 +63,7 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
   const hints = data?.hints ?? {};
   const disabled = data ? !data.encryptionConfigured : false;
 
-  async function saveSimple(kind: 'openai' | 'upload_post', key: string, clear: () => void) {
+  async function saveSimple(kind: 'openai', key: string, clear: () => void) {
     if (!key.trim()) return;
     setBusy(kind);
     setBanner(null);
@@ -133,10 +137,10 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
         className="flex w-full items-center justify-between gap-2 p-4 text-left"
       >
         <div>
-          <h2 className="text-base font-semibold text-strong">Your API keys</h2>
+          <h2 className="text-base font-semibold text-strong">Advanced settings</h2>
           <p className="mt-0.5 text-xs text-muted">
-            Bring your own keys — clip AI and publishing run on your accounts. Optional; the app
-            defaults are used otherwise.
+            Optional. ClipFlow already runs on the app&apos;s keys — add your own only if you want clip
+            AI or posting billed to your own accounts.
           </p>
         </div>
         <svg
@@ -172,27 +176,13 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
             disabled={disabled}
           />
 
-          {/* Upload-Post */}
-          <KeyRow
-            label="Upload-Post API key"
-            help="Post clips straight to TikTok, Instagram, YouTube & X under your own Upload-Post account."
-            hint={hints.upload_post}
-            value={uploadPostKey}
-            onChange={setUploadPostKey}
-            onSave={() => saveSimple('upload_post', uploadPostKey, () => setUploadPostKey(''))}
-            onRemove={() => remove('upload_post')}
-            placeholder="Upload-Post API key"
-            busy={busy === 'upload_post'}
-            disabled={disabled}
-          />
-
           {/* Per-platform OAuth apps */}
           <div className="space-y-3">
             <div>
               <h3 className="text-sm font-medium text-strong">Per-platform app credentials</h3>
               <p className="mt-0.5 text-xs text-muted">
-                Advanced: connect a platform directly with your own developer app (client id &amp;
-                secret) instead of Upload-Post.
+                Connect a platform with your own developer app (client id &amp; secret) instead of the
+                app&apos;s shared one.
               </p>
             </div>
             {PLATFORMS.map((p) => {

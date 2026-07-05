@@ -1,8 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { processProject } from './pipeline';
 import { publishClip } from './platforms';
-import { uploadPostEnabledFor, publishViaUploadPost } from './uploadpost';
-import { resolveUploadPostKey } from './secrets';
 import { decryptToken } from './crypto';
 import type { Job } from './queue';
 import type { Platform, PlatformHashtags } from './types';
@@ -49,44 +47,26 @@ export async function publishOnePost(admin: SupabaseClient, postId: string): Pro
     const platform = post.platform as Platform;
     const hashtags = tagsForPlatform(clip.hashtags as PlatformHashtags, platform);
 
-    // Publish through Upload-Post when a key is available (the user's own key,
-    // else the app account key) — it owns the platform connections via each
-    // user's profile. Otherwise fall back to the per-platform OAuth path.
-    const uploadPostKey = await resolveUploadPostKey(admin, post.user_id);
-    let result: { externalId: string | null; externalUrl: string | null };
-    if (uploadPostEnabledFor(uploadPostKey)) {
-      result = await publishViaUploadPost(
-        post.user_id,
-        platform,
-        {
-          videoUrl: signed.signedUrl,
-          cacheKey: clip.file_path,
-          title: clip.title ?? '',
-          description: clip.description ?? '',
-          hashtags,
-        },
-        uploadPostKey!
-      );
-    } else {
-      const { data: connection } = await admin
-        .from('clipflow_connections')
-        .select('*')
-        .eq('user_id', post.user_id)
-        .eq('platform', post.platform)
-        .single();
-      if (!connection?.encrypted_access_token) {
-        throw new Error(`Connect your ${post.platform} account before posting.`);
-      }
-
-      result = await publishClip(platform, {
-        accessToken: decryptToken(connection.encrypted_access_token),
-        accountId: connection.account_id,
-        videoUrl: signed.signedUrl,
-        title: clip.title ?? '',
-        description: clip.description ?? '',
-        hashtags,
-      });
+    // Publish through the user's own per-platform OAuth connection: they sign in
+    // once, the access token is stored encrypted, and it's decrypted and used here.
+    const { data: connection } = await admin
+      .from('clipflow_connections')
+      .select('*')
+      .eq('user_id', post.user_id)
+      .eq('platform', post.platform)
+      .single();
+    if (!connection?.encrypted_access_token) {
+      throw new Error(`Connect your ${post.platform} account before posting.`);
     }
+
+    const result = await publishClip(platform, {
+      accessToken: decryptToken(connection.encrypted_access_token),
+      accountId: connection.account_id,
+      videoUrl: signed.signedUrl,
+      title: clip.title ?? '',
+      description: clip.description ?? '',
+      hashtags,
+    });
 
     await setStatus({
       status: 'posted',

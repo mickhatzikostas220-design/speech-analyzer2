@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-type Platform = 'instagram' | 'tiktok' | 'youtube' | 'twitter';
+type Platform = 'instagram' | 'tiktok' | 'youtube' | 'twitter' | 'linkedin' | 'facebook';
 
 interface Status {
   configured: boolean;
@@ -15,6 +15,8 @@ const LABELS: Record<Platform, string> = {
   tiktok: 'TikTok',
   youtube: 'YouTube',
   twitter: 'X',
+  linkedin: 'LinkedIn',
+  facebook: 'Facebook',
 };
 
 // Lets each speaker connect their own social accounts to their Upload-Post
@@ -82,8 +84,8 @@ export function UploadPostPanel({ onChanged }: { onChanged?: () => void }) {
         <div>
           <h2 className="text-base font-semibold text-strong">Publish accounts</h2>
           <p className="mt-0.5 text-xs text-muted">
-            Connect your TikTok, Instagram, YouTube, and X accounts to post clips — handled securely
-            through Upload-Post, no per-platform app to set up.
+            Connect your TikTok, Instagram, YouTube, X, LinkedIn, and Facebook accounts to post clips —
+            handled securely through Upload-Post, no per-platform app to set up.
           </p>
         </div>
         {!loading && connected.length > 0 && (

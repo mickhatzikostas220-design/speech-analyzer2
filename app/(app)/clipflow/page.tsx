@@ -262,10 +262,10 @@ export default function ClipFlowPage() {
         className="card flex items-center justify-between gap-4 p-4 transition-colors hover:border-strong"
       >
         <div>
-          <p className="text-sm font-semibold text-strong">Connect accounts &amp; API keys →</p>
+          <p className="text-sm font-semibold text-strong">Connect your accounts →</p>
           <p className="mt-0.5 text-xs text-muted">
-            Add your OpenAI / Upload-Post keys and connect TikTok, Instagram, YouTube &amp; X to post
-            clips — managed in Settings.
+            Sign in to TikTok, Instagram, YouTube, X, LinkedIn &amp; Facebook to post your clips — no API
+            key needed. Managed in Settings.
           </p>
         </div>
         <svg className="h-5 w-5 shrink-0 text-[var(--ink-400)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -3,12 +3,11 @@
 import { useEffect, useState } from 'react';
 
 interface Connection {
-  platform: 'instagram' | 'tiktok' | 'youtube' | 'twitter';
+  platform: 'instagram' | 'tiktok' | 'youtube' | 'twitter' | 'linkedin' | 'facebook';
   label: string;
   configured: boolean;
   connected: boolean;
   account_name: string | null;
-  provider?: 'oauth' | 'uploadpost';
 }
 
 const PLATFORM_STYLE: Record<string, { dot: string; glyph: string }> = {
@@ -16,6 +15,8 @@ const PLATFORM_STYLE: Record<string, { dot: string; glyph: string }> = {
   tiktok: { dot: 'from-cyan-400 to-pink-500', glyph: 'TT' },
   youtube: { dot: 'from-red-500 to-red-700', glyph: 'YT' },
   twitter: { dot: 'from-zinc-400 to-zinc-600', glyph: '𝕏' },
+  linkedin: { dot: 'from-sky-600 to-blue-800', glyph: 'in' },
+  facebook: { dot: 'from-blue-500 to-blue-700', glyph: 'f' },
 };
 
 export function ConnectionsPanel({ refresh = 0 }: { refresh?: number }) {
@@ -44,20 +45,14 @@ export function ConnectionsPanel({ refresh = 0 }: { refresh?: number }) {
     load();
   }
 
-  // When Upload-Post is the provider it owns the platform connections — accounts
-  // are linked via the "Publish accounts" panel above, not per-platform OAuth.
-  const viaUploadPost = connections.some((c) => c.provider === 'uploadpost');
-
   return (
     <div>
-      <div className="mb-4 flex items-center gap-2">
-        <h2 className="text-base font-semibold text-strong">Connected platforms</h2>
-        {viaUploadPost && (
-          <span className="rounded-full border border-[color:var(--accent-2)]/30 bg-[var(--info-bg)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[color:var(--accent-2)]">
-            via Upload-Post
-          </span>
-        )}
+      <div className="mb-1">
+        <h2 className="text-base font-semibold text-strong">Connect accounts to post</h2>
       </div>
+      <p className="mb-4 text-xs text-muted">
+        Sign in to each platform to publish your clips — no API key needed. Disconnect any time.
+      </p>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {(loading ? Array.from({ length: 4 }) : connections).map((c, i) => {
@@ -78,16 +73,8 @@ export function ConnectionsPanel({ refresh = 0 }: { refresh?: number }) {
               </div>
               <span className="text-xs font-medium leading-tight text-strong">{conn.label}</span>
 
-              {conn.provider === 'uploadpost' ? (
-                conn.connected ? (
-                  <span className="max-w-[90px] truncate text-[10px] text-[color:var(--success)]">
-                    {conn.account_name || 'Connected'}
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-faint">Connect above ↑</span>
-                )
-              ) : !conn.configured ? (
-                <span className="text-[10px] text-faint">Not configured</span>
+              {!conn.configured ? (
+                <span className="text-[10px] text-faint">Not available yet</span>
               ) : conn.connected ? (
                 <div className="flex flex-col items-center gap-1">
                   <span className="max-w-[90px] truncate text-[10px] text-[color:var(--success)]">
@@ -103,10 +90,10 @@ export function ConnectionsPanel({ refresh = 0 }: { refresh?: number }) {
               ) : (
                 <a
                   href={`/api/clipflow/connections/${conn.platform}/authorize`}
-                  className="text-[10px] transition-colors hover:underline"
+                  className="rounded-full border border-[color:var(--signature)] px-2.5 py-1 text-[10px] font-medium transition-colors hover:bg-[var(--signature)] hover:text-[color:var(--on-signature)]"
                   style={{ color: 'var(--text-link)' }}
                 >
-                  Connect →
+                  Sign in →
                 </a>
               )}
             </div>

@@ -63,7 +63,7 @@ create index if not exists clipflow_clips_project_idx on clipflow_clips (project
 create table if not exists clipflow_connections (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references profiles(id) on delete cascade not null,
-  platform text not null check (platform in ('instagram', 'tiktok', 'youtube', 'twitter')),
+  platform text not null check (platform in ('instagram', 'tiktok', 'youtube', 'twitter', 'linkedin', 'facebook')),
   account_name text,
   account_id text,
   scopes text,
@@ -80,7 +80,7 @@ create table if not exists clipflow_posts (
   id uuid primary key default gen_random_uuid(),
   clip_id uuid references clipflow_clips(id) on delete cascade not null,
   user_id uuid references profiles(id) on delete cascade not null,
-  platform text not null check (platform in ('instagram', 'tiktok', 'youtube', 'twitter')),
+  platform text not null check (platform in ('instagram', 'tiktok', 'youtube', 'twitter', 'linkedin', 'facebook')),
   status text not null default 'queued'
     check (status in ('queued', 'scheduled', 'posting', 'posted', 'failed')),
   scheduled_at timestamptz,
@@ -101,14 +101,16 @@ create index if not exists clipflow_posts_clip_idx on clipflow_posts (clip_id);
 -- credentials. Ciphertext (AES-256-GCM via APP_ENCRYPTION_KEY) never leaves the
 -- server; the client only ever sees `hint` (last 4 chars).
 --   kind ∈ 'openai' | 'upload_post' |
---          'oauth_youtube' | 'oauth_tiktok' | 'oauth_instagram' | 'oauth_twitter'
+--          'oauth_youtube' | 'oauth_tiktok' | 'oauth_instagram' | 'oauth_twitter' |
+--          'oauth_linkedin' | 'oauth_facebook'
 -- For the oauth_* kinds the encrypted value is JSON {clientId, clientSecret}.
 create table if not exists clipflow_secrets (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references profiles(id) on delete cascade not null,
   kind text not null check (kind in (
     'openai', 'upload_post',
-    'oauth_youtube', 'oauth_tiktok', 'oauth_instagram', 'oauth_twitter'
+    'oauth_youtube', 'oauth_tiktok', 'oauth_instagram', 'oauth_twitter',
+    'oauth_linkedin', 'oauth_facebook'
   )),
   encrypted_value text not null,
   hint text not null default '',
@@ -137,6 +139,26 @@ create table if not exists clipflow_jobs (
 );
 
 create index if not exists clipflow_jobs_queue_idx on clipflow_jobs (status, run_after);
+
+-- ── Widen platform / kind constraints for existing databases ────────────────
+-- The CREATE TABLE checks above only apply to fresh installs. For databases
+-- created before LinkedIn + Facebook were added, drop and re-add the check
+-- constraints so those platforms can be stored. Idempotent and safe to re-run.
+alter table clipflow_connections drop constraint if exists clipflow_connections_platform_check;
+alter table clipflow_connections add constraint clipflow_connections_platform_check
+  check (platform in ('instagram', 'tiktok', 'youtube', 'twitter', 'linkedin', 'facebook'));
+
+alter table clipflow_posts drop constraint if exists clipflow_posts_platform_check;
+alter table clipflow_posts add constraint clipflow_posts_platform_check
+  check (platform in ('instagram', 'tiktok', 'youtube', 'twitter', 'linkedin', 'facebook'));
+
+alter table clipflow_secrets drop constraint if exists clipflow_secrets_kind_check;
+alter table clipflow_secrets add constraint clipflow_secrets_kind_check
+  check (kind in (
+    'openai', 'upload_post',
+    'oauth_youtube', 'oauth_tiktok', 'oauth_instagram', 'oauth_twitter',
+    'oauth_linkedin', 'oauth_facebook'
+  ));
 
 -- ── Row-level security ──────────────────────────────────────────────────────
 alter table clipflow_projects enable row level security;

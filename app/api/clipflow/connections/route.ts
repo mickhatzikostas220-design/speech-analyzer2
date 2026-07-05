@@ -1,46 +1,21 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { PLATFORMS, PLATFORM_LABELS, type Platform } from '@/lib/clipflow/types';
+import { PLATFORMS, PLATFORM_LABELS } from '@/lib/clipflow/types';
 import { isConfiguredWith } from '@/lib/clipflow/platforms';
-import { uploadPostEnabledFor, getUserConnection } from '@/lib/clipflow/uploadpost';
-import { resolveUploadPostKey, resolveOAuthCreds } from '@/lib/clipflow/secrets';
+import { resolveOAuthCreds } from '@/lib/clipflow/secrets';
 
 export const dynamic = 'force-dynamic';
 
 // Returns connection status for all platforms. Deliberately selects only
 // non-sensitive columns — credentials never leave the server.
 //
-// Two providers: when Upload-Post is configured it owns the connections and the
-// account list comes from the user's Upload-Post profile; otherwise each platform
-// is connected through its own OAuth flow and stored in clipflow_connections.
+// Each platform is connected through its own OAuth flow (the user signs in) and
+// stored in clipflow_connections.
 export async function GET() {
   try {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const uploadPostKey = await resolveUploadPostKey(supabase, user.id);
-    if (uploadPostEnabledFor(uploadPostKey)) {
-      let connected: Platform[] = [];
-      let names: Partial<Record<Platform, string>> = {};
-      try {
-        ({ connected, names } = await getUserConnection(user.id, uploadPostKey!));
-      } catch {
-        // Surface every platform as not-yet-connected if Upload-Post is unreachable.
-      }
-
-      const connections = PLATFORMS.map((platform) => ({
-        platform,
-        label: PLATFORM_LABELS[platform],
-        configured: true,
-        connected: connected.includes(platform),
-        account_name: names[platform] ?? null,
-        token_expires_at: null,
-        provider: 'uploadpost' as const,
-      }));
-
-      return NextResponse.json(connections);
-    }
 
     const { data: rows } = await supabase
       .from('clipflow_connections')

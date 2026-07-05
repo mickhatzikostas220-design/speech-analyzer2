@@ -31,6 +31,8 @@ const ALL_KINDS: ClipflowSecretKind[] = [
   'oauth_tiktok',
   'oauth_instagram',
   'oauth_twitter',
+  'oauth_linkedin',
+  'oauth_facebook',
 ];
 
 export function isClipflowSecretKind(v: unknown): v is ClipflowSecretKind {
@@ -79,6 +81,8 @@ const ENV_OAUTH: Record<Platform, { id: string; secret: string }> = {
   tiktok: { id: 'TIKTOK_OAUTH_CLIENT_KEY', secret: 'TIKTOK_OAUTH_CLIENT_SECRET' },
   instagram: { id: 'INSTAGRAM_OAUTH_CLIENT_ID', secret: 'INSTAGRAM_OAUTH_CLIENT_SECRET' },
   twitter: { id: 'TWITTER_OAUTH_CLIENT_ID', secret: 'TWITTER_OAUTH_CLIENT_SECRET' },
+  linkedin: { id: 'LINKEDIN_OAUTH_CLIENT_ID', secret: 'LINKEDIN_OAUTH_CLIENT_SECRET' },
+  facebook: { id: 'FACEBOOK_OAUTH_CLIENT_ID', secret: 'FACEBOOK_OAUTH_CLIENT_SECRET' },
 };
 
 /** The user's own per-platform OAuth client creds, falling back to env, or null. */
