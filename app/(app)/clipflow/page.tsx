@@ -7,6 +7,18 @@ import { CLIP_LENGTHS, CLIP_LENGTH_LABELS, type ClipLength } from '@/lib/clipflo
 
 const TONE_SUGGESTIONS = ['Funny', 'Educational', 'Inspirational', 'High-energy', 'Storytelling', 'Controversial'];
 
+// Platforms clips can publish to. Users connect these by signing in (no API key)
+// on /settings/connections — the logos + "Connect accounts" button at the bottom
+// of this page link there. Colors mirror ConnectionsPanel's PLATFORM_STYLE.
+const PUBLISH_PLATFORMS = [
+  { id: 'youtube', label: 'YouTube', glyph: 'YT', dot: 'from-red-500 to-red-700' },
+  { id: 'tiktok', label: 'TikTok', glyph: 'TT', dot: 'from-cyan-400 to-pink-500' },
+  { id: 'instagram', label: 'Instagram', glyph: 'IG', dot: 'from-fuchsia-500 to-amber-500' },
+  { id: 'twitter', label: 'X', glyph: '𝕏', dot: 'from-zinc-400 to-zinc-600' },
+  { id: 'linkedin', label: 'LinkedIn', glyph: 'in', dot: 'from-sky-600 to-blue-800' },
+  { id: 'facebook', label: 'Facebook', glyph: 'f', dot: 'from-blue-500 to-blue-700' },
+] as const;
+
 interface ProjectSummary {
   id: string;
   source_url: string;
@@ -256,23 +268,6 @@ export default function ClipFlowPage() {
         )}
       </form>
 
-      {/* Connect accounts & API keys live in shared Settings */}
-      <Link
-        href="/settings/connections"
-        className="card flex items-center justify-between gap-4 p-4 transition-colors hover:border-strong"
-      >
-        <div>
-          <p className="text-sm font-semibold text-strong">Connect your accounts →</p>
-          <p className="mt-0.5 text-xs text-muted">
-            Sign in to TikTok, Instagram, YouTube, X, LinkedIn &amp; Facebook to post your clips — no API
-            key needed. Managed in Settings.
-          </p>
-        </div>
-        <svg className="h-5 w-5 shrink-0 text-[var(--ink-400)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </Link>
-
       {/* Projects */}
       <div>
         <h2 className="mb-4 text-base font-semibold text-strong">Your videos</h2>
@@ -341,6 +336,36 @@ export default function ClipFlowPage() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Publish destinations — connect socials by signing in, no API key */}
+      <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)] p-6 text-center">
+        <h2 className="text-base font-semibold text-strong">Post your clips everywhere</h2>
+        <p className="mx-auto mt-1 max-w-md text-xs text-muted">
+          Publish straight to your social accounts — just sign in, no API key needed.
+        </p>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-4">
+          {PUBLISH_PLATFORMS.map((p) => (
+            <div key={p.id} className="flex flex-col items-center gap-1.5">
+              <div
+                className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${p.dot} text-sm font-bold text-white shadow-sm`}
+              >
+                {p.glyph}
+              </div>
+              <span className="text-[10px] text-faint">{p.label}</span>
+            </div>
+          ))}
+        </div>
+        <Link
+          href="/settings/connections"
+          className="btn-primary mt-6 inline-flex items-center gap-1.5 text-sm"
+          style={{ padding: '10px 20px' }}
+        >
+          Connect accounts
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
       </div>
 
       {/* Delete confirmation modal */}
