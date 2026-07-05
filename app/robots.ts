@@ -28,6 +28,7 @@ export default function robots(): MetadataRoute.Robots {
         '/tips',
         '/seo',
         '/stagefinder',
+        '/content-ideas',
         '/verify-email',
       ],
     },

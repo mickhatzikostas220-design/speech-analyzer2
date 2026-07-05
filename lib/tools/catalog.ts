@@ -23,6 +23,7 @@ import {
   Lightbulb,
   Search,
   Telescope,
+  Newspaper,
 } from 'lucide-react';
 import type { PlanId } from '@/lib/subscription/plans';
 
@@ -145,6 +146,16 @@ export const TOOLS: ToolMeta[] = [
     href: '/seo',
     bg: 'var(--accent-2)',
     fg: '#fff',
+  },
+  {
+    key: 'content-ideas',
+    icon: Newspaper,
+    name: 'Content Ideas',
+    desc: 'Get 20–30 blog, video, and short titles that people actually search for — in your brand voice.',
+    href: '/content-ideas',
+    bg: 'var(--yellow-400)',
+    fg: 'var(--ink-900)',
+    tier: 'core',
   },
   {
     key: 'coaching-tips',

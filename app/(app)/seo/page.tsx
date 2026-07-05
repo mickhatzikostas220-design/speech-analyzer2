@@ -4,7 +4,7 @@
 // search engines and being cited by AI answer engines. Free users get one tip
 // a week; paid users see every tip and can save fixes to their tip plan.
 import { useState } from 'react';
-import { Search, Sparkles, Check, CalendarPlus } from 'lucide-react';
+import { Search, Sparkles, Check, CalendarPlus, Copy, Code2 } from 'lucide-react';
 import { SEO_PLATFORMS, type SeoPlatformId } from '@/lib/seo/platforms';
 import SeoChat from './SeoChat';
 
@@ -13,6 +13,9 @@ interface TipItem {
   detail: string;
   severity: 'high' | 'medium' | 'low';
   steps: string[];
+  /** Optional ready-to-paste artifact (JSON-LD, HTML, llms.txt, …). */
+  code?: string;
+  codeLang?: string;
 }
 interface Report {
   summary: string;
@@ -25,6 +28,39 @@ const SEVERITY: Record<string, { label: string; cls: string }> = {
   medium: { label: 'Medium', cls: 'bg-[var(--warning-bg)] text-[#8A6D00]' },
   low: { label: 'Nice to have', cls: 'bg-[var(--info-bg)] text-[color:var(--accent-2)]' },
 };
+
+// A ready-to-paste artifact (JSON-LD, HTML, llms.txt) with a copy button — the
+// thing that makes an AEO tip actionable instead of abstract.
+function CodeBlock({ code, lang }: { code: string; lang?: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked (e.g. insecure context) — leave the button as-is.
+    }
+  }
+  return (
+    <div className="mt-3 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--ink-900)]">
+      <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3 py-1.5">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--pink-200)]">
+          <Code2 className="h-3.5 w-3.5" /> Paste this{lang ? ` · ${lang}` : ''}
+        </span>
+        <button
+          onClick={copy}
+          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--pink-200)] transition-opacity hover:opacity-80"
+        >
+          {copied ? (<><Check className="h-3.5 w-3.5" /> Copied</>) : (<><Copy className="h-3.5 w-3.5" /> Copy</>)}
+        </button>
+      </div>
+      <pre className="max-h-72 overflow-auto p-3 text-[12px] leading-relaxed text-[var(--paper)]">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
 
 function TipCard({ tip, canSave }: { tip: TipItem; canSave: boolean }) {
   const [date, setDate] = useState('');
@@ -67,6 +103,8 @@ function TipCard({ tip, canSave }: { tip: TipItem; canSave: boolean }) {
           ))}
         </ol>
       )}
+
+      {tip.code && <CodeBlock code={tip.code} lang={tip.codeLang} />}
 
       {canSave && (
         <div className="mt-4 flex items-center gap-2 border-t border-[var(--border-subtle)] pt-3">

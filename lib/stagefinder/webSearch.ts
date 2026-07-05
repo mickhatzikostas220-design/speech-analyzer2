@@ -1,9 +1,10 @@
 // Stage Finder web-search helper. Uses the OpenAI Responses API with the built-in
 // web_search tool to gather REAL, currently-documented facts BEFORE we structure a
-// report — specifically (1) where the admired speakers have actually spoken and
-// (2) real, current events/series in their world that book outside speakers. The
-// facts (and their source URLs) are then handed to the normal JSON call so the
-// report is grounded in what was actually found, not the model's memory.
+// report — specifically (1) where the admired speakers have actually spoken (with
+// the real event pages and dates) and (2) real, current events/series in their
+// world that book outside speakers. The facts (and their source URLs) are then
+// handed to the JSON call so the report is grounded in what was actually found,
+// not the model's memory.
 //
 // Why the Responses API + web_search tool (and not the gpt-4o-search-preview chat
 // model): the *-search-preview chat models are deprecated and shut down
@@ -27,6 +28,14 @@ export interface WebSearchFindings {
   text: string;
   /** De-duplicated source URLs the model cited. */
   sources: WebSource[];
+}
+
+/** Tuning knobs for a single research pass. */
+export interface WebSearchOptions {
+  /** Output token ceiling for the brief. Higher = more appearances surfaced. */
+  maxOutputTokens?: number;
+  /** How much of the web the tool pulls in per query. 'high' digs deeper. */
+  searchContextSize?: 'low' | 'medium' | 'high';
 }
 
 // Minimal shapes for reading Responses output WITHOUT depending on the exact SDK
@@ -76,16 +85,36 @@ function extractSources(output: unknown): WebSource[] {
  * Run one web-search research pass and return the findings brief + cited sources.
  * Throws on API error — the caller decides whether to degrade gracefully.
  */
-export async function runWebSearch(prompt: string): Promise<WebSearchFindings> {
+export async function runWebSearch(
+  prompt: string,
+  opts: WebSearchOptions = {}
+): Promise<WebSearchFindings> {
   const openai = new OpenAI(aiClientOptions());
   const response = await openai.responses.create({
     model: 'gpt-4o',
-    tools: [{ type: 'web_search_preview' }],
+    tools: [{ type: 'web_search_preview', search_context_size: opts.searchContextSize ?? 'high' }],
     input: prompt,
-    max_output_tokens: 2000,
+    max_output_tokens: opts.maxOutputTokens ?? 2000,
   });
   return {
     text: response.output_text ?? '',
     sources: extractSources(response.output),
   };
+}
+
+/** Merge several findings passes into one brief + de-duplicated source list. */
+export function mergeFindings(all: WebSearchFindings[]): WebSearchFindings {
+  const seen = new Set<string>();
+  const sources: WebSource[] = [];
+  const texts: string[] = [];
+  for (const f of all) {
+    if (f.text.trim()) texts.push(f.text.trim());
+    for (const s of f.sources) {
+      if (!seen.has(s.url)) {
+        seen.add(s.url);
+        sources.push(s);
+      }
+    }
+  }
+  return { text: texts.join('\n\n'), sources };
 }

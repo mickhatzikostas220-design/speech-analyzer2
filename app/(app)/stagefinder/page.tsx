@@ -12,6 +12,7 @@ import {
   MapPin,
   Mic,
   ExternalLink,
+  CalendarClock,
   Send,
   Copy,
   Check,
@@ -232,7 +233,9 @@ export default function StageFinderPage() {
                 <Mic className="h-4 w-4 text-muted" /> Where your idols actually speak
               </h2>
               <p className="mb-3 text-xs text-faint">
-                Pulled from a live web search — follow the source links to verify before you pitch.
+                Pulled from a live web search of each speaker&apos;s footprint. Click{' '}
+                <span className="font-semibold">Event page</span> to open the stage&apos;s own site, check
+                when it next runs, and find who to pitch.
               </p>
               <div className="space-y-3">
                 {report.speakerAppearances.map((sa, i) => (
@@ -247,7 +250,12 @@ export default function StageFinderPage() {
                               {ev.format}
                             </span>
                           )}
-                          {ev.sourceUrl && <SourceLink url={ev.sourceUrl} />}
+                          {ev.sourceUrl && <SourceLink url={ev.sourceUrl} label="Event page" />}
+                          {ev.when && (
+                            <span className="flex w-full items-center gap-1 text-xs font-medium text-muted">
+                              <CalendarClock className="h-3 w-3 text-faint" /> {ev.when}
+                            </span>
+                          )}
                           {ev.note && <span className="w-full text-xs text-faint">{ev.note}</span>}
                         </li>
                       ))}
@@ -281,7 +289,8 @@ export default function StageFinderPage() {
                                   {ev.format}
                                 </span>
                               )}
-                              {ev.sourceUrl && <SourceLink url={ev.sourceUrl} />}
+                              {ev.sourceUrl && <SourceLink url={ev.sourceUrl} label="Event page" />}
+                              {ev.when && <span className="w-full text-[11px] text-faint">{ev.when}</span>}
                             </li>
                           ))}
                         </ul>
@@ -371,9 +380,10 @@ function EventCard({ event }: { event: StageReport['events'][number] }) {
   );
 }
 
-// A small "Source" link out to where a fact was found on the web. Opens in a new
-// tab; rel keeps us safe from tab-nabbing and passing referrer/rank to the target.
-function SourceLink({ url }: { url: string }) {
+// A small link out to where a fact was found on the web — an event's own page
+// for appearances, or a supporting source elsewhere. Opens in a new tab; rel
+// keeps us safe from tab-nabbing and passing referrer/rank to the target.
+function SourceLink({ url, label = 'Source' }: { url: string; label?: string }) {
   return (
     <a
       href={url}
@@ -381,7 +391,7 @@ function SourceLink({ url }: { url: string }) {
       rel="noopener noreferrer nofollow"
       className="inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--accent-2)] hover:underline"
     >
-      <ExternalLink className="h-3 w-3" /> Source
+      <ExternalLink className="h-3 w-3" /> {label}
     </a>
   );
 }

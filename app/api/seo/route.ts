@@ -17,6 +17,14 @@ interface SeoTip {
   detail: string;
   severity: 'high' | 'medium' | 'low';
   steps: string[];
+  /**
+   * Optional ready-to-paste artifact (e.g. JSON-LD, an llms.txt file, an FAQ
+   * block). This is what makes AEO advice actionable instead of abstract —
+   * the speaker copies it straight onto their site.
+   */
+  code?: string;
+  /** Language hint for the code block, e.g. "json", "html", "text". */
+  codeLang?: string;
 }
 
 export const maxDuration = 60;
@@ -34,7 +42,7 @@ function isBlockedHost(host: string): boolean {
   return false;
 }
 
-async function fetchHtml(url: string): Promise<string> {
+async function fetchHtml(url: string): Promise<{ html: string; xRobotsTag: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -49,13 +57,62 @@ async function fetchHtml(url: string): Promise<string> {
     });
     if (!res.ok) throw new BrandExtractError(`The site responded with ${res.status}.`);
     const buf = await res.arrayBuffer();
-    return new TextDecoder('utf-8').decode(buf.slice(0, MAX_HTML_BYTES));
+    return {
+      html: new TextDecoder('utf-8').decode(buf.slice(0, MAX_HTML_BYTES)),
+      // X-Robots-Tag can noindex a page from the HTTP layer even when the HTML
+      // looks fine — capture it so we can report true indexability.
+      xRobotsTag: res.headers.get('x-robots-tag') ?? '',
+    };
   } finally {
     clearTimeout(timer);
   }
 }
 
-function extractSignals(html: string) {
+/**
+ * Check robots.txt for whether the site declares a sitemap. Best-effort and
+ * bounded — a missing/blocked robots.txt just means "unknown", not an error.
+ */
+async function fetchRobotsInfo(origin: string): Promise<{ hasRobotsTxt: boolean; declaresSitemap: boolean }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(`${origin}/robots.txt`, { redirect: 'follow', signal: controller.signal });
+    if (!res.ok) return { hasRobotsTxt: false, declaresSitemap: false };
+    const text = (await res.text()).slice(0, 50_000);
+    return { hasRobotsTxt: true, declaresSitemap: /^\s*sitemap\s*:/im.test(text) };
+  } catch {
+    return { hasRobotsTxt: false, declaresSitemap: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Social / professional profiles worth citing as schema.org sameAs and as
+// E-E-A-T signals. We just note which ones the page already links out to.
+const SOCIAL_HOSTS: Record<string, string> = {
+  'linkedin.com': 'LinkedIn',
+  'twitter.com': 'X/Twitter',
+  'x.com': 'X/Twitter',
+  'youtube.com': 'YouTube',
+  'instagram.com': 'Instagram',
+  'facebook.com': 'Facebook',
+  'tiktok.com': 'TikTok',
+  'wikipedia.org': 'Wikipedia',
+  'medium.com': 'Medium',
+  'substack.com': 'Substack',
+};
+
+function headingTexts(html: string, tag: string): string[] {
+  return Array.from(html.matchAll(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'gi')))
+    .map((m) => m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+}
+
+function isQuestion(s: string): boolean {
+  return /\?\s*$/.test(s) || /^(who|what|why|how|when|where|which|can|do|does|is|are|should|will)\b/i.test(s);
+}
+
+function extractSignals(html: string, xRobotsTag: string, robots: { hasRobotsTxt: boolean; declaresSitemap: boolean }) {
   const pick = (re: RegExp) => (html.match(re)?.[1] ?? '').trim();
   const count = (re: RegExp) => (html.match(re) ?? []).length;
   const text = html
@@ -64,16 +121,47 @@ function extractSignals(html: string) {
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  const jsonLdTypes = Array.from(
+
+  // Collect all JSON-LD @type values (handles arrays and @graph nesting loosely).
+  const jsonLdBlocks = Array.from(
     html.matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)
+  ).map((m) => m[1] ?? '');
+  const jsonLdTypes = Array.from(
+    jsonLdBlocks.join(' ').matchAll(/"@type"\s*:\s*"([^"]+)"/gi)
   )
-    .map((m) => (m[1]!.match(/"@type"\s*:\s*"([^"]+)"/)?.[1] ?? ''))
+    .map((m) => m[1])
     .filter(Boolean);
+  const jsonLdBlob = jsonLdBlocks.join(' ').toLowerCase();
+
+  const metaRobots = pick(/<meta[^>]+name=["']robots["'][^>]+content=["']([^"']*)["']/i);
+  const robotsDirective = [metaRobots, xRobotsTag].filter(Boolean).join(' | ');
+  const indexable = !/noindex/i.test(metaRobots) && !/noindex/i.test(xRobotsTag);
+
+  const h1s = headingTexts(html, 'h1');
+  const h2s = headingTexts(html, 'h2');
+  const h3s = headingTexts(html, 'h3');
+  const questionHeadings = [...h1s, ...h2s, ...h3s].filter(isQuestion).slice(0, 12);
+
+  // Which social / professional profiles the page links out to (sameAs fodder).
+  const socialProfiles = Array.from(
+    new Set(
+      Array.from(html.matchAll(/href=["'](https?:\/\/[^"']+)["']/gi))
+        .map((m) => m[1])
+        .map((href) => {
+          const host = Object.keys(SOCIAL_HOSTS).find((h) => href.includes(h));
+          return host ? SOCIAL_HOSTS[host] : '';
+        })
+        .filter(Boolean)
+    )
+  );
 
   return {
     title: pick(/<title[^>]*>([\s\S]*?)<\/title>/i),
     metaDescription: pick(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i),
-    metaRobots: pick(/<meta[^>]+name=["']robots["'][^>]+content=["']([^"']*)["']/i),
+    // True indexability, resolved from meta robots AND the X-Robots-Tag header —
+    // so tips never wrongly tell a speaker to "enable indexing" when it's already on.
+    indexable,
+    robotsDirective,
     canonical: pick(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']*)["']/i),
     htmlLang: pick(/<html[^>]+lang=["']([^"']*)["']/i),
     hasViewport: /<meta[^>]+name=["']viewport["']/i.test(html),
@@ -81,13 +169,25 @@ function extractSignals(html: string) {
     ogDescription: pick(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']*)["']/i),
     ogImage: pick(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']*)["']/i),
     twitterCard: pick(/<meta[^>]+name=["']twitter:card["'][^>]+content=["']([^"']*)["']/i),
-    h1Count: count(/<h1[\s>]/gi),
-    firstH1: pick(/<h1[^>]*>([\s\S]*?)<\/h1>/i).replace(/<[^>]+>/g, '').trim(),
-    h2Count: count(/<h2[\s>]/gi),
+    h1Count: h1s.length,
+    firstH1: h1s[0] ?? '',
+    h2Count: h2s.length,
+    h2Samples: h2s.slice(0, 8),
+    questionHeadings,
     imgCount: count(/<img[\s>]/gi),
     imgMissingAlt: count(/<img(?:(?!alt=)[^>])*?>/gi),
     jsonLdTypes,
+    // Concrete schema flags so the model refines what exists instead of
+    // re-recommending it from scratch.
+    hasFaqSchema: /faqpage|"question"/i.test(jsonLdBlob),
+    hasPersonSchema: /"@type"\s*:\s*"person"/i.test(jsonLdBlob),
+    hasOrganizationSchema: /organization/i.test(jsonLdBlob),
+    hasSpeakableSchema: /speakable/i.test(jsonLdBlob),
+    socialProfiles,
+    hasRobotsTxt: robots.hasRobotsTxt,
+    declaresSitemap: robots.declaresSitemap,
     wordCount: text ? text.split(' ').length : 0,
+    textSample: text.slice(0, 1100),
   };
 }
 
@@ -152,9 +252,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'That address is not allowed.' }, { status: 400 });
   }
 
+  const origin = new URL(url).origin;
   let html: string;
+  let xRobotsTag = '';
+  let robots = { hasRobotsTxt: false, declaresSitemap: false };
   try {
-    html = await fetchHtml(url);
+    // Fetch the page and its robots.txt together so indexability + sitemap
+    // status are grounded in fact, not guessed.
+    const [page, robotsInfo] = await Promise.all([fetchHtml(url), fetchRobotsInfo(origin)]);
+    html = page.html;
+    xRobotsTag = page.xRobotsTag;
+    robots = robotsInfo;
   } catch {
     return NextResponse.json(
       { error: "Couldn't reach that website. Check the address and try again." },
@@ -162,31 +270,62 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const signals = extractSignals(html);
+  const signals = extractSignals(html, xRobotsTag, robots);
 
-  const prompt = `You are an SEO and AEO (Answer Engine Optimization) expert advising a public speaker on their website. AEO = being cited by AI assistants and answer engines (ChatGPT, Perplexity, Google AI Overviews).
+  // Spell out what the page ALREADY does well so the model can't "recommend"
+  // fixing something that's already in place — the top complaint about generic
+  // SEO tools (telling you to enable indexing when it's on, add an H1 that exists).
+  const alreadyGood: string[] = [];
+  if (signals.indexable) alreadyGood.push('The page is indexable (no noindex in meta robots or the X-Robots-Tag header) — do NOT suggest enabling indexing.');
+  if (signals.h1Count >= 1) alreadyGood.push(`There is already an H1 ("${signals.firstH1 || 'present'}") — do NOT suggest adding an H1; only suggest rewording it if genuinely weak.`);
+  if (signals.metaDescription) alreadyGood.push('A meta description already exists — only suggest tightening it, not adding one.');
+  if (signals.canonical) alreadyGood.push('A canonical tag is present — do NOT suggest adding one.');
+  if (signals.hasViewport) alreadyGood.push('A responsive viewport meta tag is present — do NOT flag mobile-friendliness on that basis.');
+  if (signals.declaresSitemap) alreadyGood.push('robots.txt already declares a sitemap — do NOT suggest creating/submitting a sitemap from scratch.');
+  if (signals.hasFaqSchema) alreadyGood.push('FAQ schema (FAQPage/Question) is already present — do NOT suggest adding FAQ schema; suggest expanding the questions instead.');
+  if (signals.hasPersonSchema) alreadyGood.push('Person schema is already present — refine it (add sameAs, jobTitle, knowsAbout) rather than adding it fresh.');
+  if (signals.jsonLdTypes.length) alreadyGood.push(`Structured data already present: ${signals.jsonLdTypes.join(', ')}.`);
 
-Here are the on-page signals scraped from ${url}:
+  const prompt = `You are a senior SEO + AEO/GEO strategist advising a PUBLIC SPEAKER on their website. AEO/GEO = getting cited and recommended by AI answer engines (ChatGPT, Perplexity, Google AI Overviews, Gemini). The speaker's goal is to get booked — so "found by an event organizer or an AI that an organizer asks" matters as much as classic Google ranking.
+
+ON-PAGE SIGNALS scraped from ${url}:
 ${JSON.stringify(signals, null, 2)}
 
-Give specific, actionable tips tailored to THIS page's signals — reference what's missing or weak (e.g. no meta description, thin word count, no structured data). Don't give generic advice that ignores the data.
+WHAT THIS PAGE ALREADY DOES WELL — you MUST NOT recommend adding or enabling any of these; treat them as done:
+${alreadyGood.length ? alreadyGood.map((s) => `- ${s}`).join('\n') : '- (nothing detected as already in place)'}
 
-The website is built with: ${platformLabel(platform)}. Every "steps" instruction MUST be written for ${platformLabel(platform)} specifically — use that platform's real menu names, panels, and where to paste or edit things (e.g. for Wix: Settings → SEO / the SEO panel on each page; for WordPress: an SEO plugin like Yoast or the block editor; for Squarespace/Webflow/Shopify: their page-settings + custom-code areas; for "Custom code / HTML": editing the actual <head>, tags, and markup). Do not give steps for a different platform.
+HARD RULES:
+- Never recommend something the signals show already exists. If you're not sure from the data, don't assume it's missing.
+- Every tip must reference THIS page's actual data (its real title, headings, word count, schema types, question headings, linked profiles). No boilerplate that would read the same for any website.
+- Be specific to a speaker: their bio/credentials (E-E-A-T), their talk topics as entities, the exact questions an event organizer or attendee would ask an AI ("who is a good keynote speaker on X?").
 
-Every tip MUST include "steps": a 3–5 item array of short, concrete, do-this-now instructions (imperative, plain language a non-technical speaker can follow). Reference exact tags/fields/menus where relevant.
+The site is built with: ${platformLabel(platform)}. Every "steps" instruction MUST be written for ${platformLabel(platform)} specifically — its real menus/panels/where to paste code (Wix: Settings → SEO + the Custom Code / embed panel; WordPress: an SEO plugin like Yoast/RankMath or a custom-HTML block; Squarespace/Webflow/Shopify: page settings + code injection; "Custom code / HTML": edit the actual <head> and markup). Do not give steps for a different platform.
+
+For SEO (classic search): give 3–5 of the highest-leverage fixes for THIS page (e.g. a weak/missing title or meta description using the real current values, thin content if wordCount is low, heading structure, image alt if imgMissingAlt is high, internal linking).
+
+For AEO/GEO: this is where speakers win and where generic tools fail. Go BEYOND "add an FAQ." Give 3–5 concrete, higher-leverage tactics such as:
+- A Person + speakable JSON-LD block that makes the speaker a machine-readable entity (name, jobTitle, knowsAbout = their topics, sameAs = their real linked profiles${signals.socialProfiles.length ? ` — detected: ${signals.socialProfiles.join(', ')}` : ''}).
+- Question-shaped headings that mirror what people literally ask AI, each answered in a tight 40–60 word "quotable" paragraph the model can lift.
+- An FAQPage (or expanded FAQ) targeting booking-intent questions ("How much does {name} charge to speak?", "What does {name} speak about?").
+- An llms.txt / AI-readable summary file, and clear authorship/credibility signals.
+When a tip is about adding markup or a file, include a ready-to-paste artifact in "code" (real JSON-LD / HTML / text, pre-filled with this speaker's actual name, URL ${url}, and detected topics/profiles where possible) and set "codeLang" to "json", "html", or "text". Use placeholders like [Your headshot URL] only where you truly can't infer the value.
+
+Every tip MUST include "steps": 3–5 short, concrete, do-this-now instructions in plain language for ${platformLabel(platform)}.
 
 Respond with ONLY valid JSON in this exact shape:
 {
-  "summary": "one or two sentence overall read on the page",
-  "seo": [{ "title": "short tip", "detail": "one or two sentences on why it matters", "severity": "high" | "medium" | "low", "steps": ["step 1", "step 2", "step 3"] }],
-  "aeo": [{ "title": "short tip", "detail": "one or two sentences on why it matters", "severity": "high" | "medium" | "low", "steps": ["step 1", "step 2", "step 3"] }]
+  "summary": "two or three sentences: how discoverable this page is today for a speaker, and the single biggest opportunity",
+  "seo": [{ "title": "short tip", "detail": "why it matters for THIS page", "severity": "high" | "medium" | "low", "steps": ["step 1", "step 2", "step 3"] }],
+  "aeo": [{ "title": "short tip", "detail": "why it matters for getting cited by AI", "severity": "high" | "medium" | "low", "steps": ["step 1", "step 2", "step 3"], "code": "ready-to-paste artifact when relevant, else omit", "codeLang": "json|html|text when code is present" }]
 }
-Aim for 3–5 items in each array. No markdown, no code fences.`;
+Aim for 3–5 items in each array. No markdown, no code fences around the whole response.`;
 
   let report: { summary: string; seo: SeoTip[]; aeo: SeoTip[] };
   try {
     const completion = await createChatCompletion('gpt-4o', {
-      max_tokens: 2200,
+      // Higher than before: AEO tips now carry ready-to-paste JSON-LD/HTML
+      // artifacts, which are token-heavy, so the JSON mustn't truncate.
+      max_tokens: 4000,
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: prompt }],
     });

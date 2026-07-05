@@ -36,7 +36,16 @@ export interface SpeakerAppearanceEvent {
   format: string;
   /** Short context — talk title, role, or year if known. May be empty. */
   note: string;
-  /** Web source backing this appearance (from live search). May be empty. */
+  /**
+   * Timing: when they appeared and, when known, when the event next runs —
+   * e.g. "Spoke Oct 2024 · Next edition Sept 2025". Lets the user gauge the
+   * event's cadence and the window to pitch. May be empty.
+   */
+  when: string;
+  /**
+   * Web source backing this appearance — ideally the event's OWN site or the
+   * announcement page, not a speaker-bureau profile. May be empty.
+   */
   sourceUrl: string;
 }
 
