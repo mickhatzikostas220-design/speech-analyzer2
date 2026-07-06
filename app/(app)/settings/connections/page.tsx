@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AgentConnectionsPanel } from '@/components/settings/AgentConnectionsPanel';
 import { ApiKeysPanel } from '@/components/clipflow/ApiKeysPanel';
-import { ConnectionsPanel } from '@/components/clipflow/ConnectionsPanel';
 
 // Shared "Connections & API keys" page. Both the Assistant and ClipFlow manage
 // their API keys and connected apps here, so "Connect" actions across the app
@@ -74,15 +73,18 @@ export default function ConnectionsSettingsPage() {
       {/* Assistant */}
       <AgentConnectionsPanel onChanged={bump} />
 
-      {/* ClipFlow */}
+      {/* ClipFlow — advanced settings only; account sign-in lives on the ClipFlow page */}
       <section className="space-y-4">
         <div>
           <h2 className="text-base font-semibold text-strong">ClipFlow</h2>
           <p className="mt-0.5 text-xs text-muted">
-            Connect the accounts your clips publish to — just sign in, no API key needed.
+            Advanced, optional developer settings. Connect your social accounts on the{' '}
+            <Link href="/clipflow" className="underline" style={{ color: 'var(--text-link)' }}>
+              ClipFlow page
+            </Link>
+            .
           </p>
         </div>
-        <ConnectionsPanel refresh={connRefresh} />
         <ApiKeysPanel onChanged={bump} />
       </section>
     </div>

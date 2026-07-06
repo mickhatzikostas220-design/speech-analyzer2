@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CLIP_LENGTHS, CLIP_LENGTH_LABELS, type ClipLength } from '@/lib/clipflow/types';
-import { PlatformIcon, PLATFORM_LABELS, PLATFORM_ORDER } from '@/components/clipflow/PlatformIcon';
+import { ConnectionsPanel } from '@/components/clipflow/ConnectionsPanel';
 
 const TONE_SUGGESTIONS = ['Funny', 'Educational', 'Inspirational', 'High-energy', 'Storytelling', 'Controversial'];
 
@@ -327,31 +326,8 @@ export default function ClipFlowPage() {
         )}
       </div>
 
-      {/* Publish destinations — connect socials by signing in, no API key */}
-      <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)] p-6 text-center">
-        <h2 className="text-base font-semibold text-strong">Post your clips everywhere</h2>
-        <p className="mx-auto mt-1 max-w-md text-xs text-muted">
-          Publish straight to your social accounts — just sign in, no API key needed.
-        </p>
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-4">
-          {PLATFORM_ORDER.map((id) => (
-            <div key={id} className="flex flex-col items-center gap-1.5">
-              <PlatformIcon platform={id} size={44} />
-              <span className="text-[10px] text-faint">{PLATFORM_LABELS[id]}</span>
-            </div>
-          ))}
-        </div>
-        <Link
-          href="/settings/connections"
-          className="btn-primary mt-6 inline-flex items-center gap-1.5 text-sm"
-          style={{ padding: '10px 20px' }}
-        >
-          Connect accounts
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
-      </div>
+      {/* Connect socials by signing in — embedded right here on the ClipFlow page */}
+      <ConnectionsPanel />
 
       {/* Delete confirmation modal */}
       {deleteTarget && (
