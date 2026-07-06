@@ -128,7 +128,7 @@ export const TOOLS: ToolMeta[] = [
     desc: 'Put two talks side by side and see what actually moved the room.',
     href: '/compare',
     bg: 'var(--ink-900)',
-    fg: 'var(--signature)',
+    fg: '#F34E1E',
   },
   {
     key: 'talk-library',
