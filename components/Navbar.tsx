@@ -7,7 +7,7 @@ import { Menu, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Logo } from '@/components/brand/Logo';
 import type { BrandKit } from '@/lib/brand/types';
-import { toolByKey, type ToolMeta } from '@/lib/tools/catalog';
+import { toolByKey, toolIsComingSoon, type ToolMeta } from '@/lib/tools/catalog';
 
 // The top bar shows the Hub tab plus the speaker's favorited tools — nothing
 // else. The old fixed tool tabs were removed so each speaker's bar reflects the
@@ -16,10 +16,11 @@ const HUB: [string, string] = ['/dashboard', 'Hub'];
 
 export function Navbar({ brand, favorites = [] }: { brand: BrandKit; favorites?: string[] }) {
   const pathname = usePathname();
-  // Resolve pinned tool keys to their catalog metadata (dropping any unknowns).
+  // Resolve pinned tool keys to their catalog metadata (dropping any unknowns,
+  // and any tool that's still "coming soon" so we never pin a locked tool).
   const pinned: ToolMeta[] = favorites
     .map((key) => toolByKey(key))
-    .filter((t): t is ToolMeta => Boolean(t));
+    .filter((t): t is ToolMeta => Boolean(t) && !toolIsComingSoon(t as ToolMeta));
   const router = useRouter();
   const supabase = createClient();
   // Controls the mobile dropdown menu (hidden on >= sm screens).

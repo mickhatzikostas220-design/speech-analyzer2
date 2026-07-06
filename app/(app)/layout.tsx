@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { redirect } from 'next/navigation';
 import { Navbar } from '@/components/Navbar';
 import { BetaBanner } from '@/components/BetaBanner';
+import { SiteFooter } from '@/components/marketing/SiteFooter';
 import { getUserBrandState } from '@/lib/brand/server';
 import { getFavoriteTools } from '@/lib/tools/favorites';
 import { brandToCssVars, brandFontHref } from '@/lib/brand/theme';
@@ -32,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Navbar brand={state.brand} favorites={favoriteTools} />
       {FREE_BETA && <BetaBanner />}
       <main className="flex-1">{children}</main>
+      <SiteFooter brand={state.brand} />
     </div>
   );
 }

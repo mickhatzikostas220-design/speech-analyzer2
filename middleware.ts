@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isPathComingSoon } from '@/lib/tools/comingSoon';
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -33,6 +34,12 @@ export async function middleware(request: NextRequest) {
 
   if (!user && isAppPath) {
     return NextResponse.redirect(new URL('/login', request.url));
+  }
+
+  // Hard lock for tools flagged "coming soon": even if someone types the URL
+  // directly, send them back to the hub (where the tool shows as coming soon).
+  if (user && isAppPath && isPathComingSoon(path)) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   if (user && isAuthPath) {

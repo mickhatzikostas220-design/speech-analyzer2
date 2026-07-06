@@ -26,6 +26,7 @@ import {
   Newspaper,
 } from 'lucide-react';
 import type { PlanId } from '@/lib/subscription/plans';
+import { isPathComingSoon } from '@/lib/tools/comingSoon';
 
 export interface ToolMeta {
   /** Stable id persisted in favorites. Do not change once shipped. */
@@ -185,4 +186,10 @@ const TOOLS_BY_KEY = new Map(TOOLS.map((t) => [t.key, t]));
 /** Look up a tool's metadata by its stable key. */
 export function toolByKey(key: string): ToolMeta | undefined {
   return TOOLS_BY_KEY.get(key);
+}
+
+/** True when a tool is locked as "coming soon" (see lib/tools/comingSoon.ts,
+ *  the single source of truth shared with the middleware route guard). */
+export function toolIsComingSoon(tool: ToolMeta): boolean {
+  return isPathComingSoon(tool.href);
 }

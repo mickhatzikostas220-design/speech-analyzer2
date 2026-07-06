@@ -10,6 +10,7 @@ import { Logo } from '@/components/brand/Logo';
 import { DEFAULT_BRAND } from '@/lib/brand/defaults';
 import { SITE_NAME } from '@/lib/site';
 import { DonateForm } from '@/components/marketing/DonateForm';
+import { SiteFooter } from '@/components/marketing/SiteFooter';
 
 export const metadata: Metadata = {
   title: 'Support Speaker Hub',
@@ -42,7 +43,6 @@ export default function DonatePage({
   searchParams?: { [key: string]: string | string[] | undefined };
 }) {
   const thanks = searchParams?.thanks === '1';
-  const year = new Date().getFullYear();
 
   return (
     <div className="min-h-screen bg-surface-page">
@@ -121,18 +121,7 @@ export default function DonatePage({
         </div>
       </main>
 
-      <footer className="border-t border-[var(--border-subtle)] bg-surface-card">
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-faint sm:flex-row sm:px-6">
-          <span>
-            © {year} {SITE_NAME}. All rights reserved.
-          </span>
-          <span className="flex items-center gap-4">
-            <Link href="/about" className="transition-colors hover:text-strong">About</Link>
-            <Link href="/privacy" className="transition-colors hover:text-strong">Privacy</Link>
-            <Link href="/terms" className="transition-colors hover:text-strong">Terms</Link>
-          </span>
-        </div>
-      </footer>
+      <SiteFooter maxWidthClass="max-w-5xl" />
     </div>
   );
 }

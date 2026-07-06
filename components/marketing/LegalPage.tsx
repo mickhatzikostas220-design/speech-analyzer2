@@ -8,6 +8,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { DEFAULT_BRAND } from '@/lib/brand/defaults';
 import { SITE_NAME } from '@/lib/site';
+import { SiteFooter } from '@/components/marketing/SiteFooter';
 
 export interface LegalSection {
   heading: string;
@@ -25,8 +26,6 @@ export function LegalPage({
   intro: string;
   sections: LegalSection[];
 }) {
-  const year = new Date().getFullYear();
-
   return (
     <div className="min-h-screen bg-surface-page">
       <header className="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-surface-card">
@@ -64,19 +63,7 @@ export function LegalPage({
         </div>
       </main>
 
-      <footer className="border-t border-[var(--border-subtle)] bg-surface-card">
-        <div className="mx-auto flex max-w-3xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-faint sm:flex-row sm:px-6">
-          <span>
-            © {year} {SITE_NAME}. All rights reserved.
-          </span>
-          <span className="flex items-center gap-4">
-            <Link href="/privacy" className="transition-colors hover:text-strong">Privacy</Link>
-            <Link href="/terms" className="transition-colors hover:text-strong">Terms</Link>
-            <Link href="/cookies" className="transition-colors hover:text-strong">Cookies</Link>
-            <Link href="/login" className="transition-colors hover:text-strong">Log in</Link>
-          </span>
-        </div>
-      </footer>
+      <SiteFooter maxWidthClass="max-w-3xl" />
     </div>
   );
 }

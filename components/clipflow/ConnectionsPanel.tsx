@@ -43,7 +43,8 @@ export function ConnectionsPanel({ refresh = 0 }: { refresh?: number }) {
         <h2 className="text-base font-semibold text-strong">Connect accounts to post</h2>
       </div>
       <p className="mb-4 text-xs text-muted">
-        Sign in to each platform to publish your clips — no API key needed. Disconnect any time.
+        Sign in to a platform to publish your clips there — no API key needed. Disconnect any time.
+        More platforms are coming soon.
       </p>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -55,13 +56,17 @@ export function ConnectionsPanel({ refresh = 0 }: { refresh?: number }) {
           return (
             <div
               key={conn.platform}
-              className="card flex flex-col items-center gap-2 p-3 text-center"
+              className={`card flex flex-col items-center gap-2 p-3 text-center ${
+                conn.configured ? '' : 'opacity-70'
+              }`}
             >
               <PlatformIcon platform={conn.platform} size={40} />
               <span className="text-xs font-medium leading-tight text-strong">{conn.label}</span>
 
               {!conn.configured ? (
-                <span className="text-[10px] text-faint">Not available yet</span>
+                <span className="rounded-[var(--radius-pill)] border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-faint">
+                  Coming soon
+                </span>
               ) : conn.connected ? (
                 <div className="flex flex-col items-center gap-1">
                   <span className="max-w-[90px] truncate text-[10px] text-[color:var(--success)]">

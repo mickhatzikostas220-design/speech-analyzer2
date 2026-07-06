@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { planRank, type PlanId } from '@/lib/subscription/plans';
-import { TOOLS } from '@/lib/tools/catalog';
+import { TOOLS, toolIsComingSoon } from '@/lib/tools/catalog';
 import { FavoriteButton } from '@/components/hub/FavoriteButton';
 
 /**
@@ -34,6 +34,34 @@ export function ToolGrid({
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {TOOLS.map((t) => {
         const count = counts[t.key];
+
+        // Not-ready tools stay visible so speakers know they're coming, but the
+        // card is inert (no link, no favorite star) and wears a "Coming soon"
+        // badge instead of a live count.
+        if (toolIsComingSoon(t)) {
+          return (
+            <div
+              key={t.key}
+              className="relative h-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-surface-card p-5 opacity-80"
+              aria-disabled="true"
+            >
+              <span
+                className="mb-4 flex h-12 w-12 items-center justify-center rounded-[14px] opacity-70"
+                style={{ background: t.bg, color: t.fg }}
+              >
+                <t.icon className="h-6 w-6" strokeWidth={2.25} />
+              </span>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-extrabold text-strong">{t.name}</h3>
+              </div>
+              <p className="mt-1 text-sm text-muted">{t.desc}</p>
+              <div className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-faint">
+                Coming soon
+              </div>
+            </div>
+          );
+        }
+
         return (
           <div key={t.key} className="group relative h-full">
             <Link

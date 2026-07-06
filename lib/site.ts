@@ -25,3 +25,12 @@ export const SITE_TAGLINE = 'Every tool a speaker needs, in one place.';
 
 export const SITE_DESCRIPTION =
   'Speaker Hub is the all-in-one workspace for professional speakers — analyze your talks with AI, sharpen your scripts, manage bookings, cut shareable clips, and keep everything unmistakably on-brand.';
+
+// Public contact details shown in the site footer and pointed at by support copy.
+// The email must stay on the owned, verified domain (speaker-hub.com) — it is the
+// same address used in the Terms of Service. Don't invent an address on a domain
+// the business doesn't control.
+export const SITE_CONTACT_EMAIL = 'support@speaker-hub.com';
+
+// Mick's public LinkedIn — the human behind the project. Also used on /about.
+export const FOUNDER_LINKEDIN = 'https://www.linkedin.com/in/mick-hatzikostas-b655a3405/';

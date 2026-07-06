@@ -18,12 +18,14 @@ import {
   Check,
   Plus,
   ArrowUpRight,
+  Mail,
   type LucideIcon,
 } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { DEFAULT_BRAND } from '@/lib/brand/defaults';
 import { PLANS } from '@/lib/subscription/plans';
-import { SITE_NAME } from '@/lib/site';
+import { FREE_BETA } from '@/lib/subscription/config';
+import { SITE_NAME, SITE_CONTACT_EMAIL, FOUNDER_LINKEDIN } from '@/lib/site';
 import { FAQS } from '@/components/marketing/content';
 import { StructuredData } from '@/components/marketing/StructuredData';
 
@@ -424,6 +426,17 @@ function Pricing() {
         <p className="mt-4 text-lg text-muted">
           Simple month-to-month plans. Cancel anytime, no lock-in.
         </p>
+        {FREE_BETA && (
+          <p className="mx-auto mt-5 inline-flex items-center gap-2 rounded-pill border border-[var(--border-subtle)] bg-surface-card px-4 py-2 text-sm font-semibold text-muted">
+            <span
+              className="rounded-[var(--radius-pill)] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide"
+              style={{ background: 'var(--signature)', color: 'var(--on-signature)' }}
+            >
+              Beta
+            </span>
+            Every plan is free while Speaker Hub is in beta. Sign up and use it all — no charge.
+          </p>
+        )}
       </div>
 
       <div className="mt-12 grid items-start gap-6 lg:grid-cols-3">
@@ -559,6 +572,25 @@ function Footer() {
             <p className="mt-3 text-sm text-muted">
               Every tool a speaker needs, in one place — analyze, prepare, book, and share.
             </p>
+            <div className="mt-4 space-y-2 text-sm">
+              <a
+                href={`mailto:${SITE_CONTACT_EMAIL}`}
+                className="inline-flex items-center gap-1.5 text-muted transition-colors hover:text-strong"
+              >
+                <Mail className="h-3.5 w-3.5 shrink-0" />
+                {SITE_CONTACT_EMAIL}
+              </a>
+              <div>
+                <a
+                  href={FOUNDER_LINKEDIN}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted transition-colors hover:text-strong"
+                >
+                  Mick on LinkedIn
+                </a>
+              </div>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
             <FooterCol
@@ -573,8 +605,8 @@ function Footer() {
             <FooterCol
               title="Company"
               links={[
-                ['About', '/about'],
-                ['Support', '/donate'],
+                ['About Mick', '/about'],
+                ['Support the site', '/donate'],
               ]}
             />
             <FooterCol
