@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { PlatformIcon } from '@/components/clipflow/PlatformIcon';
 
 interface Connection {
   platform: 'instagram' | 'tiktok' | 'youtube' | 'twitter' | 'linkedin' | 'facebook';
@@ -9,15 +10,6 @@ interface Connection {
   connected: boolean;
   account_name: string | null;
 }
-
-const PLATFORM_STYLE: Record<string, { dot: string; glyph: string }> = {
-  instagram: { dot: 'from-fuchsia-500 to-amber-500', glyph: 'IG' },
-  tiktok: { dot: 'from-cyan-400 to-pink-500', glyph: 'TT' },
-  youtube: { dot: 'from-red-500 to-red-700', glyph: 'YT' },
-  twitter: { dot: 'from-zinc-400 to-zinc-600', glyph: '𝕏' },
-  linkedin: { dot: 'from-sky-600 to-blue-800', glyph: 'in' },
-  facebook: { dot: 'from-blue-500 to-blue-700', glyph: 'f' },
-};
 
 export function ConnectionsPanel({ refresh = 0 }: { refresh?: number }) {
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -60,17 +52,12 @@ export function ConnectionsPanel({ refresh = 0 }: { refresh?: number }) {
           if (!conn) {
             return <div key={i} className="h-24 animate-pulse rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)]" />;
           }
-          const style = PLATFORM_STYLE[conn.platform];
           return (
             <div
               key={conn.platform}
               className="card flex flex-col items-center gap-2 p-3 text-center"
             >
-              <div
-                className={`flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br ${style.dot} text-xs font-bold text-white`}
-              >
-                {style.glyph}
-              </div>
+              <PlatformIcon platform={conn.platform} size={40} />
               <span className="text-xs font-medium leading-tight text-strong">{conn.label}</span>
 
               {!conn.configured ? (

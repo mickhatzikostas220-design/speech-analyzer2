@@ -4,20 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CLIP_LENGTHS, CLIP_LENGTH_LABELS, type ClipLength } from '@/lib/clipflow/types';
+import { PlatformIcon, PLATFORM_LABELS, PLATFORM_ORDER } from '@/components/clipflow/PlatformIcon';
 
 const TONE_SUGGESTIONS = ['Funny', 'Educational', 'Inspirational', 'High-energy', 'Storytelling', 'Controversial'];
-
-// Platforms clips can publish to. Users connect these by signing in (no API key)
-// on /settings/connections — the logos + "Connect accounts" button at the bottom
-// of this page link there. Colors mirror ConnectionsPanel's PLATFORM_STYLE.
-const PUBLISH_PLATFORMS = [
-  { id: 'youtube', label: 'YouTube', glyph: 'YT', dot: 'from-red-500 to-red-700' },
-  { id: 'tiktok', label: 'TikTok', glyph: 'TT', dot: 'from-cyan-400 to-pink-500' },
-  { id: 'instagram', label: 'Instagram', glyph: 'IG', dot: 'from-fuchsia-500 to-amber-500' },
-  { id: 'twitter', label: 'X', glyph: '𝕏', dot: 'from-zinc-400 to-zinc-600' },
-  { id: 'linkedin', label: 'LinkedIn', glyph: 'in', dot: 'from-sky-600 to-blue-800' },
-  { id: 'facebook', label: 'Facebook', glyph: 'f', dot: 'from-blue-500 to-blue-700' },
-] as const;
 
 interface ProjectSummary {
   id: string;
@@ -345,14 +334,10 @@ export default function ClipFlowPage() {
           Publish straight to your social accounts — just sign in, no API key needed.
         </p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-4">
-          {PUBLISH_PLATFORMS.map((p) => (
-            <div key={p.id} className="flex flex-col items-center gap-1.5">
-              <div
-                className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${p.dot} text-sm font-bold text-white shadow-sm`}
-              >
-                {p.glyph}
-              </div>
-              <span className="text-[10px] text-faint">{p.label}</span>
+          {PLATFORM_ORDER.map((id) => (
+            <div key={id} className="flex flex-col items-center gap-1.5">
+              <PlatformIcon platform={id} size={44} />
+              <span className="text-[10px] text-faint">{PLATFORM_LABELS[id]}</span>
             </div>
           ))}
         </div>
