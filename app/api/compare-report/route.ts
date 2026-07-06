@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createChatCompletion } from '@/lib/ai-config';
+import { getMemoryContext } from '@/lib/memory/store';
 
 // Created lazily inside the handler — instantiating at module scope throws
 // when OPENAI_API_KEY is missing during `next build`, which breaks the build.
@@ -90,9 +91,14 @@ Remember: for DMN, lower scores are better (less mind-wandering). For all others
 
 Write the report now.`;
 
+  // Fold in what we remember about this speaker (goals, style, audience) so the
+  // report is framed for them, not generic. Empty string when memory is off.
+  const memoryContext = await getMemoryContext(supabase, user.id);
+
   const response = await createChatCompletion('gpt-4o', {
     messages: [
       { role: 'system', content: systemPrompt },
+      ...(memoryContext ? [{ role: 'system' as const, content: memoryContext }] : []),
       { role: 'user', content: userPrompt },
     ],
     max_tokens: 1500,

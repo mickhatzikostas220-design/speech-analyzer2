@@ -589,6 +589,7 @@ function Footer() {
               links={[
                 ['Privacy', '/privacy'],
                 ['Terms', '/terms'],
+                ['Cookies', '/cookies'],
               ]}
             />
           </div>

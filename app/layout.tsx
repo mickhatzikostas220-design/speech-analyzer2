@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from '@/lib/site';
 import { TesterFreshStart } from '@/components/TesterFreshStart';
+import { CookieConsent } from '@/components/CookieConsent';
 
 export const metadata: Metadata = {
   title: {
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen antialiased">
         <TesterFreshStart />
         {children}
+        <CookieConsent />
       </body>
     </html>
   );

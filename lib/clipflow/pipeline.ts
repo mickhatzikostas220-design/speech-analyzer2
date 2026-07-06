@@ -8,7 +8,6 @@ import {
   type VideoMeta,
 } from './youtube';
 import { detectClips } from './ai';
-import { resolveOpenAIKey } from './secrets';
 import type { ClipFlowProject, TranscriptCue } from './types';
 
 // Orchestrates a project from raw URL to a grid of captioned clip plans.
@@ -85,14 +84,13 @@ export async function processProject(
     const cues: TranscriptCue[] | null = await getTranscript(videoId);
     if (cues) await update(admin, projectId, { transcript: cues });
 
-    // 4) Detect high-value moments with Claude.
+    // 4) Detect high-value moments. Clip AI always runs on the app-wide
+    // OPENAI_API_KEY (see lib/ai-config) — users no longer bring their own key.
     await update(admin, projectId, { status: 'analyzing', progress: 65 });
     const maxClips = clipCountForDuration(meta.durationSeconds);
-    const apiKey = (await resolveOpenAIKey(admin, project.user_id)) ?? undefined;
     const candidates = await detectClips(meta, cues, {
       maxClips,
       preferences: project.preferences ?? undefined,
-      apiKey,
     });
 
     if (candidates.length === 0) {

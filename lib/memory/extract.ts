@@ -6,7 +6,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
-import { isMemoryEnabled, saveMemory } from './store';
+import { getMemoryFacts, isMemoryEnabled, saveMemory } from './store';
 
 const EXTRACTOR_SYSTEM = `You extract durable, personal facts about a user from a conversation so an app can remember them later and feel personal.
 
@@ -24,6 +24,11 @@ Do NOT extract:
 - guesses — only what the user actually stated or clearly implied
 
 Rewrite each as a short, standalone third-person fact ("Speaks about leadership to Fortune 500 audiences.") — not a quote, no "the user said".
+
+Quality bar (be strict — a wrong or noisy memory is worse than none):
+- Only capture facts that will STILL be true and useful weeks from now. When in doubt, leave it out.
+- You may be given a list of facts already remembered. Do NOT return anything that repeats or is a trivial reword of one of those. Only return genuinely NEW information. If a fact meaningfully UPDATES a known one (e.g. a new date, a changed goal), return the full updated fact.
+- Prefer one precise fact over several vague ones. Never pad the list.
 
 Respond with ONLY valid JSON: {"memories":[{"content":"...","category":"goal|preference|fact|event|style|other"}]}. If there is nothing worth remembering, return {"memories":[]}. Never invent facts.`;
 
@@ -50,13 +55,22 @@ export async function captureMemories(
     if (!hasAiKey()) return 0;
     if (!(await isMemoryEnabled(supabase, userId))) return 0;
 
+    // Give the extractor the facts we already know so it won't re-capture
+    // duplicates or trivial rewordings — the main source of memory noise.
+    const known = await getMemoryFacts(supabase, userId);
+    const knownBlock = known.length
+      ? `Facts already remembered (do NOT repeat or reword these — only return NEW information):\n${known
+          .map((f) => `- ${f}`)
+          .join('\n')}\n\n`
+      : '';
+
     const completion = await createChatCompletion('gpt-4o-mini', {
       max_tokens: 500,
       temperature: 0,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: EXTRACTOR_SYSTEM },
-        { role: 'user', content: trimmed.slice(0, 6000) },
+        { role: 'user', content: `${knownBlock}Conversation to extract from:\n${trimmed.slice(0, 6000)}` },
       ],
     });
 

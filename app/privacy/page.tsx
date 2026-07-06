@@ -54,7 +54,14 @@ const sections: LegalSection[] = [
   {
     heading: 'Personalization',
     paragraphs: [
-      'To make the tools more useful, we may remember preferences and details you share across the app so that features stay consistent and tailored to you. You can view, change, or clear this information from your account.',
+      'To make the tools more useful, we may remember preferences and details you share across the app — such as your goals, speaking topics, and your website — so that features stay consistent and tailored to you. This memory powers personalized results across the app, including the SEO tips we generate for your site. You can view, change, or clear this information, or turn memory off entirely, from your account settings.',
+    ],
+  },
+  {
+    heading: 'Cookies and similar technologies',
+    paragraphs: [
+      'We use strictly necessary cookies to keep you signed in and secure your session, and we store a few functional items in your browser (such as your cookie choice and your most recent tips) to make the tools easier to use. We do not use third-party advertising or cross-site tracking cookies.',
+      'You can accept or decline non-essential cookies when you first visit, and manage cookies through your browser at any time. For full details, see our Cookie Policy.',
     ],
   },
   {
@@ -97,7 +104,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      updated="July 5, 2026"
+      updated="July 6, 2026"
       intro={`This Privacy Policy explains what information ${SITE_NAME} collects, how we use it, and the choices you have. By using the service, you agree to the practices described here.`}
       sections={sections}
     />

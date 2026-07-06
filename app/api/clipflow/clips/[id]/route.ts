@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generateClipCopy } from '@/lib/clipflow/ai';
-import { resolveOpenAIKey } from '@/lib/clipflow/secrets';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -33,10 +32,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         .eq('id', clip.project_id)
         .single();
 
+      // Clip copy always runs on the app-wide OPENAI_API_KEY (no BYOK).
       const copy = await generateClipCopy({
         videoTitle: project?.title ?? '',
         transcriptText: clip.transcript_text ?? '',
-        apiKey: (await resolveOpenAIKey(supabase, user.id)) ?? undefined,
       });
 
       const { error } = await supabase

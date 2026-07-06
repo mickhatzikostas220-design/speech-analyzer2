@@ -25,19 +25,18 @@ const PLATFORMS: Platform[] = ['youtube', 'tiktok', 'instagram', 'linkedin', 'fa
 const INPUT_CLS =
   'rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-surface-card px-3 py-2 text-xs text-strong placeholder:text-[var(--text-faint)] focus:border-[color:var(--signature)] focus:outline-none disabled:opacity-50';
 
-// Advanced/optional: lets a user bring their own ClipFlow API keys — OpenAI (clip
-// AI) and per-platform OAuth client credentials (use their own developer app
-// instead of the app's shared one). Keys are encrypted server-side; only a 4-char
-// hint is ever returned. End users never need any of this — the app supplies the
-// defaults and social accounts connect by signing in (see ConnectionsPanel).
+// Advanced/optional: lets a user bring their own per-platform OAuth client
+// credentials (use their own developer app instead of the app's shared one).
+// Clip AI itself always runs on the app's OpenAI key — users never supply one.
+// Keys are encrypted server-side; only a 4-char hint is ever returned. End users
+// never need any of this — the app supplies the defaults and social accounts
+// connect by signing in (see ConnectionsPanel).
 export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
   const [data, setData] = useState<KeysData | null>(null);
   const [open, setOpen] = useState(false);
   const [banner, setBanner] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  // Simple-key inputs.
-  const [openaiKey, setOpenaiKey] = useState('');
   // Per-platform OAuth inputs.
   const [oauth, setOauth] = useState<Record<Platform, { id: string; secret: string }>>({
     youtube: { id: '', secret: '' },
@@ -63,30 +62,6 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
 
   const hints = data?.hints ?? {};
   const disabled = data ? !data.encryptionConfigured : false;
-
-  async function saveSimple(kind: 'openai', key: string, clear: () => void) {
-    if (!key.trim()) return;
-    setBusy(kind);
-    setBanner(null);
-    try {
-      const res = await fetch('/api/clipflow/keys', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, key: key.trim() }),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (res.ok) {
-        clear();
-        setBanner({ kind: 'ok', text: 'Key saved.' });
-        await load();
-        onChanged?.();
-      } else {
-        setBanner({ kind: 'err', text: j.error || 'Could not save key.' });
-      }
-    } finally {
-      setBusy(null);
-    }
-  }
 
   async function saveOAuth(platform: Platform) {
     const creds = oauth[platform];
@@ -140,8 +115,8 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
         <div>
           <h2 className="text-base font-semibold text-strong">Advanced settings</h2>
           <p className="mt-0.5 text-xs text-muted">
-            Optional. ClipFlow already runs on the app&apos;s keys — add your own only if you want clip
-            AI or posting billed to your own accounts.
+            Optional. ClipFlow already runs on the app&apos;s keys — add your own developer app only if
+            you want posting billed to your own platform accounts.
           </p>
         </div>
         <svg
@@ -162,20 +137,6 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
               set.
             </p>
           )}
-
-          {/* OpenAI */}
-          <KeyRow
-            label="OpenAI API key"
-            help="Powers clip moment-detection, titles, captions & hashtags (GPT-4o). Billed to your OpenAI account."
-            hint={hints.openai}
-            value={openaiKey}
-            onChange={setOpenaiKey}
-            onSave={() => saveSimple('openai', openaiKey, () => setOpenaiKey(''))}
-            onRemove={() => remove('openai')}
-            placeholder="sk-…"
-            busy={busy === 'openai'}
-            disabled={disabled}
-          />
 
           {/* Per-platform OAuth apps */}
           <div className="space-y-3">
@@ -251,58 +212,6 @@ export function ApiKeysPanel({ onChanged }: { onChanged?: () => void }) {
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function KeyRow(props: {
-  label: string;
-  help: string;
-  hint?: string;
-  value: string;
-  onChange: (v: string) => void;
-  onSave: () => void;
-  onRemove: () => void;
-  placeholder: string;
-  busy: boolean;
-  disabled: boolean;
-}) {
-  return (
-    <div className="space-y-2">
-      <div>
-        <h3 className="text-sm font-medium text-strong">{props.label}</h3>
-        <p className="mt-0.5 text-xs text-muted">{props.help}</p>
-      </div>
-      {props.hint && (
-        <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--surface-sunk)] px-3 py-1.5">
-          <span className="text-xs text-body">Key set ••••{props.hint}</span>
-          <button
-            onClick={props.onRemove}
-            disabled={props.busy}
-            className="text-[11px] text-muted hover:text-[color:var(--danger)] disabled:opacity-50"
-          >
-            Remove
-          </button>
-        </div>
-      )}
-      <div className="flex gap-2">
-        <input
-          type="password"
-          value={props.value}
-          disabled={props.disabled}
-          onChange={(e) => props.onChange(e.target.value)}
-          placeholder={props.placeholder}
-          className={`${INPUT_CLS} flex-1`}
-        />
-        <button
-          onClick={props.onSave}
-          disabled={props.disabled || props.busy || !props.value.trim()}
-          className="btn-primary whitespace-nowrap text-xs"
-          style={{ padding: '8px 16px' }}
-        >
-          {props.busy ? 'Checking…' : props.hint ? 'Replace' : 'Add'}
-        </button>
-      </div>
     </div>
   );
 }

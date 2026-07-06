@@ -3,7 +3,7 @@
 // SEO & AEO tool: enter a website URL, get step-by-step tips for ranking on
 // search engines and being cited by AI answer engines. Free users get one tip
 // a week; paid users see every tip and can save fixes to their tip plan.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Sparkles, Check, CalendarPlus, Copy, Code2 } from 'lucide-react';
 import { SEO_PLATFORMS, type SeoPlatformId } from '@/lib/seo/platforms';
 import SeoChat from './SeoChat';
@@ -22,6 +22,10 @@ interface Report {
   seo: TipItem[];
   aeo: TipItem[];
 }
+
+// Persist the last scan locally so leaving the tool and coming back doesn't wipe
+// the tips (free users especially: their weekly tip would otherwise be lost).
+const STORAGE_KEY = 'seo:last-scan-v1';
 
 const SEVERITY: Record<string, { label: string; cls: string }> = {
   high: { label: 'High impact', cls: 'bg-[var(--danger-bg)] text-[color:var(--danger)]' },
@@ -151,6 +155,31 @@ export default function SeoPage() {
 
   const isPaid = plan !== 'free';
 
+  // Restore the last scan on mount so the tips survive navigating away and back.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        url?: string;
+        analyzedUrl?: string;
+        signals?: Record<string, unknown> | null;
+        report?: Report;
+        plan?: string;
+        platform?: SeoPlatformId;
+      };
+      if (!saved?.report) return;
+      setReport(saved.report);
+      setAnalyzedUrl(saved.analyzedUrl ?? '');
+      setSignals(saved.signals ?? null);
+      setPlan(saved.plan ?? 'free');
+      if (saved.platform) setPlatform(saved.platform);
+      if (saved.url) setUrl(saved.url);
+    } catch {
+      /* corrupt or unavailable storage — just start fresh */
+    }
+  }, []);
+
   async function analyze(e: React.FormEvent) {
     e.preventDefault();
     if (!url.trim()) return;
@@ -167,10 +196,29 @@ export default function SeoPage() {
       if (!res.ok) {
         setError(data.error || 'Something went wrong. Please try again.');
       } else {
-        setReport(data.report as Report);
+        const nextReport = data.report as Report;
+        const nextSignals = (data.signals as Record<string, unknown>) ?? null;
+        const nextPlan = (data.plan as string) ?? 'free';
+        setReport(nextReport);
         setAnalyzedUrl(data.url as string);
-        setSignals((data.signals as Record<string, unknown>) ?? null);
-        setPlan((data.plan as string) ?? 'free');
+        setSignals(nextSignals);
+        setPlan(nextPlan);
+        // Cache it so it's still here when the speaker returns to the tool.
+        try {
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              url: url.trim(),
+              analyzedUrl: data.url,
+              signals: nextSignals,
+              report: nextReport,
+              plan: nextPlan,
+              platform,
+            })
+          );
+        } catch {
+          /* storage full or blocked — non-fatal */
+        }
       }
     } catch {
       setError('Network error. Please try again.');
