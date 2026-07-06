@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const CONTACT_EMAIL = 'privacy@speakerhub.app';
+const CONTACT_EMAIL = 'privacy@speaker-hub.com';
 
 const sections: LegalSection[] = [
   {
@@ -45,10 +45,30 @@ const sections: LegalSection[] = [
     ],
   },
   {
+    heading: 'Connected social accounts',
+    paragraphs: [
+      'If you connect a social account (such as X, YouTube, TikTok, Instagram, Facebook, or LinkedIn) to publish clips, we receive and securely store the access tokens those platforms issue so we can post on your behalf at your request. We request only the permissions needed to publish the content you choose.',
+      'You can disconnect a linked account at any time, which revokes our stored access. Each connected platform also handles your data under its own privacy policy and terms.',
+    ],
+  },
+  {
+    heading: 'Personalization',
+    paragraphs: [
+      'To make the tools more useful, we may remember preferences and details you share across the app so that features stay consistent and tailored to you. You can view, change, or clear this information from your account.',
+    ],
+  },
+  {
     heading: 'How we share information',
     paragraphs: [
-      'We share information only with the service providers that make the product work — for example authentication and database hosting (Supabase), AI processing (OpenAI, Anthropic), payments (Stripe), and email delivery (Resend) — and only to the extent needed to provide the service.',
+      'We share information only with the service providers that make the product work — for example authentication and database hosting (Supabase), AI processing (OpenAI, Anthropic), payments (Stripe), email delivery (Resend), and any social platforms you choose to connect (to publish the content you ask us to) — and only to the extent needed to provide the service.',
       'We may disclose information if required by law, to protect our rights, or as part of a business transfer such as a merger or acquisition. We do not sell your personal information.',
+    ],
+  },
+  {
+    heading: 'Donations',
+    paragraphs: [
+      'If you choose to make a voluntary donation to support Speaker Hub, your payment is processed by Stripe, the same processor we use for subscriptions. We receive confirmation of the donation and limited details (such as the amount and, if you provide it, your email), but we never see or store your full card number.',
+      'If you donate through a third-party platform we link to, that platform collects and processes your payment under its own privacy policy and terms. Donations are optional and are never required to use the Service.',
     ],
   },
   {
@@ -77,7 +97,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      updated="July 1, 2026"
+      updated="July 5, 2026"
       intro={`This Privacy Policy explains what information ${SITE_NAME} collects, how we use it, and the choices you have. By using the service, you agree to the practices described here.`}
       sections={sections}
     />

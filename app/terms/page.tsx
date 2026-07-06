@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const CONTACT_EMAIL = 'support@speakerhub.app';
+const CONTACT_EMAIL = 'support@speaker-hub.com';
 
 const sections: LegalSection[] = [
   {
@@ -42,6 +42,13 @@ const sections: LegalSection[] = [
     ],
   },
   {
+    heading: 'Donations',
+    paragraphs: [
+      'Speaker Hub may invite you to make a voluntary donation to support the site. Donations are gifts that help fund the Service — they are not a purchase of any product or service, do not create any obligation on our part, and do not grant access to paid plan features.',
+      'One-time donations are processed by Stripe. You may also choose a recurring monthly donation, which continues until you cancel it; you can cancel a recurring donation at any time. Except where required by law, donations are non-refundable. If you donate through a third-party platform we link to, that platform’s own terms also apply.',
+    ],
+  },
+  {
     heading: 'Your content',
     paragraphs: [
       'You retain ownership of the talks, recordings, scripts, and other content you upload ("Your Content"). You grant us a limited license to store, process, and display Your Content solely to operate and provide the Service to you — including sending it to AI providers to generate transcriptions and analysis at your request.',
@@ -59,6 +66,13 @@ const sections: LegalSection[] = [
     heading: 'AI-generated content',
     paragraphs: [
       'Speaker Hub uses AI to produce transcriptions, analysis, suggestions, and drafts. These outputs can be imperfect or inaccurate and are provided to assist you, not to replace your own judgment. You are responsible for reviewing anything you rely on or publish.',
+    ],
+  },
+  {
+    heading: 'Connected accounts and third-party platforms',
+    paragraphs: [
+      'The Service lets you connect third-party accounts (such as social media platforms) so we can publish content on your behalf. By connecting an account, you authorize us to access it and act at your direction, and you confirm you have the right to do so.',
+      'Your use of any connected platform is also governed by that platform’s own terms and policies. We are not responsible for third-party services, and we may lose access if a platform changes or revokes it. You can disconnect a linked account at any time.',
     ],
   },
   {
@@ -87,7 +101,7 @@ export default function TermsPage() {
   return (
     <LegalPage
       title="Terms of Service"
-      updated="July 1, 2026"
+      updated="July 5, 2026"
       intro={`Please read these terms carefully. They govern your access to and use of ${SITE_NAME}.`}
       sections={sections}
     />

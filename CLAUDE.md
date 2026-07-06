@@ -48,6 +48,25 @@ When Mick opens this project, Claude Code should be ready to help with all of th
 - Never expose secret keys. All Stripe keys go in `.env.local` only.
 - If adding a new paid feature, explain which tier it should sit behind and why.
 
+### 4. Keeping Legal Pages Current
+- The legal pages live at `/app/privacy/page.tsx` (Privacy Policy) and `/app/terms/page.tsx`
+  (Terms of Service). They are linked from the landing-page footer.
+- **Keep them in sync with the app.** Whenever a change materially affects data handling,
+  features, plans/pricing, or third-party integrations, update the relevant legal page in the
+  SAME task. Examples that require a legal update: collecting a new type of data, adding an AI
+  or other third-party provider, connecting external accounts (e.g. social platforms), changing
+  what data is shared, or changing the plan/billing structure.
+- When you edit a legal page, bump its `updated="..."` date to the current date, and tell Mick
+  in plain English exactly what you changed and why.
+- **Contact + domain rule:** legal contact emails and any hardcoded domain must use the owned,
+  verified domain `speaker-hub.com` — never the parked `speakerhub.app`. Do not invent a
+  contact address on a domain the business does not control.
+- These pages are a legal baseline, not legal advice. When a change has real legal weight,
+  make the update but flag clearly that Mick should have counsel review it.
+- **Scope note:** this is a deliberate, narrow exception to the "Stay In Your Lane" rule below —
+  legal pages may be updated alongside a feature change even if Mick did not name them, *because*
+  the feature change made them out of date. If unsure whether a change needs a legal update, ask.
+
 ---
 
 ## How to Work With Mick
