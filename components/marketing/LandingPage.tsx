@@ -166,6 +166,8 @@ function Header() {
           <a href="#how" className="transition-colors hover:text-strong">How it works</a>
           <a href="#pricing" className="transition-colors hover:text-strong">Pricing</a>
           <a href="#faq" className="transition-colors hover:text-strong">FAQ</a>
+          {/* Public support page — a Link, not an anchor, since it's a real route. */}
+          <Link href="/donate" className="transition-colors hover:text-strong">Support</Link>
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
           <Link href="/login" className="btn-ghost hidden sm:inline-flex">Log in</Link>
@@ -558,7 +560,7 @@ function Footer() {
               Every tool a speaker needs, in one place — analyze, prepare, book, and share.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
             <FooterCol
               title="Product"
               links={[
@@ -566,6 +568,13 @@ function Footer() {
                 ['How it works', '#how'],
                 ['Pricing', '#pricing'],
                 ['FAQ', '#faq'],
+              ]}
+            />
+            <FooterCol
+              title="Company"
+              links={[
+                ['About', '/about'],
+                ['Support', '/donate'],
               ]}
             />
             <FooterCol

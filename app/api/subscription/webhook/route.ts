@@ -60,6 +60,8 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+        // Donations are anonymous gifts, never plan changes — ignore them.
+        if (session.metadata?.kind === 'donation') break;
         const userId = await resolveUserId(
           session.metadata?.user_id,
           typeof session.customer === 'string' ? session.customer : null
@@ -77,6 +79,8 @@ export async function POST(request: NextRequest) {
 
       case 'customer.subscription.updated': {
         const sub = event.data.object as Stripe.Subscription;
+        // A recurring donation is a subscription too — never touch a plan for it.
+        if (sub.metadata?.kind === 'donation') break;
         const userId = await resolveUserId(
           sub.metadata?.user_id,
           typeof sub.customer === 'string' ? sub.customer : null
@@ -91,6 +95,8 @@ export async function POST(request: NextRequest) {
 
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription;
+        // Cancelling a recurring donation must not downgrade anyone's plan.
+        if (sub.metadata?.kind === 'donation') break;
         const userId = await resolveUserId(
           sub.metadata?.user_id,
           typeof sub.customer === 'string' ? sub.customer : null
