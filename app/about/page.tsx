@@ -8,7 +8,7 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft, ArrowUpRight, Heart, Linkedin } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Heart } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { DEFAULT_BRAND } from '@/lib/brand/defaults';
 import { SITE_NAME } from '@/lib/site';
@@ -92,7 +92,7 @@ export default function AboutPage() {
               rel="noopener noreferrer"
               className="btn-outline mt-4 inline-flex"
             >
-              <Linkedin className="h-4 w-4" /> Connect on LinkedIn
+              Connect on LinkedIn →
             </a>
           </div>
         </div>
