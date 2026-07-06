@@ -47,8 +47,22 @@ const sections: LegalSection[] = [
   {
     heading: 'Connected social accounts',
     paragraphs: [
-      'If you connect a social account (such as X, YouTube, TikTok, Instagram, Facebook, or LinkedIn) to publish clips, we receive and securely store the access tokens those platforms issue so we can post on your behalf at your request. We request only the permissions needed to publish the content you choose.',
+      'If you connect a social account (such as X, YouTube, TikTok, Instagram, Facebook, or LinkedIn) to publish clips, we receive and securely store the access tokens those platforms issue so we can post on your behalf at your request. We request only the permissions needed to publish the content you choose. To deliver clips to some platforms we use a third-party publishing provider (Upload-Post), which transmits the clip and the connected-account credentials needed to complete the post.',
       'You can disconnect a linked account at any time, which revokes our stored access. Each connected platform also handles your data under its own privacy policy and terms.',
+    ],
+  },
+  {
+    heading: 'Connected Google account (AI Assistant)',
+    paragraphs: [
+      'If you connect a Google account to power the AI Assistant, you grant access to your Gmail messages and Google Calendar events so the Assistant can help you read, draft, and manage speaking-related correspondence and scheduling. With your instruction, the Assistant may also draft and send email on your behalf from your connected account.',
+      'We access this data only to provide the Assistant features you use, and we securely store the encrypted access and refresh tokens Google issues. We do not sell this data or use it for advertising. Our use of information received from Google APIs adheres to the Google API Services User Data Policy, including its Limited Use requirements.',
+      'You can disconnect your Google account at any time from the app, which revokes our stored access. Google processes your data under its own privacy policy and terms.',
+    ],
+  },
+  {
+    heading: 'Booking inquiries from event organizers',
+    paragraphs: [
+      'The public booking and one-sheet tools let event organizers send you an inquiry. When they do, we collect and store the details they submit — such as their name, email, organization, event name, date, location, and message — and deliver them to the speaker who owns that page. If you are an organizer submitting an inquiry, you are sharing this information so the speaker can respond to you; the speaker, not Speaker Hub, is the recipient and controller of that message.',
     ],
   },
   {
@@ -60,7 +74,7 @@ const sections: LegalSection[] = [
   {
     heading: 'How we share information',
     paragraphs: [
-      'We share information only with the service providers that make the product work — for example authentication and database hosting (Supabase), AI processing (OpenAI, Anthropic), payments (Stripe), email delivery (Resend), and any social platforms you choose to connect (to publish the content you ask us to) — and only to the extent needed to provide the service.',
+      'We share information only with the service providers that make the product work — for example authentication and database hosting (Supabase), AI processing (OpenAI, Anthropic), payments (Stripe), email delivery (Resend), social publishing infrastructure (Upload-Post), the Google account you optionally connect for the AI Assistant, and any social platforms you choose to connect (to publish the content you ask us to) — and only to the extent needed to provide the service.',
       'We may disclose information if required by law, to protect our rights, or as part of a business transfer such as a merger or acquisition. We do not sell your personal information.',
     ],
   },
@@ -97,7 +111,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      updated="July 5, 2026"
+      updated="July 6, 2026"
       intro={`This Privacy Policy explains what information ${SITE_NAME} collects, how we use it, and the choices you have. By using the service, you agree to the practices described here.`}
       sections={sections}
     />
