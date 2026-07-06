@@ -8,11 +8,13 @@ export type Platform =
   | 'linkedin'
   | 'facebook';
 
+// 'twitter' (X) is intentionally omitted — X is removed from the ClipFlow UI for
+// now (its account-validation wall blocked setup). It stays in the Platform type
+// and all the maps below, so re-adding 'twitter' to this array restores it.
 export const PLATFORMS: Platform[] = [
   'instagram',
   'tiktok',
   'youtube',
-  'twitter',
   'linkedin',
   'facebook',
 ];

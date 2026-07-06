@@ -272,7 +272,7 @@ export function ClipCard({
         {/* Platform toggles */}
         <div className="space-y-2 border-t border-[var(--border-subtle)] pt-3">
           <div className="flex flex-wrap gap-1.5">
-            {(['instagram', 'tiktok', 'youtube', 'twitter', 'linkedin', 'facebook'] as const).map((p) => {
+            {(['instagram', 'tiktok', 'youtube', 'linkedin', 'facebook'] as const).map((p) => {
               const connected = connectedPlatforms.includes(p);
               const on = selected.includes(p);
               return (

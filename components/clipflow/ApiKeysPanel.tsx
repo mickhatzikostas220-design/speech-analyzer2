@@ -18,7 +18,8 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   facebook: 'Facebook',
 };
 
-const PLATFORMS: Platform[] = ['youtube', 'tiktok', 'instagram', 'twitter', 'linkedin', 'facebook'];
+// 'twitter' (X) omitted — X is removed from the ClipFlow UI for now.
+const PLATFORMS: Platform[] = ['youtube', 'tiktok', 'instagram', 'linkedin', 'facebook'];
 
 // Shared compact input styling, mapped to the brand design tokens.
 const INPUT_CLS =
