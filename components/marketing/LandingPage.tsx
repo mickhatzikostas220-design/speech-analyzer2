@@ -223,7 +223,7 @@ function Hero() {
             </a>
           </div>
           <p className="mt-4 text-sm text-faint">
-            No credit card required · 3 free talk analyses every month
+            No credit card required · Free, unlimited talk analyses
           </p>
         </div>
 

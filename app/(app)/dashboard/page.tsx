@@ -11,9 +11,6 @@ import { StatTiles, type Stat } from '@/components/hub/StatTiles';
 import { UpcomingGigs } from '@/components/hub/UpcomingGigs';
 import { TipCard } from '@/components/hub/TipCard';
 import { getUserPlan } from '@/lib/subscription/server';
-import { monthlyAnalysisCount } from '@/lib/subscription/usage';
-import { FREE_MONTHLY_ANALYSES } from '@/lib/subscription/plans';
-import { FreeQuotaBanner } from '@/components/subscription/FreeQuotaBanner';
 import type { Analysis } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -71,10 +68,9 @@ export default async function HubPage() {
 
   const first = (brand.name || 'there').split(' ')[0];
 
-  // Surface the free-plan monthly quota on the hub so free users see it where
-  // they land (not only on the analyzer). Null-safe / fails open.
+  // Plan still drives which tools appear unlocked in the grid; the Speech
+  // Analyzer itself is free and unlimited, so there's no quota to surface here.
   const plan = await getUserPlan(supabase);
-  const freeUsed = plan === 'free' && userId ? await monthlyAnalysisCount(supabase, userId) : null;
 
   // Which tools this speaker has pinned — drives the star state on each card.
   const favorites = await getFavoriteTools();
@@ -100,12 +96,6 @@ export default async function HubPage() {
           <Plus className="h-4 w-4" /> New talk
         </Link>
       </div>
-
-      {plan === 'free' && freeUsed !== null && (
-        <div className="mt-6">
-          <FreeQuotaBanner used={freeUsed} limit={FREE_MONTHLY_ANALYSES} />
-        </div>
-      )}
 
       {/* tools */}
       <h2 className="eyebrow mb-4 mt-9">Your tools</h2>

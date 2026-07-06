@@ -69,6 +69,13 @@ const sections: LegalSection[] = [
     ],
   },
   {
+    heading: 'Third-party AI models',
+    paragraphs: [
+      "The Speech Analyzer runs on open AI models we did not create and offer to you free of charge: TRIBE v2 by Meta AI, used under its Creative Commons Attribution-NonCommercial 4.0 license; Parakeet by NVIDIA, used under its Creative Commons Attribution 4.0 license; and OpenAI's Whisper for transcription. Each model belongs to its owner and stays subject to that owner's license. We credit these models in the app wherever the tool is used.",
+      'TRIBE v2 predicts how a listener\'s brain is likely to respond to a talk; it does not measure brain activity. Its output is an estimate to support your practice and is not scientific, medical, or diagnostic advice. Do not rely on it as such.',
+    ],
+  },
+  {
     heading: 'Connected accounts and third-party platforms',
     paragraphs: [
       'The Service lets you connect third-party accounts (such as social media platforms) so we can publish content on your behalf. By connecting an account, you authorize us to access it and act at your direction, and you confirm you have the right to do so.',
@@ -101,7 +108,7 @@ export default function TermsPage() {
   return (
     <LegalPage
       title="Terms of Service"
-      updated="July 5, 2026"
+      updated="July 6, 2026"
       intro={`Please read these terms carefully. They govern your access to and use of ${SITE_NAME}.`}
       sections={sections}
     />

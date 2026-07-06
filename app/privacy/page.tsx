@@ -41,6 +41,7 @@ const sections: LegalSection[] = [
     heading: 'AI processing',
     paragraphs: [
       'Some features send your content to trusted AI providers (such as OpenAI and Anthropic) to transcribe audio and generate analysis, suggestions, and drafts. This processing happens only to deliver the feature you requested.',
+      "The Speech Analyzer works a little differently. When you analyze a talk, your recording is transcribed by an open speech-to-text model (NVIDIA's Parakeet, or OpenAI's Whisper as a fallback) and then run through TRIBE v2, an open research model from Meta that predicts how a listener's brain is likely to respond. These models run on third-party GPU infrastructure (Modal), which processes your recording only to produce your report. The results are model estimates meant to help you rehearse — not measured brain activity, and not medical information.",
       'We do not sell your content, and we do not use it to train our own advertising profiles. AI providers process the content under their own terms and applicable data-processing agreements.',
     ],
   },
@@ -67,7 +68,7 @@ const sections: LegalSection[] = [
   {
     heading: 'How we share information',
     paragraphs: [
-      'We share information only with the service providers that make the product work — for example authentication and database hosting (Supabase), AI processing (OpenAI, Anthropic), payments (Stripe), email delivery (Resend), and any social platforms you choose to connect (to publish the content you ask us to) — and only to the extent needed to provide the service.',
+      'We share information only with the service providers that make the product work — for example authentication and database hosting (Supabase), AI processing (OpenAI and Anthropic, plus the open Speech Analyzer models from Meta and NVIDIA, which run on Modal GPU infrastructure), payments (Stripe), email delivery (Resend), and any social platforms you choose to connect (to publish the content you ask us to) — and only to the extent needed to provide the service.',
       'We may disclose information if required by law, to protect our rights, or as part of a business transfer such as a merger or acquisition. We do not sell your personal information.',
     ],
   },

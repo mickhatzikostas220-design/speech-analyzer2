@@ -7,6 +7,7 @@ import { EngagementChart } from '@/components/EngagementChart';
 import { ROIChart } from '@/components/ROIChart';
 import { ScoreRing } from '@/components/ScoreRing';
 import { BrainMap } from '@/components/BrainMap';
+import { ModelCredits } from '@/components/ModelCredits';
 import type { AnalysisDetail, FeedbackPoint, WordResponse } from '@/types';
 
 const POLL_INTERVAL = 2500;
@@ -741,6 +742,8 @@ export default function AnalysisPage() {
           </form>
         </div>
       )}
+
+      <ModelCredits className="mt-2" />
     </div>
   );
 }

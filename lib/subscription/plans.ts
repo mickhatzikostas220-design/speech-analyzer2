@@ -7,13 +7,6 @@
 
 export type PlanId = 'free' | 'core' | 'full';
 
-/**
- * How many Speech Analyzer runs the Free plan allows per calendar month.
- * Single source of truth: the marketing copy, the Plans page feature list, and
- * the server-side enforcement in app/api/analyses all trace back here.
- */
-export const FREE_MONTHLY_ANALYSES = 3;
-
 export interface Plan {
   id: PlanId;
   name: string;
@@ -33,7 +26,7 @@ export const PLANS: Plan[] = [
     price: 0,
     tagline: 'Analyze your talks and find where the room leans in.',
     features: [
-      `Speech Analyzer (${FREE_MONTHLY_ANALYSES} talks / month)`,
+      'Speech Analyzer — free & unlimited',
       'Talk Library',
       'Compare two talks',
     ],
@@ -45,7 +38,6 @@ export const PLANS: Plan[] = [
     tagline: 'Everything you need to prepare and sharpen every talk.',
     highlighted: true,
     features: [
-      'Unlimited speech analyses',
       'Script Studio & Talk Editor',
       'Booking Inbox & public one-sheet',
       'Brand Kit personalization',
