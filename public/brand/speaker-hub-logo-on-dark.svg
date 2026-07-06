@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="812" height="156" viewBox="0 0 812 156" role="img" aria-label="Speaker Hub">
+  <title>Speaker Hub</title>
+  <!-- Speaker Hub logo for DARK backgrounds (e.g. the app navbar). Same mark,
+       white wordmark. Matches Logo with color="paper". -->
+  <rect x="18" y="18" width="120" height="120" rx="31" fill="#1A2B50"/>
+  <text x="78" y="80" text-anchor="middle" dominant-baseline="central"
+        font-family="Montserrat, 'Segoe UI', system-ui, -apple-system, sans-serif"
+        font-weight="800" font-size="70" fill="#FFFFFF">S</text>
+  <text x="184" y="80" dominant-baseline="central"
+        font-family="Montserrat, 'Segoe UI', system-ui, -apple-system, sans-serif"
+        font-weight="800" font-size="92" letter-spacing="0.9" fill="#FFFFFF">Speaker Hub</text>
+</svg>

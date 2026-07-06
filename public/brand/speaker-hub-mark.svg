@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="Speaker Hub">
+  <title>Speaker Hub mark</title>
+  <!-- Speaker Hub mark only (the square "S"). Use as app icon / favicon source / avatar. -->
+  <rect x="0" y="0" width="120" height="120" rx="31" fill="#1A2B50"/>
+  <text x="60" y="62" text-anchor="middle" dominant-baseline="central"
+        font-family="Montserrat, 'Segoe UI', system-ui, -apple-system, sans-serif"
+        font-weight="800" font-size="70" fill="#FFFFFF">S</text>
+</svg>

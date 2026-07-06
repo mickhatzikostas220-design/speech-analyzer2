@@ -27,7 +27,7 @@ export function Navbar({ brand, favorites = [] }: { brand: BrandKit; favorites?:
 
   async function handleSignOut() {
     await supabase.auth.signOut();
-    router.push('/login');
+    router.push('/');
     router.refresh();
   }
 
