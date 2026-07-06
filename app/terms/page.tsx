@@ -36,6 +36,7 @@ const sections: LegalSection[] = [
   {
     heading: 'Plans and billing',
     paragraphs: [
+      'Speaker Hub is currently in a free beta. Every feature is available at no charge and paid subscriptions are turned off, so you will not be billed for anything during this period. When we enable paid plans, we will let you know first, and the billing terms below will apply from that point.',
       'The Service offers a Free plan and paid plans (Core Premium and Full Premium). Paid plans are billed monthly in advance through our payment processor, Stripe.',
       'Subscriptions renew automatically each billing period until you cancel. You can cancel anytime from your account settings; your plan remains active through the end of the current paid period.',
       'Except where required by law, payments are non-refundable. We may change plan pricing or features, and if we do, we will give you reasonable notice.',

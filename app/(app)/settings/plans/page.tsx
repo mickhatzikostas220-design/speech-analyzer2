@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getBillingPlan } from '@/lib/subscription/server';
 import { PLANS, PLAN_BY_ID } from '@/lib/subscription/plans';
 import { PlanActions } from '@/components/subscription/PlanActions';
+import { FREE_BETA } from '@/lib/subscription/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,6 +45,23 @@ export default async function PlansPage({
         <span className="font-bold text-strong">{PLAN_BY_ID[currentPlan].name}</span> plan.
       </p>
 
+      {FREE_BETA && (
+        <div className="mb-8 rounded-[var(--radius-lg)] border border-[color:var(--signature)]/40 bg-surface-card p-5">
+          <p className="text-strong font-bold">Everything&rsquo;s free while we&rsquo;re in beta.</p>
+          <p className="mt-1 text-sm text-muted">
+            Speaker Hub is still being built, so every tool across all plans is unlocked for
+            early speakers at no charge. Paid plans are turned off for now — when billing goes
+            live, we&rsquo;ll give you plenty of notice first.
+          </p>
+          <p className="mt-3 text-sm">
+            The best way to say thanks?{' '}
+            <Link href="/feedback" className="font-semibold" style={{ color: 'var(--text-link)' }}>
+              Tell us what to build next &rarr;
+            </Link>
+          </p>
+        </div>
+      )}
+
       {justUpgraded && (
         <div className="mb-6 rounded-[var(--radius-md)] border border-[color:var(--success)]/40 bg-[var(--success-bg)] px-4 py-3 text-sm text-[color:var(--success)]">
           Thanks! Your subscription is being activated — it’ll update here within a moment.
@@ -70,8 +88,17 @@ export default async function PlansPage({
               <p className="mt-1 min-h-[40px] text-sm text-muted">{plan.tagline}</p>
 
               <div className="mt-4 flex items-end gap-1">
-                <span className="text-3xl font-extrabold text-strong">${plan.price}</span>
-                <span className="mb-1 text-sm text-muted">/ month</span>
+                {FREE_BETA && plan.price > 0 ? (
+                  <>
+                    <span className="text-3xl font-extrabold text-strong">Free</span>
+                    <span className="mb-1 text-sm text-muted line-through">${plan.price}/mo</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-3xl font-extrabold text-strong">${plan.price}</span>
+                    <span className="mb-1 text-sm text-muted">/ month</span>
+                  </>
+                )}
               </div>
 
               <ul className="mt-5 flex-1 space-y-2.5">
@@ -84,14 +111,16 @@ export default async function PlansPage({
               </ul>
 
               <div className="mt-6">
-                <PlanActions planId={plan.id} currentPlan={currentPlan} highlighted={plan.highlighted} />
+                <PlanActions planId={plan.id} currentPlan={currentPlan} highlighted={plan.highlighted} locked={FREE_BETA} />
               </div>
             </div>
           ))}
       </div>
 
       <p className="mt-8 text-center text-xs text-faint">
-        Secure checkout and billing are handled by Stripe. Cancel anytime from “Manage billing”.
+        {FREE_BETA
+          ? 'No card required while we’re in beta. When paid plans go live, checkout and billing will be handled securely by Stripe.'
+          : 'Secure checkout and billing are handled by Stripe. Cancel anytime from “Manage billing”.'}
       </p>
     </div>
   );

@@ -9,10 +9,13 @@ export function PlanActions({
   planId,
   currentPlan,
   highlighted,
+  locked,
 }: {
   planId: PlanId;
   currentPlan: PlanId;
   highlighted?: boolean;
+  /** Free beta: paid upgrades are turned off, so show an "included" state. */
+  locked?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +61,16 @@ export function PlanActions({
     return (
       <button disabled className="w-full rounded-[var(--radius-pill)] border-2 border-[var(--border-subtle)] py-2 text-sm font-bold text-muted">
         Current plan
+      </button>
+    );
+  }
+
+  // Free beta: everything is unlocked at no charge, so paid upgrades are hidden
+  // behind a plain "included" state instead of a checkout button.
+  if (locked && isUpgrade) {
+    return (
+      <button disabled className="w-full rounded-[var(--radius-pill)] border-2 border-[var(--border-subtle)] py-2 text-sm font-bold text-faint">
+        Free during beta
       </button>
     );
   }

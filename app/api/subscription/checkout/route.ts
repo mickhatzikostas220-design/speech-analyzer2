@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getStripe, stripeConfigured, PRICE_BY_PLAN } from '@/lib/subscription/stripe';
+import { FREE_BETA } from '@/lib/subscription/config';
 
 export async function POST(request: NextRequest) {
   const supabase = createClient();
@@ -12,6 +13,15 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
+  }
+
+  // Free beta: paid plans are turned off, so never open a checkout session. This
+  // is the server-side lock behind the disabled buttons on the Plans page.
+  if (FREE_BETA) {
+    return NextResponse.json(
+      { error: "Speaker Hub is free while we're in beta — there's nothing to pay for right now." },
+      { status: 403 }
+    );
   }
 
   if (!stripeConfigured()) {
