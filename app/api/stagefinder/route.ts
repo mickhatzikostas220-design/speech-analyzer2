@@ -21,6 +21,7 @@ import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
 import { getUserBrandState } from '@/lib/brand/server';
 import { DEFAULT_BRAND } from '@/lib/brand/defaults';
 import { getMemoryFacts } from '@/lib/memory/store';
+import { saveToolRun } from '@/lib/toolRuns/store';
 import { runWebSearch, mergeFindings, type WebSearchFindings } from '@/lib/stagefinder/webSearch';
 import {
   isSpeakingFormat,
@@ -348,5 +349,15 @@ No markdown, no code fences.`;
   }
 
   const plan = await getUserPlan(supabase);
+
+  // Persist so the pitch pack survives leaving/returning and is on every device.
+  // Inputs go in the output too so re-opening a run repopulates the form.
+  await saveToolRun(supabase, user.id, {
+    tool: 'stagefinder',
+    title: (topic || speakers.join(', ')).slice(0, 120),
+    input: { speakers, topic, rate, format },
+    output: { report, plan, speakers, topic, rate, format },
+  });
+
   return NextResponse.json({ report, plan });
 }

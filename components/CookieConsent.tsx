@@ -14,7 +14,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Cookie } from 'lucide-react';
 
 const STORAGE_KEY = 'cookie-consent';
 
@@ -62,7 +61,6 @@ export function CookieConsent() {
     >
       <div className="mx-auto flex max-w-3xl flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-surface-card p-4 shadow-lg sm:flex-row sm:items-center sm:gap-4">
         <div className="flex flex-1 items-start gap-3">
-          <Cookie className="mt-0.5 h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
           <p className="text-sm text-body">
             We use cookies to keep you signed in and to remember your preferences. We don&apos;t use
             advertising or cross-site tracking cookies. See our{' '}

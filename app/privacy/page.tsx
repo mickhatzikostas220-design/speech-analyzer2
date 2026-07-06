@@ -25,6 +25,7 @@ const sections: LegalSection[] = [
     paragraphs: [
       'Account information: when you sign up, we collect your name, email address, and password credentials (stored securely by our authentication provider). If you personalize your hub, we also store the brand details you provide, such as colors, logo, and voice.',
       'Content you upload: talks, recordings, transcripts, scripts, one-sheets, and any other material you add to the app so that our tools can analyze and improve it for you.',
+      'Tool results and history: to keep the tools useful across visits and devices, we save the results they generate for you — for example your SEO/AEO tips, content ideas, and stage lists — to your account, and keep a limited recent history you can return to.',
       'Usage information: basic technical data such as device and browser type, pages visited, and actions taken, which helps us keep the service reliable and understand which features are useful.',
       'Payment information: if you subscribe to a paid plan, payments are processed by Stripe. We do not store your full card number — Stripe handles that directly under its own security standards.',
     ],

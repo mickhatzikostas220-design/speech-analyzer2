@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createChatCompletion } from '@/lib/ai-config';
-import { getMemoryContext } from '@/lib/memory/store';
+import { getPersonaContext } from '@/lib/personalization/context';
+import { saveToolRun } from '@/lib/toolRuns/store';
 
 // Created lazily inside the handler — instantiating at module scope throws
 // when OPENAI_API_KEY is missing during `next build`, which breaks the build.
@@ -91,9 +92,9 @@ Remember: for DMN, lower scores are better (less mind-wandering). For all others
 
 Write the report now.`;
 
-  // Fold in what we remember about this speaker (goals, style, audience) so the
-  // report is framed for them, not generic. Empty string when memory is off.
-  const memoryContext = await getMemoryContext(supabase, user.id);
+  // Fold in who this speaker is — Brand Kit + memory (topics, voice, goals) — so
+  // the report is framed for them, not generic. Empty when we know nothing.
+  const memoryContext = await getPersonaContext(supabase, user.id);
 
   const response = await createChatCompletion('gpt-4o', {
     messages: [
@@ -106,5 +107,14 @@ Write the report now.`;
   });
 
   const report = response.choices[0]?.message?.content ?? 'Report generation failed.';
+
+  // Persist so the report survives leaving/returning and is on every device.
+  await saveToolRun(supabase, user.id, {
+    tool: 'compare',
+    title: `${labelA} vs ${labelB}`.slice(0, 120),
+    input: { labelA, labelB, avgs: avgsRaw, choices },
+    output: { report, labelA, labelB },
+  });
+
   return NextResponse.json({ report });
 }

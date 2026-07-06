@@ -4,7 +4,7 @@
 // back similar speakers, the kinds of events those speakers appear at, a tailored
 // pitch angle for each, and a ready-to-send outreach email. Core Premium — the
 // folder layout gates the page and the API route re-checks the plan server-side.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Telescope,
   Sparkles,
@@ -19,8 +19,20 @@ import {
   X,
 } from 'lucide-react';
 import { SPEAKING_FORMATS, type SpeakingFormatId, type StageReport } from '@/lib/stagefinder/types';
+import { ToolRunHistory } from '@/components/ToolRunHistory';
+import { loadLocalRun, saveLocalRun, fetchLatestRun, type ToolRunSummary } from '@/lib/toolRuns/client';
 
 const MAX_SPEAKERS = 5;
+
+// What we persist per run — report plus the form inputs so re-opening restores
+// both the results and the fields that produced them.
+interface SavedStage {
+  report?: StageReport | null;
+  speakers?: string[];
+  topic?: string;
+  rate?: string;
+  format?: SpeakingFormatId;
+}
 
 export default function StageFinderPage() {
   const [speakers, setSpeakers] = useState<string[]>([]);
@@ -34,6 +46,48 @@ export default function StageFinderPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<StageReport | null>(null);
+  const [runHistory, setRunHistory] = useState<ToolRunSummary[]>([]);
+
+  // Rehydrate results + the form from a saved run (local cache or server record).
+  function hydrate(saved: SavedStage) {
+    if (!saved?.report) return;
+    setReport(saved.report);
+    if (Array.isArray(saved.speakers)) setSpeakers(saved.speakers);
+    if (typeof saved.topic === 'string') setTopic(saved.topic);
+    if (typeof saved.rate === 'string') setRate(saved.rate);
+    if (saved.format) setFormat(saved.format);
+  }
+
+  async function refreshHistory() {
+    const res = await fetchLatestRun<SavedStage>('stagefinder');
+    if (!res) return;
+    setRunHistory(
+      res.latest
+        ? [{ id: res.latest.id, title: res.latest.title, created_at: res.latest.created_at }, ...res.history]
+        : res.history
+    );
+  }
+
+  // On mount: instant repaint from local cache, then the durable server copy
+  // (cross-device) plus the recent-run history.
+  useEffect(() => {
+    const local = loadLocalRun<SavedStage>('stagefinder');
+    if (local) hydrate(local);
+    let active = true;
+    fetchLatestRun<SavedStage>('stagefinder').then((res) => {
+      if (!active || !res) return;
+      if (res.latest?.output) hydrate(res.latest.output as SavedStage);
+      setRunHistory(
+        res.latest
+          ? [{ id: res.latest.id, title: res.latest.title, created_at: res.latest.created_at }, ...res.history]
+          : res.history
+      );
+    });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function addSpeaker(name: string) {
     const clean = name.trim();
@@ -91,7 +145,16 @@ export default function StageFinderPage() {
       if (!res.ok) {
         setError(data.error || 'Something went wrong. Please try again.');
       } else {
-        setReport(data.report as StageReport);
+        const nextReport = data.report as StageReport;
+        setReport(nextReport);
+        saveLocalRun<SavedStage>('stagefinder', {
+          report: nextReport,
+          speakers: list,
+          topic: topic.trim(),
+          rate: rate.trim(),
+          format,
+        });
+        void refreshHistory();
       }
     } catch {
       setError('Network error. Please try again.');
@@ -209,6 +272,8 @@ export default function StageFinderPage() {
           {error}
         </p>
       )}
+
+      <ToolRunHistory tool="stagefinder" items={runHistory} onLoad={(out) => hydrate(out as SavedStage)} label="Recent searches" />
 
       {loading && (
         <div className="space-y-3">

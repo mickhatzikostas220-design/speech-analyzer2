@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { MemorySettings } from '@/components/settings/MemorySettings';
+import { PersonalizationSummary } from '@/components/settings/PersonalizationSummary';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,10 +19,10 @@ export default async function MemorySettingsPage() {
     <div className="mx-auto max-w-3xl space-y-8 px-4 py-10">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-strong">Memory</h1>
+          <h1 className="text-2xl font-semibold text-strong">Personalization &amp; memory</h1>
           <p className="mt-1 text-sm text-muted">
-            The more the app knows about you, the more personal it gets. You&apos;re in control of
-            everything it remembers.
+            The more the app knows about you, the more personal it gets. Here&apos;s exactly what it
+            uses — and you&apos;re in control of all of it.
           </p>
         </div>
         <Link
@@ -33,6 +34,7 @@ export default async function MemorySettingsPage() {
         </Link>
       </div>
 
+      <PersonalizationSummary />
       <MemorySettings />
     </div>
   );

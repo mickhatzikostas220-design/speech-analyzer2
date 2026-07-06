@@ -11,7 +11,7 @@ import { rateLimit, clientIp } from '@/lib/rateLimit';
 import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
 import { buildTailorPrompt } from '@/lib/keynotes/prompt';
 import { cleanIndustry } from '@/lib/keynotes/industries';
-import { getMemoryFacts } from '@/lib/memory/store';
+import { getPersonaContext } from '@/lib/personalization/context';
 import type { Keynote } from '@/lib/keynotes/types';
 
 export const maxDuration = 60;
@@ -61,12 +61,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   if (!keynote) return NextResponse.json({ error: 'Keynote not found.' }, { status: 404 });
 
   const k = keynote as Keynote;
-  // Pull in what we remember about this speaker so the re-frame keeps their
-  // authentic voice and priorities rather than a generic industry rewrite.
-  const memoryFacts = await getMemoryFacts(supabase, user.id);
-  const speakerContext = memoryFacts.length
-    ? memoryFacts.map((f) => `- ${f}`).join('\n').slice(0, 1200)
-    : undefined;
+  // Pull in who this speaker is — Brand Kit + memory — so the re-frame keeps
+  // their authentic voice and priorities rather than a generic industry rewrite.
+  const speakerContext = (await getPersonaContext(supabase, user.id)) || undefined;
   const prompt = buildTailorPrompt({
     title: k.title,
     description: k.description,

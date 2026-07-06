@@ -5,7 +5,7 @@
 // the speaker's expertise + tone from their brand kit server-side, so the form is
 // optional — hit Generate and go, or steer it with a topic / voice / format.
 // Core Premium — the folder layout gates the page and the API re-checks the plan.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Lightbulb, Sparkles, Copy, Check, FileText, Video, Zap } from 'lucide-react';
 import {
   CONTENT_FORMATS,
@@ -14,6 +14,14 @@ import {
   type ContentIdea,
   type ContentIdeaReport,
 } from '@/lib/contentideas/types';
+import { ToolRunHistory } from '@/components/ToolRunHistory';
+import { loadLocalRun, saveLocalRun, fetchLatestRun, type ToolRunSummary } from '@/lib/toolRuns/client';
+
+// What we persist per run — locally for instant repaint + on the server (via
+// /api/content-ideas) for cross-device durability.
+interface SavedIdeas {
+  report?: ContentIdeaReport | null;
+}
 
 const FORMAT_ICON: Record<ContentFormatId, typeof FileText> = {
   blog: FileText,
@@ -30,6 +38,45 @@ export default function ContentIdeasPage() {
   const [report, setReport] = useState<ContentIdeaReport | null>(null);
   const [filter, setFilter] = useState<'all' | ContentFormatId>('all');
   const [copiedAll, setCopiedAll] = useState(false);
+  const [runHistory, setRunHistory] = useState<ToolRunSummary[]>([]);
+
+  // Rehydrate from a saved run (local cache or a server record).
+  function hydrate(saved: SavedIdeas) {
+    if (!saved?.report) return;
+    setReport(saved.report);
+    setFilter('all');
+  }
+
+  async function refreshHistory() {
+    const res = await fetchLatestRun<SavedIdeas>('content_ideas');
+    if (!res) return;
+    setRunHistory(
+      res.latest
+        ? [{ id: res.latest.id, title: res.latest.title, created_at: res.latest.created_at }, ...res.history]
+        : res.history
+    );
+  }
+
+  // On mount: instant repaint from local cache, then the durable server copy
+  // (cross-device) plus the recent-run history.
+  useEffect(() => {
+    const local = loadLocalRun<SavedIdeas>('content_ideas');
+    if (local) hydrate(local);
+    let active = true;
+    fetchLatestRun<SavedIdeas>('content_ideas').then((res) => {
+      if (!active || !res) return;
+      if (res.latest?.output) hydrate(res.latest.output as SavedIdeas);
+      setRunHistory(
+        res.latest
+          ? [{ id: res.latest.id, title: res.latest.title, created_at: res.latest.created_at }, ...res.history]
+          : res.history
+      );
+    });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function generate(e: React.FormEvent) {
     e.preventDefault();
@@ -47,7 +94,10 @@ export default function ContentIdeasPage() {
       if (!res.ok) {
         setError(data.error || 'Something went wrong. Please try again.');
       } else {
-        setReport(data.report as ContentIdeaReport);
+        const nextReport = data.report as ContentIdeaReport;
+        setReport(nextReport);
+        saveLocalRun<SavedIdeas>('content_ideas', { report: nextReport });
+        void refreshHistory();
       }
     } catch {
       setError('Network error. Please try again.');
@@ -150,6 +200,8 @@ export default function ContentIdeasPage() {
           {error}
         </p>
       )}
+
+      <ToolRunHistory tool="content_ideas" items={runHistory} onLoad={(out) => hydrate(out as SavedIdeas)} label="Recent batches" />
 
       {loading && (
         <div className="grid gap-3 sm:grid-cols-2">

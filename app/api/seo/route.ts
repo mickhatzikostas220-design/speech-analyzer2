@@ -8,7 +8,10 @@ import { getUserPlan } from '@/lib/subscription/server';
 import { isPlatform, platformLabel } from '@/lib/seo/platforms';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
 import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
-import { getMemoryFacts, saveMemory } from '@/lib/memory/store';
+import { saveMemory } from '@/lib/memory/store';
+import { getPersonaContext } from '@/lib/personalization/context';
+import { saveToolRun } from '@/lib/toolRuns/store';
+import { scoreSignals, auditToPromptBlock } from '@/lib/seo/audit';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const SEVERITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -287,15 +290,17 @@ export async function POST(request: NextRequest) {
   if (signals.hasPersonSchema) alreadyGood.push('Person schema is already present — refine it (add sameAs, jobTitle, knowsAbout) rather than adding it fresh.');
   if (signals.jsonLdTypes.length) alreadyGood.push(`Structured data already present: ${signals.jsonLdTypes.join(', ')}.`);
 
-  // Personalization: fold in durable facts we remember about this speaker (their
-  // real talk topics, audience, goals) so the tips are tailored to THEM, not just
-  // their HTML. Empty when memory is off or we know nothing yet.
-  const facts = await getMemoryFacts(supabase, user.id);
-  const memoryBlock = facts.length
-    ? `\n\nWHAT WE REMEMBER ABOUT THIS SPEAKER (personalize every tip to this — use their real talk topics as the target keywords/entities, and let their audience and booking goals set the priorities):\n${facts
-        .map((f) => `- ${f}`)
-        .join('\n')}`
-    : '';
+  // Personalization: fold in who this speaker actually is — their Brand Kit
+  // (name, signature topics, bio, voice) plus any remembered facts — so tips are
+  // tailored to THEM, not just their HTML. Empty only when we truly know nothing.
+  const personaBlock = await getPersonaContext(supabase, user.id);
+  const memoryBlock = personaBlock ? `\n\n${personaBlock}` : '';
+
+  // Run the concrete, scored audit on the scraped signals. It gives the user a
+  // real "what we found" panel AND anchors the AI tips to the same verified
+  // findings so the advice can't read as random.
+  const audit = scoreSignals(signals as Record<string, unknown>);
+  const auditBlock = auditToPromptBlock(audit);
 
   const prompt = `You are a senior SEO + AEO/GEO strategist advising a PUBLIC SPEAKER on their website. AEO/GEO = getting cited and recommended by AI answer engines (ChatGPT, Perplexity, Google AI Overviews, Gemini). The speaker's goal is to get booked — so "found by an event organizer or an AI that an organizer asks" matters as much as classic Google ranking.
 
@@ -303,13 +308,13 @@ ON-PAGE SIGNALS scraped from ${url}:
 ${JSON.stringify(signals, null, 2)}
 
 WHAT THIS PAGE ALREADY DOES WELL — you MUST NOT recommend adding or enabling any of these; treat them as done:
-${alreadyGood.length ? alreadyGood.map((s) => `- ${s}`).join('\n') : '- (nothing detected as already in place)'}${memoryBlock}
+${alreadyGood.length ? alreadyGood.map((s) => `- ${s}`).join('\n') : '- (nothing detected as already in place)'}${memoryBlock}${auditBlock ? `\n\n${auditBlock}` : ''}
 
 HARD RULES:
 - Never recommend something the signals show already exists. If you're not sure from the data, don't assume it's missing.
 - Every tip must reference THIS page's actual data (its real title, headings, word count, schema types, question headings, linked profiles). No boilerplate that would read the same for any website.
 - Be specific to a speaker: their bio/credentials (E-E-A-T), their talk topics as entities, the exact questions an event organizer or attendee would ask an AI ("who is a good keynote speaker on X?").
-- If we remember facts about this speaker (above), personalize to them: target their actual talk topics as keywords/entities, pre-fill schema (knowsAbout, jobTitle) with what we know, and prioritize the fixes that best serve their stated goals.
+- If we know who this speaker is (the "WHO THIS SPEAKER IS" block above), personalize hard: target their actual talk topics as keywords/entities, pre-fill schema (name, jobTitle, knowsAbout) with what we know, quote their real bio/voice, and prioritize the fixes that best serve their goals. Do NOT give advice that ignores who they are.
 
 The site is built with: ${platformLabel(platform)}. Every "steps" instruction MUST be written for ${platformLabel(platform)} specifically — its real menus/panels/where to paste code (Wix: Settings → SEO + the Custom Code / embed panel; WordPress: an SEO plugin like Yoast/RankMath or a custom-HTML block; Squarespace/Webflow/Shopify: page settings + code injection; "Custom code / HTML": edit the actual <head> and markup). Do not give steps for a different platform.
 
@@ -376,5 +381,13 @@ Aim for 3–5 items in each array. No markdown, no code fences around the whole 
     source: 'auto',
   });
 
-  return NextResponse.json({ url, signals, report, plan, platform });
+  // Persist the run so the tips survive leaving/returning and are on every device.
+  await saveToolRun(supabase, user.id, {
+    tool: 'seo',
+    title: url,
+    input: { url, platform },
+    output: { url, signals, report, plan, platform, audit },
+  });
+
+  return NextResponse.json({ url, signals, report, plan, platform, audit });
 }

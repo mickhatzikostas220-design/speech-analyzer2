@@ -18,6 +18,7 @@ import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
 import { getUserBrandState } from '@/lib/brand/server';
 import { DEFAULT_BRAND } from '@/lib/brand/defaults';
 import { getMemoryFacts } from '@/lib/memory/store';
+import { saveToolRun } from '@/lib/toolRuns/store';
 import { runWebSearch, type WebSearchFindings } from '@/lib/stagefinder/webSearch';
 import {
   isContentFormat,
@@ -220,5 +221,14 @@ Return 24–30 ideas. No markdown, no code fences.`;
   }
 
   const plan = await getUserPlan(supabase);
+
+  // Persist so the batch survives leaving/returning and is on every device.
+  await saveToolRun(supabase, user.id, {
+    tool: 'content_ideas',
+    title: (topicInput || focus).slice(0, 120),
+    input: { topic: topicInput, voice: voiceInput, format: formatBias },
+    output: { report, plan },
+  });
+
   return NextResponse.json({ report, plan });
 }

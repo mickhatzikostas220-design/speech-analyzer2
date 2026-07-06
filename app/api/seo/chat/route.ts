@@ -12,7 +12,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserPlan } from '@/lib/subscription/server';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
 import { createChatCompletion, hasAiKey } from '@/lib/ai-config';
-import { getMemoryContext } from '@/lib/memory/store';
+import { getPersonaContext } from '@/lib/personalization/context';
 
 export const maxDuration = 60;
 
@@ -123,8 +123,8 @@ export async function POST(request: NextRequest) {
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .slice(-12);
 
-  // Fold in what we remember about this speaker so tips fit their site & goals.
-  const memoryContext = await getMemoryContext(supabase, user.id);
+  // Fold in who this speaker is — Brand Kit + memory — so tips fit their site & goals.
+  const memoryContext = await getPersonaContext(supabase, user.id);
 
   let stream: Awaited<ReturnType<typeof createChatCompletion>>;
   try {

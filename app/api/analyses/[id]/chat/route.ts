@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { createChatCompletion } from '@/lib/ai-config';
-import { getMemoryContext } from '@/lib/memory/store';
+import { getPersonaContext } from '@/lib/personalization/context';
 import { NextRequest } from 'next/server';
 
 export const maxDuration = 60;
@@ -94,9 +94,9 @@ export async function POST(
     return new Response('Analysis not complete yet', { status: 422 });
   }
 
-  // Personalize with what we remember about this speaker (goals, style, audience)
-  // so coaching lands for them specifically. Empty string when memory is off.
-  const memoryContext = await getMemoryContext(supabase, user.id);
+  // Personalize with who this speaker is — Brand Kit + memory (goals, style,
+  // audience) — so coaching lands for them specifically. Empty when unknown.
+  const memoryContext = await getPersonaContext(supabase, user.id);
 
   const stream = await createChatCompletion('gpt-4o', {
     max_tokens: 1024,

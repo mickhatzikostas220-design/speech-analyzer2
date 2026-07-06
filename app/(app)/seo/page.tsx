@@ -7,6 +7,9 @@ import { useEffect, useState } from 'react';
 import { Search, Sparkles, Check, CalendarPlus, Copy, Code2 } from 'lucide-react';
 import { SEO_PLATFORMS, type SeoPlatformId } from '@/lib/seo/platforms';
 import SeoChat from './SeoChat';
+import { ToolRunHistory } from '@/components/ToolRunHistory';
+import { loadLocalRun, saveLocalRun, fetchLatestRun, type ToolRunSummary } from '@/lib/toolRuns/client';
+import type { AuditResult, AuditCheck } from '@/lib/seo/audit';
 
 interface TipItem {
   title: string;
@@ -23,9 +26,17 @@ interface Report {
   aeo: TipItem[];
 }
 
-// Persist the last scan locally so leaving the tool and coming back doesn't wipe
-// the tips (free users especially: their weekly tip would otherwise be lost).
-const STORAGE_KEY = 'seo:last-scan-v1';
+// The shape we persist per scan — locally for instant repaint AND on the server
+// (via /api/seo) for cross-device durability. Mirrors the API response 1:1.
+interface SavedSeo {
+  url?: string;
+  analyzedUrl?: string;
+  signals?: Record<string, unknown> | null;
+  report?: Report;
+  plan?: string;
+  platform?: SeoPlatformId;
+  audit?: AuditResult | null;
+}
 
 const SEVERITY: Record<string, { label: string; cls: string }> = {
   high: { label: 'High impact', cls: 'bg-[var(--danger-bg)] text-[color:var(--danger)]' },
@@ -143,6 +154,71 @@ function TipSection({ title, items, canSave }: { title: string; items: TipItem[]
   );
 }
 
+// ── Audit evidence panel — the "real check" the speaker can see ─────────────
+function scoreColor(score: number): string {
+  return score >= 80 ? 'var(--success)' : score >= 50 ? '#8A6D00' : 'var(--danger)';
+}
+
+function ScorePill({ label, score }: { label: string; score: number }) {
+  return (
+    <div className="flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--border-subtle)] px-3 py-1">
+      <span className="text-[11px] font-bold uppercase tracking-wide text-muted">{label}</span>
+      <span className="text-sm font-extrabold" style={{ color: scoreColor(score) }}>{score}</span>
+      <span className="text-[11px] text-faint">/100</span>
+    </div>
+  );
+}
+
+const STATUS_COLOR: Record<AuditCheck['status'], string> = {
+  pass: 'var(--success)',
+  warn: '#8A6D00',
+  fail: 'var(--danger)',
+};
+
+function CheckRow({ check }: { check: AuditCheck }) {
+  return (
+    <li className="flex items-start gap-2">
+      <span
+        aria-hidden
+        className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+        style={{ background: STATUS_COLOR[check.status] }}
+      />
+      <span className="text-sm leading-snug">
+        <span className="font-semibold text-strong">{check.label}</span>
+        <span className="text-faint"> — {check.found}</span>
+      </span>
+    </li>
+  );
+}
+
+function AuditPanel({ audit }: { audit: AuditResult }) {
+  const seo = audit.checks.filter((c) => c.dimension === 'seo');
+  const aeo = audit.checks.filter((c) => c.dimension === 'aeo');
+  return (
+    <div className="card p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="flex items-center gap-2 font-bold text-strong">
+          <Sparkles className="h-4 w-4 text-muted" /> What we found on your site
+        </p>
+        <div className="flex gap-2">
+          <ScorePill label="SEO" score={audit.seoScore} />
+          <ScorePill label="AEO" score={audit.aeoScore} />
+        </div>
+      </div>
+      <div className="mt-4 grid gap-5 sm:grid-cols-2">
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-faint">Search (SEO)</p>
+          <ul className="space-y-1.5">{seo.map((c) => <CheckRow key={c.id} check={c} />)}</ul>
+        </div>
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-faint">Answer engines (AEO)</p>
+          <ul className="space-y-1.5">{aeo.map((c) => <CheckRow key={c.id} check={c} />)}</ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SeoPage() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -150,34 +226,56 @@ export default function SeoPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [analyzedUrl, setAnalyzedUrl] = useState('');
   const [signals, setSignals] = useState<Record<string, unknown> | null>(null);
+  const [audit, setAudit] = useState<AuditResult | null>(null);
   const [plan, setPlan] = useState<string>('free');
   const [platform, setPlatform] = useState<SeoPlatformId>('custom');
 
+  const [runHistory, setRunHistory] = useState<ToolRunSummary[]>([]);
+
   const isPaid = plan !== 'free';
 
-  // Restore the last scan on mount so the tips survive navigating away and back.
+  // Rehydrate the whole view from a saved run (local cache or a server record).
+  function hydrate(saved: SavedSeo) {
+    if (!saved?.report) return;
+    const scanned = saved.url ?? saved.analyzedUrl ?? '';
+    setReport(saved.report);
+    setAnalyzedUrl(scanned);
+    setSignals(saved.signals ?? null);
+    setAudit(saved.audit ?? null);
+    setPlan(saved.plan ?? 'free');
+    if (saved.platform) setPlatform(saved.platform);
+    if (scanned) setUrl(scanned);
+  }
+
+  async function refreshHistory() {
+    const res = await fetchLatestRun<SavedSeo>('seo');
+    if (!res) return;
+    setRunHistory(
+      res.latest
+        ? [{ id: res.latest.id, title: res.latest.title, created_at: res.latest.created_at }, ...res.history]
+        : res.history
+    );
+  }
+
+  // On mount: instant repaint from the local cache, then the server copy (which
+  // works across devices) as the source of truth, plus the recent-run history.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw) as {
-        url?: string;
-        analyzedUrl?: string;
-        signals?: Record<string, unknown> | null;
-        report?: Report;
-        plan?: string;
-        platform?: SeoPlatformId;
-      };
-      if (!saved?.report) return;
-      setReport(saved.report);
-      setAnalyzedUrl(saved.analyzedUrl ?? '');
-      setSignals(saved.signals ?? null);
-      setPlan(saved.plan ?? 'free');
-      if (saved.platform) setPlatform(saved.platform);
-      if (saved.url) setUrl(saved.url);
-    } catch {
-      /* corrupt or unavailable storage — just start fresh */
-    }
+    const local = loadLocalRun<SavedSeo>('seo');
+    if (local) hydrate(local);
+    let active = true;
+    fetchLatestRun<SavedSeo>('seo').then((res) => {
+      if (!active || !res) return;
+      if (res.latest?.output) hydrate(res.latest.output as SavedSeo);
+      setRunHistory(
+        res.latest
+          ? [{ id: res.latest.id, title: res.latest.title, created_at: res.latest.created_at }, ...res.history]
+          : res.history
+      );
+    });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function analyze(e: React.FormEvent) {
@@ -198,27 +296,26 @@ export default function SeoPage() {
       } else {
         const nextReport = data.report as Report;
         const nextSignals = (data.signals as Record<string, unknown>) ?? null;
+        const nextAudit = (data.audit as AuditResult) ?? null;
         const nextPlan = (data.plan as string) ?? 'free';
+        const scanned = (data.url as string) ?? url.trim();
         setReport(nextReport);
-        setAnalyzedUrl(data.url as string);
+        setAnalyzedUrl(scanned);
         setSignals(nextSignals);
+        setAudit(nextAudit);
         setPlan(nextPlan);
-        // Cache it so it's still here when the speaker returns to the tool.
-        try {
-          localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({
-              url: url.trim(),
-              analyzedUrl: data.url,
-              signals: nextSignals,
-              report: nextReport,
-              plan: nextPlan,
-              platform,
-            })
-          );
-        } catch {
-          /* storage full or blocked — non-fatal */
-        }
+        // Instant local cache (the durable server copy is written by /api/seo),
+        // then refresh the recent-run history so this scan appears in it.
+        saveLocalRun<SavedSeo>('seo', {
+          url: scanned,
+          analyzedUrl: scanned,
+          signals: nextSignals,
+          report: nextReport,
+          plan: nextPlan,
+          platform,
+          audit: nextAudit,
+        });
+        void refreshHistory();
       }
     } catch {
       setError('Network error. Please try again.');
@@ -277,6 +374,8 @@ export default function SeoPage() {
         </p>
       )}
 
+      <ToolRunHistory tool="seo" items={runHistory} onLoad={(out) => hydrate(out as SavedSeo)} label="Recent scans" />
+
       {loading && (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
@@ -292,6 +391,8 @@ export default function SeoPage() {
             <p className="mb-2 break-all text-sm font-semibold text-strong">{analyzedUrl}</p>
             <p className="text-sm text-muted">{report.summary}</p>
           </div>
+
+          {audit && <AuditPanel audit={audit} />}
 
           {report.seo?.length > 0 && <TipSection title="Search engine optimization (SEO)" items={report.seo} canSave={isPaid} />}
           {report.aeo?.length > 0 && <TipSection title="Answer engine optimization (AEO)" items={report.aeo} canSave={isPaid} />}
