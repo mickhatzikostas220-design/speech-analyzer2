@@ -23,7 +23,7 @@ export const FAQS: Faq[] = [
   },
   {
     q: 'How does the AI analysis work?',
-    a: 'Your talk is transcribed and read by AI that scores engagement moment by moment, surfaces where attention rises and falls, and gives concrete, specific notes you can act on before your next performance.',
+    a: 'Your talk gets transcribed, then scored moment by moment for engagement. You see exactly where attention rose and fell, with specific notes you can act on before your next performance.',
   },
   {
     q: 'Can I cancel anytime?',

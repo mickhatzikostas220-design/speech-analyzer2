@@ -10,8 +10,7 @@ export default function NotFound() {
         This page took a different stage.
       </h1>
       <p className="mb-8 max-w-md text-[color:var(--text-muted)]">
-        The page you&apos;re looking for doesn&apos;t exist or may have moved.
-        Let&apos;s get you back on track.
+        It doesn&apos;t exist anymore, or maybe it never did. Here&apos;s your way back.
       </p>
       <Link href="/" className="btn-primary">
         Back home

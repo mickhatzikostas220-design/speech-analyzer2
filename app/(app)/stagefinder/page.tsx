@@ -108,7 +108,7 @@ export default function StageFinderPage() {
       <h1 className="display-h1 mb-1">Find the stages your idols speak on</h1>
       <p className="mb-8 text-muted">
         Name a few speakers you admire. We&apos;ll find speakers like them, the kinds of events they
-        take the stage at, and exactly how you could pitch yourself to those same rooms.
+        take the stage at, and exactly how to pitch yourself to those same rooms.
       </p>
 
       <form onSubmit={findStages} className="mb-8 space-y-4">

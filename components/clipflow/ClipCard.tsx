@@ -225,7 +225,7 @@ export function ClipCard({
         <input
           value={tags}
           onChange={(e) => setTags(e.target.value)}
-          placeholder="hashtags, comma, separated"
+          placeholder="hashtags, comma-separated"
           className={`${INPUT_CLS} text-xs text-[color:var(--accent-2)]`}
         />
 

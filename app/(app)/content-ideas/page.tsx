@@ -86,9 +86,8 @@ export default function ContentIdeasPage() {
       <p className="eyebrow mb-2">Content Ideas</p>
       <h1 className="display-h1 mb-1">Titles people search for — in your voice</h1>
       <p className="mb-8 text-muted">
-        Get 20–30 blog, video, and short titles that sit inside your expertise, answer what people
-        actually search, and sound unmistakably like you. We use your brand voice automatically —
-        steer it below if you want.
+        Get 20–30 blog, video, and short titles that fit your expertise and answer what people
+        actually search for. We pull in your brand voice automatically — steer it below if you want.
       </p>
 
       <form onSubmit={generate} className="mb-8 space-y-4">

@@ -140,6 +140,39 @@ npm run lint      # Run ESLint
 
 ---
 
+## Writing Style — Sound Human, Not Like AI
+
+All copy Claude writes for this project — landing page, tool UI, emails, error messages,
+onboarding text, this file — should read like a person wrote it. Avoid the tells listed at
+[Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing):
+
+- **Cut stock AI phrases.** No "delve," "boast," "vibrant," "tapestry," "in today's
+  fast-paced world," "it's important to note," "unlock the power of," "seamless," "robust
+  solution," "game-changer," "elevate." If a word feels like it came from a listicle, cut it.
+- **Skip the puffery.** Don't tell the reader something is "crucial," "essential," or
+  "powerful" — show what it does and let them decide it's crucial.
+- **Kill the rule of three.** Not every sentence needs three parallel adjectives or examples
+  ("fast, reliable, and intuitive"). One well-chosen word beats three vague ones.
+- **No recap paragraphs.** Don't end a section by restating what it just said ("In summary,
+  this tool helps you..."). Say it once.
+- **Vary sentence length.** Real writing has short sentences next to longer ones. Uniform,
+  metronomic sentence structure reads as machine-generated.
+- **Contractions are fine.** "Don't," "it's," "you're" — use them. Formal, contraction-free
+  prose is a tell.
+- **Say the thing, don't gesture at it.** Avoid vague scope-inflation like "a wide range of
+  features" or "various tools" — name the actual thing.
+- **Skip false hedging.** Don't pile on "may," "could," "might," "in some cases" when you
+  actually know the answer.
+- **Headers should be plain, not title-cased marketing lines.** "Pricing," not "Unlock Your
+  Full Potential: Flexible Pricing for Every Speaker."
+- **Em dashes sparingly.** One per paragraph, not one per sentence.
+
+This applies to new copy going forward. If asked to rewrite existing copy for tone, apply the
+same rules and call out any change that could shift legal or factual meaning (see legal pages
+rule above).
+
+---
+
 ## Scope Rule — Stay In Your Lane
 
 This is the most important rule.

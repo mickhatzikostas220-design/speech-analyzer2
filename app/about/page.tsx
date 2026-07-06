@@ -50,7 +50,7 @@ const STORY: Array<{ heading?: string; paragraphs: string[] }> = [
   {
     heading: 'Where it’s going',
     paragraphs: [
-      `My hope is that ${SITE_NAME} reaches speakers everywhere and helps propel the great messages and teachings they have to share. If it saves them time and helps even one more person hear what they have to say, that's a win.`,
+      `My hope is that ${SITE_NAME} reaches speakers everywhere and makes their message a little easier to get out into the world. If it saves them time and helps even one more person hear what they have to say, that's a win.`,
       `It's built and run by one 15-year-old, so every bit of support genuinely helps me keep improving it and adding new tools.`,
     ],
   },

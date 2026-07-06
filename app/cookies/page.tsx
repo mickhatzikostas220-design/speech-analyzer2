@@ -60,7 +60,7 @@ const sections: LegalSection[] = [
     heading: 'Managing your cookies',
     paragraphs: [
       'You can accept all cookies or choose "Necessary only" in the banner shown on your first visit. You can also control or delete cookies at any time through your browser settings, and clear this site’s local storage from your browser.',
-      'Please note that blocking or deleting strictly necessary cookies will sign you out and prevent core features from working, because we use them to keep your session secure.',
+      'Blocking or deleting strictly necessary cookies will sign you out and prevent core features from working, because we use them to keep your session secure.',
     ],
   },
   {

@@ -345,8 +345,8 @@ function Features() {
           Stop juggling ten tools
         </h2>
         <p className="mt-4 text-lg text-muted">
-          Speaker Hub brings your whole speaking world — prep, analysis, bookings, and content —
-          under one roof, styled to your brand.
+          Prep, analysis, bookings, content — Speaker Hub keeps all of it in one place, styled to
+          your brand.
         </p>
       </div>
 

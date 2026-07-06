@@ -332,7 +332,7 @@ export function BrandSettings({ initialBrand }: { initialBrand: BrandKit }) {
           </div>
           {lowContrastPairs.length > 0 && (
             <div className="mt-3 rounded-[var(--radius-sm)] bg-[var(--warning-bg)] px-3 py-2 text-xs" style={{ color: '#8A6D00' }}>
-              <p className="font-semibold">Low contrast — this text may be hard to read (aim for 4.5:1):</p>
+              <p className="font-semibold">Low contrast — this text is hard to read (aim for 4.5:1):</p>
               <ul className="mt-1 space-y-0.5">
                 {lowContrastPairs.map((c) => (
                   <li key={c.label}>• {c.label} — {c.ratio.toFixed(1)}:1</li>

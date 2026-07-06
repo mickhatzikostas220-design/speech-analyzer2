@@ -290,7 +290,7 @@ function CompareSummary({ dataA, dataB, labelA, labelB }: { dataA: ChartData; da
       </div>
 
       <div className="border-t border-[var(--border-subtle)] pt-5 space-y-4">
-        <h2 className="text-sm font-medium text-body">Generate Claude Prompt</h2>
+        <h2 className="text-sm font-medium text-body">Generate a Claude prompt</h2>
 
         <div className="space-y-1.5">
           <p className="text-xs text-muted">Who is this report for?</p>
@@ -438,7 +438,7 @@ export default function ComparePage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       <div>
-        <h1 className="text-xl font-extrabold text-strong">Compare Speeches</h1>
+        <h1 className="text-xl font-extrabold text-strong">Compare speeches</h1>
         <p className="text-muted text-sm mt-1">Overlay two analyses to compare neural engagement across every metric.</p>
       </div>
 

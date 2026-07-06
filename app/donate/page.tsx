@@ -82,12 +82,12 @@ export default function DonatePage({
           <div>
             <p className="eyebrow mb-2">Support the site</p>
             <h1 className="display-h1" style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', lineHeight: 1.1 }}>
-              Help build the future of {SITE_NAME}
+              Help keep {SITE_NAME} free and growing
             </h1>
             <p className="mt-4 text-lg text-muted">
               {SITE_NAME} is built and run by one person. If the tools have helped you, a small
               donation helps me keep them free where I can and build the next ones faster.
-              <strong className="text-strong"> Every dollar is reinvested directly into the site</strong> —
+              <strong className="text-strong"> Every dollar goes straight back into the site</strong> —
               new tools, better AI, and the bills that keep it online.
             </p>
 
