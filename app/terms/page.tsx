@@ -72,6 +72,7 @@ const sections: LegalSection[] = [
     heading: 'Connected accounts and third-party platforms',
     paragraphs: [
       'The Service lets you connect third-party accounts (such as social media platforms) so we can publish content on your behalf. By connecting an account, you authorize us to access it and act at your direction, and you confirm you have the right to do so.',
+      'You may also connect a Google account to power the AI Assistant. When you do, you authorize the Service to access your Gmail and Google Calendar and, at your direction, to draft and send email on your behalf. You are responsible for reviewing any message before it is sent and for how you use the Assistant with your account.',
       'Your use of any connected platform is also governed by that platform’s own terms and policies. We are not responsible for third-party services, and we may lose access if a platform changes or revokes it. You can disconnect a linked account at any time.',
     ],
   },
@@ -101,7 +102,7 @@ export default function TermsPage() {
   return (
     <LegalPage
       title="Terms of Service"
-      updated="July 5, 2026"
+      updated="July 6, 2026"
       intro={`Please read these terms carefully. They govern your access to and use of ${SITE_NAME}.`}
       sections={sections}
     />

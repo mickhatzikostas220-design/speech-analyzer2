@@ -38,7 +38,14 @@ export function normalizeUrl(input: string): string {
   const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   try {
     const u = new URL(withScheme);
+    // Only ever speak http(s) — never file:, ftp:, data:, etc.
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('bad scheme');
     if (!u.hostname.includes('.')) throw new Error('no tld');
+    // SSRF guard on the PRIMARY fetch target. Previously isBlockedHost was only
+    // applied to scraped stylesheet URLs, so a user could point this at an
+    // internal address (169.254.169.254, 10.x, 127.0.0.1, an internal hostname
+    // with a dot, etc.) and have the server fetch it. Block those here too.
+    if (isBlockedHost(u.hostname)) throw new Error('blocked host');
     return u.toString();
   } catch {
     throw new BrandExtractError("That doesn't look like a valid website address.");
@@ -46,7 +53,7 @@ export function normalizeUrl(input: string): string {
 }
 
 // Block obvious SSRF targets (localhost, link-local, private ranges). Applied to
-// stylesheet URLs pulled from the page markup, which we don't fully control.
+// the primary page fetch AND to stylesheet URLs pulled from the page markup.
 function isBlockedHost(host: string): boolean {
   const h = host.toLowerCase();
   if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
@@ -72,6 +79,16 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
         'Accept-Language': 'en-US,en;q=0.9',
       },
     });
+    // Defense-in-depth: a public URL can 302-redirect to an internal address.
+    // We follow redirects, so re-check the FINAL host and refuse to read the
+    // body if it landed somewhere private.
+    try {
+      if (isBlockedHost(new URL(res.url || url).hostname)) {
+        throw new BrandExtractError('That address is not allowed.');
+      }
+    } catch (e) {
+      if (e instanceof BrandExtractError) throw e;
+    }
     if (!res.ok) throw new BrandExtractError(`The site responded with ${res.status}.`);
     const reader = res.body?.getReader();
     if (!reader) return { html: await res.text(), finalUrl: res.url || url };
