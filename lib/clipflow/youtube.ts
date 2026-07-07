@@ -38,6 +38,16 @@ function apiKey(): string {
   return key;
 }
 
+// A YouTube video id is always exactly 11 chars of [A-Za-z0-9_-]. Validating
+// here is not just cosmetic: the id is later interpolated into a `yt-dlp` shell
+// command (lib/clipflow/clipper.ts) and into fetch URLs, so an id carrying shell
+// metacharacters would be a command-injection vector. Reject anything that
+// isn't a canonical id at parse time.
+const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+export function isValidVideoId(id: string | undefined | null): id is string {
+  return typeof id === 'string' && VIDEO_ID_RE.test(id);
+}
+
 /** Parse a YouTube channel or video URL into its component identifiers. */
 export function parseSourceUrl(input: string): ParsedSource {
   const raw = input.trim();
@@ -54,17 +64,17 @@ export function parseSourceUrl(input: string): ParsedSource {
   // youtu.be/<id>
   if (host === 'youtu.be') {
     const id = path.slice(1).split('/')[0];
-    if (id) return { type: 'video', videoId: id, raw };
+    if (isValidVideoId(id)) return { type: 'video', videoId: id, raw };
   }
 
   if (host.endsWith('youtube.com')) {
     // watch?v=<id>
     const v = url.searchParams.get('v');
-    if (v) return { type: 'video', videoId: v, raw };
+    if (isValidVideoId(v)) return { type: 'video', videoId: v, raw };
 
     // /shorts/<id>, /embed/<id>, /v/<id>
     const m = path.match(/^\/(shorts|embed|v)\/([^/?]+)/);
-    if (m) return { type: 'video', videoId: m[2], raw };
+    if (m && isValidVideoId(m[2])) return { type: 'video', videoId: m[2], raw };
 
     // /channel/<UC...>
     const ch = path.match(/^\/channel\/([^/?]+)/);

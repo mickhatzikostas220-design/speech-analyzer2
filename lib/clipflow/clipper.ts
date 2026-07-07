@@ -6,6 +6,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import type { CaptionStyle, TranscriptCue } from './types';
+import { isValidVideoId } from './youtube';
 
 // Video rendering: downloads only the needed section of a YouTube video with
 // yt-dlp, reframes it to vertical 9:16 with FFmpeg, and burns in captions.
@@ -83,6 +84,13 @@ export interface RenderResult {
  * is responsible for uploading them and cleaning up the work dir via cleanup().
  */
 export async function renderClip(opts: RenderOptions): Promise<RenderResult> {
+  // Defense in depth: the id is interpolated into the yt-dlp shell command
+  // below, so reject anything that isn't a canonical 11-char YouTube id even if
+  // a caller somehow supplied one that skipped parseSourceUrl's validation.
+  if (!isValidVideoId(opts.youtubeId)) {
+    throw new ClipperUnavailableError('Invalid YouTube video id.');
+  }
+
   const tools = await checkTools();
   if (!tools.ytdlp || !tools.ffmpeg) {
     const missing = [
