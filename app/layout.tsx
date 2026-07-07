@@ -43,6 +43,12 @@ export const metadata: Metadata = {
     follow: true,
     googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
   },
+  // Bing Webmaster Tools site verification — renders <meta name="msvalidate.01" ...> in <head>
+  verification: {
+    other: {
+      'msvalidate.01': 'C1F8D8CC5EA6E1435D6CEE5EE5AFF4C2',
+    },
+  },
 };
 
 export const viewport: Viewport = {
