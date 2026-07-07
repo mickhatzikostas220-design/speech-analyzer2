@@ -52,7 +52,7 @@ export function SiteFooter({
               ]}
             />
             <div>
-              <h4 className="mb-3 text-xs font-bold uppercase tracking-wide text-faint">Contact</h4>
+              <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-muted">Contact</h2>
               <ul className="space-y-2 text-sm">
                 <li>
                   <a
@@ -78,7 +78,7 @@ export function SiteFooter({
           </div>
         </div>
 
-        <div className="mt-8 border-t border-[var(--border-subtle)] pt-6 text-sm text-faint">
+        <div className="mt-8 border-t border-[var(--border-subtle)] pt-6 text-sm text-muted">
           © {year} {SITE_NAME}. All rights reserved.
         </div>
       </div>
@@ -89,7 +89,7 @@ export function SiteFooter({
 function FooterCol({ title, links }: { title: string; links: Array<[string, string]> }) {
   return (
     <div>
-      <h4 className="mb-3 text-xs font-bold uppercase tracking-wide text-faint">{title}</h4>
+      <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-muted">{title}</h2>
       <ul className="space-y-2 text-sm">
         {links.map(([label, href]) => (
           <li key={label}>

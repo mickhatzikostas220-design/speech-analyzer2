@@ -224,7 +224,7 @@ function Hero() {
               See what&rsquo;s inside
             </a>
           </div>
-          <p className="mt-4 text-sm text-faint">
+          <p className="mt-4 text-sm text-muted">
             No credit card required · Free, unlimited talk analyses
           </p>
         </div>
@@ -250,14 +250,17 @@ function HeroVisual() {
         <div className="flex items-start justify-between">
           <div>
             <p className="eyebrow mb-1">Engagement map</p>
-            <h3 className="text-lg font-extrabold text-strong">Closing keynote — draft 3</h3>
+            {/* Not a real heading — decorative label inside the product mock, so
+                it stays a <p> to keep the page's heading outline sequential. */}
+            <p className="text-lg font-extrabold text-strong">Closing keynote — draft 3</p>
           </div>
+          {/* Deeper green than --score-high so white text clears WCAG AA (4.5:1). */}
           <div
             className="flex h-14 w-14 flex-col items-center justify-center rounded-2xl text-white"
-            style={{ background: 'var(--score-high)' }}
+            style={{ background: '#15803D' }}
           >
             <span className="text-xl font-black leading-none">87</span>
-            <span className="text-[10px] font-bold uppercase tracking-wide opacity-80">score</span>
+            <span className="text-[10px] font-bold uppercase tracking-wide">score</span>
           </div>
         </div>
 
@@ -271,7 +274,7 @@ function HeroVisual() {
             />
           ))}
         </div>
-        <div className="mt-2 flex justify-between text-[11px] font-semibold text-faint">
+        <div className="mt-2 flex justify-between text-[11px] font-semibold text-muted">
           <span>0:00</span>
           <span>Peak at 6:40</span>
           <span>12:30</span>
@@ -626,7 +629,7 @@ function Footer() {
             />
           </div>
         </div>
-        <div className="mt-10 border-t border-[var(--border-subtle)] pt-6 text-sm text-faint">
+        <div className="mt-10 border-t border-[var(--border-subtle)] pt-6 text-sm text-muted">
           © {year} {SITE_NAME}. All rights reserved.
         </div>
       </div>
@@ -637,7 +640,7 @@ function Footer() {
 function FooterCol({ title, links }: { title: string; links: Array<[string, string]> }) {
   return (
     <div>
-      <h4 className="mb-3 text-xs font-bold uppercase tracking-wide text-faint">{title}</h4>
+      <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-muted">{title}</h2>
       <ul className="space-y-2 text-sm">
         {links.map(([label, href]) => (
           <li key={label}>
