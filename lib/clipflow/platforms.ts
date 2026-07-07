@@ -127,8 +127,11 @@ export function getAuthorizeUrl(
       `${c.label} is not configured. Add your ${c.label} client id & secret in ClipFlow → API keys (or set ${c.clientIdEnv} / ${c.clientSecretEnv}).`
     );
   }
+  // TikTok's authorize endpoint expects `client_key`; every other platform uses
+  // `client_id`. (The token exchange already special-cases this — see below.)
+  const clientParam = platform === 'tiktok' ? 'client_key' : 'client_id';
   const params = new URLSearchParams({
-    client_id: resolved.clientId,
+    [clientParam]: resolved.clientId,
     redirect_uri: redirectUri(platform),
     response_type: 'code',
     scope: c.scopes,
