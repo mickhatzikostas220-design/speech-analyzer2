@@ -60,6 +60,13 @@ const sections: LegalSection[] = [
     ],
   },
   {
+    heading: 'Public speaker pages (one-sheets)',
+    paragraphs: [
+      "If you publish a one-sheet, it's hosted at a public web address (for example speaker-hub.com/s/your-name) that anyone with the link can open — that's the whole point of it, so event organizers can find and book you. Because the page is public, search engines and AI answer engines can crawl, index, and cite it, and we include published one-sheets in our sitemap to help them find it. Only the details you choose to put on your one-sheet appear there.",
+      "Having a public one-sheet is your choice. You can change or remove it at any time from your settings; once it's removed the page stops loading, and search engines drop it from their results over time.",
+    ],
+  },
+  {
     heading: 'Cookies and similar technologies',
     paragraphs: [
       'We use strictly necessary cookies to keep you signed in and secure your session, and we store a few functional items in your browser (such as your cookie choice and your most recent tips) to make the tools easier to use. We do not use third-party advertising or cross-site tracking cookies.',
@@ -106,7 +113,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      updated="July 6, 2026"
+      updated="July 7, 2026"
       intro={`This Privacy Policy explains what information ${SITE_NAME} collects, how we use it, and the choices you have. By using the service, you agree to the practices described here.`}
       sections={sections}
     />

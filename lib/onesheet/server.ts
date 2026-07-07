@@ -33,3 +33,30 @@ export async function getProfileBySlug(slug: string): Promise<PublicOneSheet | n
     return null;
   }
 }
+
+export interface PublicOneSheetRef {
+  slug: string;
+  createdAt: string | null;
+}
+
+/**
+ * Every published one-sheet, for the public sitemap. A profile row with a
+ * non-empty `slug` has a live page at /s/<slug>, so listing them lets search
+ * engines and AI answer engines discover each speaker's public page.
+ */
+export async function listPublicOneSheetSlugs(): Promise<PublicOneSheetRef[]> {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from('profiles')
+      .select('slug, created_at')
+      .not('slug', 'is', null)
+      .neq('slug', '');
+    if (error || !data) return [];
+    return (data as Array<{ slug: string | null; created_at: string | null }>)
+      .filter((r): r is { slug: string; created_at: string | null } => Boolean(r.slug))
+      .map((r) => ({ slug: r.slug, createdAt: r.created_at }));
+  } catch {
+    return [];
+  }
+}
