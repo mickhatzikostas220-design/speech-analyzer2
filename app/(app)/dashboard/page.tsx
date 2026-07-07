@@ -23,7 +23,7 @@ function buildTip(completed: Analysis[], avg: number | null): string {
     }
     return `You’re landing strong${avg != null ? ` — ${avg} average` : ''}. Keep the energy in your first 90 seconds and you’ll keep the room.`;
   }
-  return 'Upload a talk to see exactly where your audience leans in — and where they drift. That’s your edit list.';
+  return 'Run your first talk through the Speech Analyzer — it shows where the room leans in and where it drifts, so you know exactly what to tighten.';
 }
 
 export default async function HubPage() {

@@ -58,7 +58,7 @@ export function PersonalizationSummary() {
           <Sparkles className="h-4 w-4 text-muted" /> What the AI knows about you
         </h2>
         <p className="mt-0.5 text-xs text-muted">
-          Every tool — your SEO tips, Stage Finder, Content Ideas, keynote tailoring, the assistant —
+          Every tool — your SEO tips, Stage Finder, Content Ideas, keynote description tailoring, the assistant —
           reads this so its results fit you, not a generic speaker.
         </p>
       </div>

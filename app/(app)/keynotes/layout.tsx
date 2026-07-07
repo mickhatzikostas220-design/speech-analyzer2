@@ -10,7 +10,7 @@ export default async function KeynotesLayout({ children }: { children: React.Rea
   const supabase = createClient();
   const plan = await getUserPlan(supabase);
   if (planRank(plan) < planRank('core')) {
-    return <UpgradeWall required="core" feature="Keynote Tailoring" />;
+    return <UpgradeWall required="core" feature="Keynote Description Tailoring" />;
   }
   return <>{children}</>;
 }

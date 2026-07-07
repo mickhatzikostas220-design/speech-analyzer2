@@ -84,7 +84,7 @@ export const TOOLS: ToolMeta[] = [
   {
     key: 'keynote-tailoring',
     icon: GitBranch,
-    name: 'Keynote Tailoring',
+    name: 'Keynote Description Tailoring',
     desc: 'Store your keynote once, then spin up industry-specific versions that keep your voice and idea.',
     href: '/keynotes',
     bg: 'var(--accent-2)',
@@ -95,7 +95,7 @@ export const TOOLS: ToolMeta[] = [
     key: 'stage-finder',
     icon: Telescope,
     name: 'Stage Finder',
-    desc: 'Name speakers you admire and get the events they play — plus a tailored pitch for each stage.',
+    desc: 'Name speakers you admire and find events they’ve spoken at — plus a draft pitch to reach out.',
     href: '/stagefinder',
     bg: 'var(--red)',
     fg: '#fff',

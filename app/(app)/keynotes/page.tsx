@@ -25,7 +25,7 @@ export default async function KeynotesPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      <p className="eyebrow mb-2">Keynote Tailoring</p>
+      <p className="eyebrow mb-2">Keynote Description Tailoring</p>
       <h1 className="display-h1 mb-1">Tailor your keynote to any industry</h1>
       <p className="mb-8 text-muted">
         Store your keynote once, then spin up industry-specific versions on demand. The core idea and
