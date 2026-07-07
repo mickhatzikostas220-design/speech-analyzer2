@@ -26,7 +26,13 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 
     for (const seg of segments) {
       for (const clip of seg.clips ?? []) {
-        if (clip.clipPath && !pathToUrl.has(clip.clipPath)) {
+        // segments is client-writable (see PATCH) and the admin client bypasses
+        // Storage RLS, so only sign paths under this user's own prefix.
+        if (
+          clip.clipPath &&
+          String(clip.clipPath).startsWith(`${user.id}/`) &&
+          !pathToUrl.has(clip.clipPath)
+        ) {
           const { data } = await admin.storage.from('speeches').createSignedUrl(clip.clipPath, 3600);
           if (data?.signedUrl) pathToUrl.set(clip.clipPath, data.signedUrl);
         }

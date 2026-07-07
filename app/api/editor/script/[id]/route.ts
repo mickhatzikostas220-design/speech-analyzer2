@@ -32,7 +32,9 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const admin = createAdminClient();
     const clips: ScriptClip[] = await Promise.all(
       (project.clips as ScriptClip[]).map(async (clip) => {
-        if (!clip.path) return clip;
+        // clips is client-writable (see PATCH) and the admin client bypasses
+        // Storage RLS, so only sign paths under this user's own prefix.
+        if (!clip.path || !String(clip.path).startsWith(`${user.id}/`)) return clip;
         const { data } = await admin.storage
           .from('speeches')
           .createSignedUrl(clip.path, 3600);

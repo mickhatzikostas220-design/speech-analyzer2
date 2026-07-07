@@ -1,6 +1,7 @@
 import type { BrandKit } from './types';
 import { cloneDefaultBrand } from './defaults';
 import { normalizeHex, isNeutral, saturation, readableTextOn, hexToRgb } from './color';
+import { isBlockedHost, safeFetch } from '@/lib/net/ssrf';
 
 /**
  * Auto-extract a brand kit from a speaker's website. Pure server-side:
@@ -45,23 +46,17 @@ export function normalizeUrl(input: string): string {
   }
 }
 
-// Block obvious SSRF targets (localhost, link-local, private ranges). Applied to
-// stylesheet URLs pulled from the page markup, which we don't fully control.
-function isBlockedHost(host: string): boolean {
-  const h = host.toLowerCase();
-  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
-  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
-  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd')) return true;
-  return false;
-}
+// SSRF guard for the stylesheet URLs pulled from the returned page markup (which
+// we don't fully control). The primary page fetch and every redirect hop are
+// guarded by safeFetch (lib/net/ssrf), which also resolves and checks the IP a
+// hostname points at. `isBlockedHost` here is a cheap pre-filter so we don't even
+// queue an obviously-internal stylesheet URL.
 
 async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         // A normal browser UA — speakers ask us to read their own public
@@ -104,8 +99,7 @@ async function fetchTextCapped(url: string, maxBytes: number): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CSS_FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent':

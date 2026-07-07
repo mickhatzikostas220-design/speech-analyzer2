@@ -20,7 +20,10 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     if (error || !project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     let video_url: string | null = null;
-    if (project.video_path) {
+    // Only sign paths that live under this user's own storage prefix. video_path
+    // is client-writable (see PATCH), and the admin client bypasses Storage RLS,
+    // so without this check a user could have us sign another user's object.
+    if (project.video_path && String(project.video_path).startsWith(`${user.id}/`)) {
       const admin = createAdminClient();
       const { data } = await admin.storage
         .from('speeches')
@@ -75,7 +78,9 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
       .eq('user_id', user.id)
       .single();
 
-    if (project?.video_path) {
+    // Same guard as GET: only delete objects under this user's own prefix, since
+    // video_path is client-writable and the admin client bypasses Storage RLS.
+    if (project?.video_path && String(project.video_path).startsWith(`${user.id}/`)) {
       const admin = createAdminClient();
       await admin.storage.from('speeches').remove([project.video_path]);
     }
