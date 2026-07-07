@@ -19,7 +19,7 @@ export const FAQS: Faq[] = [
   },
   {
     q: 'Is there a free plan?',
-    a: 'Yes. The Free plan lets you analyze up to three talks a month, keep them in your Talk Library, and compare two talks — no credit card required.',
+    a: 'Yes. The Free plan lets you analyze your talks with no limit, keep them in your Talk Library, and compare two talks — no credit card required.',
   },
   {
     q: 'How does the AI analysis work?',

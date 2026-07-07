@@ -1,0 +1,44 @@
+# Speaker Hub
+
+> Speaker Hub is an all-in-one web app for professional and aspiring public speakers. It brings AI talk analysis, script writing, booking management, video clip creation, and brand tools together in one hub. Live at https://speaker-hub.com. Built and run by Mick Hatzikostas.
+
+Speaker Hub is a SaaS product — not an agency, a speaker bureau, or a marketplace. A speaker signs up, uploads a recording or transcript, and gets a moment-by-moment engagement map of the talk, plus tools to prepare, book, and promote the next one. Most of the workspace lives behind sign-in; the pages linked below are the public ones.
+
+- What it is: a web app (SaaS) for public speakers
+- Who it is for: keynote speakers, speaking coaches, founders, and anyone who presents on stage
+- Pricing: Free ($0/mo), Core Premium ($19/mo), Full Premium ($49/mo). Every plan is free during the current beta.
+- Contact: support@speaker-hub.com
+
+Tools inside the hub (sign-in required):
+
+- Speech Analyzer (free): upload a talk and get an AI engagement score plus the exact moments the room leaned in or drifted.
+- Talk Library (free): every analyzed talk, organized and ready to revisit.
+- Compare (free): put two talks side by side to see what actually moved the room.
+- SEO & AEO (free): drop in your website and get tips to rank on Google and get cited by AI answer engines.
+- Coaching Tips (free): a fresh, practical speaking tip every week.
+- Brand Kit (free): store your colors, logo, fonts, and voice so the hub stays on-brand.
+- Script Studio (Core): draft, sharpen, and rehearse a keynote in your own voice.
+- Talk Editor (Core): cut highlight reels and clips straight from recorded talks.
+- Booking Inbox (Core): track speaking requests from first message to a confirmed gig.
+- Keynote Description Tailoring (Core): store a keynote once, then spin up industry-specific versions.
+- Stage Finder (Core): find events that speakers you admire have spoken at, with a draft outreach pitch.
+- Content Ideas (Core): 20–30 blog, video, and short titles people actually search for, in your brand voice.
+- AI Assistant (Full): a personal agent that knows your talks, drafts emails, and connects your calendar and inbox.
+- ClipFlow (Full): auto-cut social-ready clips from a video or channel, then post them to your platforms.
+
+## Public pages
+- [Speaker Hub home](https://speaker-hub.com/): what it is, the full tool list, pricing, and FAQ.
+- [About the founder](https://speaker-hub.com/about): Mick Hatzikostas and why he built Speaker Hub.
+- [Sign up](https://speaker-hub.com/signup): create a free account.
+- [Log in](https://speaker-hub.com/login): access an existing account.
+
+## Full content for AI
+- [Full overview (index.md)](https://speaker-hub.com/index.md): a complete, plain-markdown description of Speaker Hub written for language models — product, every tool, pricing, FAQ, and company details in one file.
+
+## Policies
+- [Privacy Policy](https://speaker-hub.com/privacy): what data is collected and how it is handled.
+- [Terms of Service](https://speaker-hub.com/terms): the rules for using Speaker Hub.
+- [Cookie Policy](https://speaker-hub.com/cookies): the cookies and tracking used on the site.
+
+## Optional
+- [Support the site](https://speaker-hub.com/donate): optional donations that help keep Speaker Hub running.
