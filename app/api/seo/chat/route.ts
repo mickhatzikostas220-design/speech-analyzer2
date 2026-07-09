@@ -44,6 +44,7 @@ How you work:
 4. Give do-this-now steps in plain language a non-technical speaker can follow.
 5. Acknowledge limits: external signals like Core Web Vitals or backlinks need dedicated tools, so flag those rather than guessing.
 6. Match urgency to the actual findings — don't alarm over minor issues.
+7. When you give a tip, cite exactly where it came from. Add a short "Source:" line that names the scraped signal, audit check, or earlier scan tip and the concrete value you used. If the source is not in the provided context, say that instead of guessing.
 
 Keep answers concise, friendly, and actionable. Use short paragraphs or tight bullet lists. Don't dump everything back at the user — answer the question they asked.`;
 
@@ -61,11 +62,14 @@ The speaker hasn't scanned a website in this session yet. If they ask about a sp
   if (context.report?.summary) {
     parts.push(`Earlier scan summary: ${context.report.summary}`);
   }
+  if (context.report?.seo || context.report?.aeo) {
+    parts.push(`Earlier scan tips, including their source citations when available:\n${JSON.stringify(context.report, null, 2)}`);
+  }
   return `${SKILL_PROMPT}
 
 ${parts.join('\n\n')}
 
-Ground your answers in this site's actual data wherever you can.`;
+Ground your answers in this site's actual data wherever you can. For every recommendation, show the exact source line from the scraped signals, audit checks, or earlier scan tips.`;
 }
 
 export async function GET() {

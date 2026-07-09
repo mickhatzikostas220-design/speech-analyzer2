@@ -3,15 +3,15 @@
 // SeoChat: the premium SEO/GEO/AEO assistant that sits at the bottom of the SEO
 // tool. Free users see a locked upgrade card; paid users can chat about their
 // website. It streams answers from /api/seo/chat and passes along the most
-// recent scan (url + on-page signals + summary) so the bot can reference real
-// data about the speaker's site.
+// recent scan (url + on-page signals + sourced tips) so the bot can reference
+// real data about the speaker's site.
 import { useEffect, useRef, useState } from 'react';
 import { MessageSquare, Lock, Sparkles } from 'lucide-react';
 
 interface SiteContext {
   url?: string;
   signals?: Record<string, unknown> | null;
-  report?: { summary?: string } | null;
+  report?: { summary?: string; seo?: unknown[]; aeo?: unknown[] } | null;
 }
 
 interface ChatMessage {

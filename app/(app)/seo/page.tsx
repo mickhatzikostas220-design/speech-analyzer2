@@ -14,6 +14,8 @@ import type { AuditResult, AuditCheck } from '@/lib/seo/audit';
 interface TipItem {
   title: string;
   detail: string;
+  /** Exact scraped/audited evidence behind this recommendation. */
+  source?: string;
   severity: 'high' | 'medium' | 'low';
   steps: string[];
   /** Optional ready-to-paste artifact (JSON-LD, HTML, llms.txt, …). */
@@ -84,7 +86,12 @@ function TipCard({ tip, canSave }: { tip: TipItem; canSave: boolean }) {
 
   async function save() {
     setState('saving');
-    const body = [tip.detail, '', ...tip.steps.map((s, i) => `${i + 1}. ${s}`)].join('\n');
+    const body = [
+      tip.detail,
+      ...(tip.source ? ['', `Source: ${tip.source}`] : []),
+      '',
+      ...tip.steps.map((s, i) => `${i + 1}. ${s}`),
+    ].join('\n');
     try {
       const res = await fetch('/api/tips', {
         method: 'POST',
@@ -107,6 +114,11 @@ function TipCard({ tip, canSave }: { tip: TipItem; canSave: boolean }) {
         </span>
       </div>
       <p className="text-sm text-muted">{tip.detail}</p>
+      {tip.source && (
+        <p className="mt-2 rounded-[var(--radius-sm)] bg-[var(--surface-sunk)] px-3 py-2 text-xs leading-snug text-muted">
+          <span className="font-bold text-strong">Source:</span> {tip.source}
+        </p>
+      )}
 
       {tip.steps?.length > 0 && (
         <ol className="mt-3 space-y-1.5">

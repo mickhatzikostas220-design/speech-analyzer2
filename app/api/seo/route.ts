@@ -19,6 +19,8 @@ const SEVERITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
 interface SeoTip {
   title: string;
   detail: string;
+  /** Exact scraped/audited evidence behind this recommendation. */
+  source?: string;
   severity: 'high' | 'medium' | 'low';
   steps: string[];
   /**
@@ -301,11 +303,25 @@ export async function POST(request: NextRequest) {
   // findings so the advice can't read as random.
   const audit = scoreSignals(signals as Record<string, unknown>);
   const auditBlock = auditToPromptBlock(audit);
+  const sourceOptions = [
+    ...audit.checks.map((check) => `Audit check: ${check.label} - ${check.found}`),
+    `On-page signal: url - ${url}`,
+    `On-page signal: title - ${signals.title || 'missing'}`,
+    `On-page signal: metaDescription - ${signals.metaDescription || 'missing'}`,
+    `On-page signal: firstH1 - ${signals.firstH1 || 'missing'}`,
+    `On-page signal: h2Samples - ${signals.h2Samples.length ? signals.h2Samples.join(' | ') : 'none'}`,
+    `On-page signal: questionHeadings - ${signals.questionHeadings.length ? signals.questionHeadings.join(' | ') : 'none'}`,
+    `On-page signal: jsonLdTypes - ${signals.jsonLdTypes.length ? signals.jsonLdTypes.join(', ') : 'none'}`,
+    `On-page signal: socialProfiles - ${signals.socialProfiles.length ? signals.socialProfiles.join(', ') : 'none'}`,
+  ];
 
   const prompt = `You are a senior SEO + AEO/GEO strategist advising a PUBLIC SPEAKER on their website. AEO/GEO = getting cited and recommended by AI answer engines (ChatGPT, Perplexity, Google AI Overviews, Gemini). The speaker's goal is to get booked — so "found by an event organizer or an AI that an organizer asks" matters as much as classic Google ranking.
 
 ON-PAGE SIGNALS scraped from ${url}:
 ${JSON.stringify(signals, null, 2)}
+
+SOURCE OPTIONS - each tip's "source" field MUST copy one of these lines verbatim:
+${sourceOptions.map((source) => `- ${source}`).join('\n')}
 
 WHAT THIS PAGE ALREADY DOES WELL — you MUST NOT recommend adding or enabling any of these; treat them as done:
 ${alreadyGood.length ? alreadyGood.map((s) => `- ${s}`).join('\n') : '- (nothing detected as already in place)'}${memoryBlock}${auditBlock ? `\n\n${auditBlock}` : ''}
@@ -313,6 +329,7 @@ ${alreadyGood.length ? alreadyGood.map((s) => `- ${s}`).join('\n') : '- (nothing
 HARD RULES:
 - Never recommend something the signals show already exists. If you're not sure from the data, don't assume it's missing.
 - Every tip must reference THIS page's actual data (its real title, headings, word count, schema types, question headings, linked profiles). No boilerplate that would read the same for any website.
+- Every tip must include a "source" field that cites exactly where the tip came from. Copy one SOURCE OPTIONS line verbatim. Do not cite a vague source like "website scan" or "SEO best practice."
 - Be specific to a speaker: their bio/credentials (E-E-A-T), their talk topics as entities, the exact questions an event organizer or attendee would ask an AI ("who is a good keynote speaker on X?").
 - If we know who this speaker is (the "WHO THIS SPEAKER IS" block above), personalize hard: target their actual talk topics as keywords/entities, pre-fill schema (name, jobTitle, knowsAbout) with what we know, quote their real bio/voice, and prioritize the fixes that best serve their goals. Do NOT give advice that ignores who they are.
 
@@ -332,8 +349,8 @@ Every tip MUST include "steps": 3–5 short, concrete, do-this-now instructions 
 Respond with ONLY valid JSON in this exact shape:
 {
   "summary": "two or three sentences: how discoverable this page is today for a speaker, and the single biggest opportunity",
-  "seo": [{ "title": "short tip", "detail": "why it matters for THIS page", "severity": "high" | "medium" | "low", "steps": ["step 1", "step 2", "step 3"] }],
-  "aeo": [{ "title": "short tip", "detail": "why it matters for getting cited by AI", "severity": "high" | "medium" | "low", "steps": ["step 1", "step 2", "step 3"], "code": "ready-to-paste artifact when relevant, else omit", "codeLang": "json|html|text when code is present" }]
+  "seo": [{ "title": "short tip", "detail": "why it matters for THIS page", "source": "exact on-page signal or audit check with the found value", "severity": "high" | "medium" | "low", "steps": ["step 1", "step 2", "step 3"] }],
+  "aeo": [{ "title": "short tip", "detail": "why it matters for getting cited by AI", "source": "exact on-page signal or audit check with the found value", "severity": "high" | "medium" | "low", "steps": ["step 1", "step 2", "step 3"], "code": "ready-to-paste artifact when relevant, else omit", "codeLang": "json|html|text when code is present" }]
 }
 Aim for 3–5 items in each array. No markdown, no code fences around the whole response.`;
 
