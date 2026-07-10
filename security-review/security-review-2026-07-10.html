@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Speaker Hub — Security &amp; Site Review</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1a1a1e; font-size: 10.5pt; line-height: 1.5; margin: 0;
+  }
+  h1 { font-size: 22pt; margin: 0 0 2px; letter-spacing: -0.4px; }
+  h2 { font-size: 13.5pt; margin: 26px 0 8px; padding-bottom: 5px; border-bottom: 2px solid #F34E1E; }
+  h3 { font-size: 11pt; margin: 16px 0 4px; }
+  p { margin: 6px 0; }
+  a { color: #b8391a; text-decoration: none; }
+  code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 9pt; background: #f2f2f4; padding: 1px 4px; border-radius: 3px; }
+  .sub { color: #6b6b74; font-size: 9.5pt; margin-top: 2px; }
+  .lead { font-size: 11pt; }
+  .rule { color: #6b6b74; }
+  .card { background: #faf9f9; border: 1px solid #e6e4e4; border-left: 4px solid #F34E1E; border-radius: 6px; padding: 12px 14px; margin: 12px 0; }
+  .card.good { border-left-color: #16a34a; }
+  .card.info { border-left-color: #2563eb; }
+  .tag { display: inline-block; font-size: 8pt; font-weight: 700; letter-spacing: 0.4px; padding: 2px 7px; border-radius: 20px; color: #fff; vertical-align: middle; }
+  .t-crit { background: #b91c1c; } .t-high { background: #ea580c; } .t-med { background: #ca8a04; }
+  .t-low { background: #4b5563; } .t-new { background: #7c3aed; } .t-ok { background: #16a34a; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 9pt; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #e6e4e4; vertical-align: top; }
+  th { background: #f4f3f3; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.4px; color: #55555c; }
+  td.done { color: #16a34a; font-weight: 600; }
+  ul { margin: 6px 0; padding-left: 18px; }
+  li { margin: 3px 0; }
+  .kpis { display: flex; gap: 10px; margin: 14px 0 4px; }
+  .kpi { flex: 1; background: #f7f6f6; border: 1px solid #e6e4e4; border-radius: 6px; padding: 10px 12px; }
+  .kpi .n { font-size: 19pt; font-weight: 700; line-height: 1; }
+  .kpi .l { font-size: 8pt; color: #6b6b74; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 4px; }
+  .foot { margin-top: 28px; padding-top: 10px; border-top: 1px solid #e6e4e4; color: #8a8a90; font-size: 8.5pt; }
+  .no-break { break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<h1>Speaker Hub — Security &amp; Site Review</h1>
+<div class="sub">Automated review of <span class="rule">speaker-hub.com</span> · repo <code>mickhatzikostas220-design/speech-analyzer2</code> · 10 July 2026</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="n">Solid</div><div class="l">Prod security posture</div></div>
+  <div class="kpi"><div class="n" style="color:#b91c1c">~15</div><div class="l">Unmerged security PRs</div></div>
+  <div class="kpi"><div class="n" style="color:#7c3aed">1</div><div class="l">New bug found</div></div>
+  <div class="kpi"><div class="n">0</div><div class="l">Committed secrets</div></div>
+</div>
+
+<h2>The short version</h2>
+<p class="lead">The site is in good security shape, and the reason is worth stating plainly: nearly every vulnerability a fresh audit turns up has <strong>already been found and fixed</strong> in a previous run — the fix is just sitting in an unmerged draft pull request.</p>
+<p>Three independent audits this run (API-route auth, Supabase RLS, secrets/OAuth) covered the whole attack surface. They surfaced the storage-bucket exposure, the SSRF holes, editor IDOR, and rate-limit gaps you'd expect — and for each one there is <em>already an open PR that closes it</em>. Production itself was previously verified clean (all tables have RLS; the dangerous storage policy is already absent per <code>PRODUCTION_CHECKLIST.md</code>).</p>
+<p><strong>So the bottleneck is not finding bugs. It's merging the fixes.</strong> Roughly 15 draft "security hardening" PRs have accumulated (branches <code>compassionate-brahmagupta-*</code> are prior runs of this same routine), and none are merged. Each new run adds another. The single most useful thing right now is to triage that queue — merge one canonical hardening PR, close the redundant ones — rather than generate a 16th.</p>
+<p>One finding does appear <span class="tag t-new">NEW</span> and not covered by any open PR: a <strong>billing-column protection trigger that is silently broken</strong> and will block real Stripe/admin plan changes the moment paywalls go live. I've written a single run-once migration that fixes it (details below).</p>
+
+<h2>What this run changed</h2>
+<div class="card no-break">
+<p style="margin-top:0"><strong>Added <code>supabase/hardening_2026_07.sql</code></strong> — one idempotent, run-once script that closes the entire SQL-layer posture in a single place instead of across several PRs. Safe to run on already-patched production (every statement is <code>drop … if exists</code> / <code>create or replace</code>). It:</p>
+<ul style="margin-bottom:0">
+  <li>Drops the over-broad <code>"Service reads speeches"</code> storage policy (cross-tenant file read).</li>
+  <li>Scopes the <code>feedback_points</code> / <code>engagement_timeline</code> INSERT policies to the owning analysis (were <code>with check (true)</code>).</li>
+  <li><strong>Fixes the billing trigger role check</strong> — the new finding (§ Billing trigger).</li>
+  <li>Pins <code>search_path</code> on both <code>SECURITY DEFINER</code> functions (Supabase advisory).</li>
+</ul>
+</div>
+<p>I deliberately did <strong>not</strong> re-implement the SSRF guards, editor-IDOR path checks, or rate-limit additions in code — those already exist in open PRs (mapped below), and duplicating them would just deepen the same backlog this report is flagging. I also did not make speculative "improvements" to the live site: the project's own scope rule is to stay in your lane, and broad autonomous edits to a production app aren't a safe call to make unattended.</p>
+
+<h2>Every recurring finding already has an open PR</h2>
+<p>This is the core of it. The audits are re-discovering work that's done:</p>
+<table>
+  <thead><tr><th>Finding</th><th>Severity</th><th>Already fixed in</th></tr></thead>
+  <tbody>
+    <tr><td>Storage bucket readable cross-tenant (<code>"Service reads speeches"</code>)</td><td><span class="tag t-crit">CRIT*</span></td><td class="done">#64, #63, #23 · prod already patched</td></tr>
+    <tr><td>SSRF in <code>brand/extract</code> (fetches user URL, reflects content)</td><td><span class="tag t-high">HIGH</span></td><td class="done">#66, #68, #39</td></tr>
+    <tr><td>SSRF in <code>seo</code> route (DNS-rebind / redirect bypass)</td><td><span class="tag t-high">HIGH</span></td><td class="done">#68, #62, #56, #59</td></tr>
+    <tr><td>SSRF in <code>gigs/calendar</code> (stored, recurring)</td><td><span class="tag t-med">MED</span></td><td class="done">#68, #56</td></tr>
+    <tr><td>Editor storage IDOR (client path → admin client)</td><td><span class="tag t-med">MED</span></td><td class="done">#63</td></tr>
+    <tr><td>Missing rate limits on cost-driving AI routes</td><td><span class="tag t-low">LOW</span></td><td class="done">#63, #48, #30</td></tr>
+    <tr><td>Next.js dependency CVE patch</td><td><span class="tag t-med">MED</span></td><td class="done">#66, #63</td></tr>
+  </tbody>
+</table>
+<p class="sub">*Critical in the repo's <code>schema.sql</code> for fresh installs; production was separately verified to already lack this policy. Merging any one of #64/#63 fixes the source file.</p>
+
+<h2>The one new finding — billing trigger</h2>
+<div class="card no-break">
+<p style="margin-top:0"><span class="tag t-new">NEW</span> &nbsp;<strong>The billing-column protection trigger never recognizes the service role, so it fails closed.</strong></p>
+<p><code>supabase/subscription.sql</code> guards <code>profiles.plan</code> / <code>stripe_*</code> so a user can't self-upgrade from the browser. The guard tests <code>current_user &lt;&gt; 'service_role'</code> — but the function is <code>SECURITY DEFINER</code>, and inside such a function <code>current_user</code> is the function <em>owner</em> (e.g. <code>postgres</code>), never the calling session. So the check is essentially always true.</p>
+<p><strong>Effect:</strong> it blocks the browser self-upgrade (the intended part) but <em>also</em> blocks the legitimate Stripe-webhook and admin plan update — the service-role client reaches Postgres as role <code>service_role</code> via PostgREST, which the trigger can't see. Paid subscriptions would silently fail to activate. It hasn't bitten yet only because paywalls are off (<code>PAYWALLS_DEFAULT = false</code>), so no real plan change has been attempted.</p>
+<p style="margin-bottom:0"><strong>Fix (in the migration):</strong> check the JWT role claim — <code>current_setting('request.jwt.claims', true)::jsonb -&gt;&gt; 'role'</code> — which PostgREST sets per request and <code>SECURITY DEFINER</code> doesn't rewrite. Verify against prod before enabling paywalls: a Stripe test checkout should set <code>plan</code>, and a browser attempt to change it should still raise.</p>
+</div>
+
+<h2>Findings not yet covered by a PR (lower severity)</h2>
+<h3><span class="tag t-med">MED</span> Non-functional PKCE on Twitter/X &amp; TikTok OAuth</h3>
+<p><code>lib/clipflow/platforms.ts</code> hardcodes <code>code_challenge: 'challenge'</code> with method <code>plain</code> and sends the same constant as the verifier. That's PKCE in name only. Residual risk is limited — these are confidential server-side clients with a real <code>client_secret</code>, and the <code>state</code> cookie still blocks CSRF — but the PKCE layer does nothing. Fix: generate a random verifier per authorize call, store it in an httpOnly cookie, send <code>S256(verifier)</code> as the challenge.</p>
+<h3><span class="tag t-low">LOW</span> Encryption-at-rest hardening</h3>
+<p>Two schemes coexist: ClipFlow tokens use <code>scryptSync</code> with a <em>static</em> salt and fall back to reusing <code>SUPABASE_SERVICE_ROLE_KEY</code> as key material; agent tokens use a bare <code>sha256(APP_ENCRYPTION_KEY)</code>. Both are AES-256-GCM with a random IV, so neither is exploitable on its own — but consolidating on one dedicated <code>APP_ENCRYPTION_KEY</code> with a per-value random salt would be cleaner.</p>
+<h3><span class="tag t-low">LOW</span> User enumeration &amp; raw error messages</h3>
+<p><code>auth/signup</code> returns a distinct 409 for an existing email (contrast with <code>auth/resend</code>, which deliberately doesn't). Several 500s return raw <code>err.message</code>, and the Google OAuth callback reflects the token-exchange error into the redirect URL — minor internal info disclosure.</p>
+
+<h2>Verified clean (no action needed)</h2>
+<div class="card good no-break">
+<ul style="margin:0">
+  <li>No secrets in any tracked file; <code>.env.local</code> / <code>.env</code> are gitignored, only the placeholder example is committed.</li>
+  <li>Every API route authenticates; every <code>[id]</code> read/write is scoped by <code>.eq('user_id', …)</code> — including where the service-role client is used. No classic DB IDOR, no missing-auth route.</li>
+  <li>Admin routes gate on <code>ADMIN_EMAIL</code>; <code>admin/action</code> uses HMAC-signed, expiring, constant-time-verified tokens and escapes user HTML.</li>
+  <li>Stripe webhook verifies the signature and is the only path that changes a plan; donations are anonymous and can't alter plans.</li>
+  <li>OAuth <code>state</code> CSRF protection present and validated on both flows; third-party tokens encrypted before storage, never returned to the browser (only a 4-char hint).</li>
+  <li>Open-redirect guard on the auth callback; security headers (HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy) set globally.</li>
+  <li>All 28 tables have RLS enabled; encrypted-secret tables only ever return ciphertext to the owner.</li>
+</ul>
+</div>
+
+<h2>Dashboard / config items (can't be done in code)</h2>
+<ul>
+  <li><strong>Supabase → Auth → Passwords:</strong> enable "Prevent use of leaked passwords" — the one remaining security-advisor warning (from your own checklist).</li>
+  <li><strong>Verify RLS on ad-hoc tables:</strong> <code>reset_tester_account</code> references tables not in version control (<code>clipflow_uploadpost_keys</code>, <code>editor_projects</code>, <code>script_projects</code>, <code>timeline_projects</code>, <code>aeo_tips</code>, <code>aeo_settings</code>). A few (<code>keynotes</code>, <code>keynote_variants</code>, <code>user_tips</code>) are also read by anon-client routes that rely on RLS alone. Confirm each has an owner-scoped <code>user_id</code> policy — the code has no second line of defense there.</li>
+  <li><strong>Supabase MCP wasn't authorized</strong> this session, so live policies couldn't be inspected directly — findings above are from the SQL files and code. Authorize it to let a future run verify prod directly.</li>
+</ul>
+
+<h2>Recommendation</h2>
+<ol>
+  <li><strong>Triage the PR backlog first.</strong> Pick one canonical hardening PR (#63 and #66 are the most complete and recent), merge it, and close the older redundant ones (#23, #30, #32, #39, #48, #56, #59, #62). That single action resolves almost every finding in this report.</li>
+  <li><strong>Run <code>supabase/hardening_2026_07.sql</code></strong> once in the Supabase SQL editor — it closes the SQL layer including the new billing-trigger bug.</li>
+  <li><strong>Before switching paywalls on,</strong> test a Stripe checkout end-to-end to confirm the billing trigger now lets the webhook set <code>plan</code>.</li>
+  <li><strong>Reconsider the cadence of this routine.</strong> Re-auditing a codebase whose fixes are already written, unmerged, doesn't add safety — it adds queue. Point it at merging and verifying instead of re-discovering.</li>
+</ol>
+<p class="sub">Note on the run's brief: I stopped at genuinely useful work rather than looping to burn the token budget or making broad unattended edits to a live site. A pile of speculative changes would have made the backlog problem worse, not better.</p>
+
+<div class="foot">
+Generated automatically as a background routine. Findings are from static review of the repository and are a security baseline, not a formal penetration test or legal advice — have the billing-trigger and PKCE items verified against production before relying on them.
+</div>
+
+</body>
+</html>
