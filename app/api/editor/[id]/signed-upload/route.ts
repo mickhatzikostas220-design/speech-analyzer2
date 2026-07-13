@@ -19,6 +19,17 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (!/^[A-Za-z0-9_-]{1,64}$/.test(params.id)) {
       return NextResponse.json({ error: 'Invalid project id' }, { status: 400 });
     }
+
+    // Confirm the project belongs to the caller before minting a signed upload
+    // URL (defense-in-depth; the key is already namespaced to user.id).
+    const { data: project } = await supabase
+      .from('editor_projects')
+      .select('id')
+      .eq('id', params.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+
     const ext =
       (String(fileName).split('.').pop() ?? '')
         .toLowerCase()

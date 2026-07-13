@@ -62,6 +62,11 @@ export async function POST(request: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session;
         // Donations are anonymous gifts, never plan changes — ignore them.
         if (session.metadata?.kind === 'donation') break;
+        // Only grant on a genuinely-paid session. Some payment methods fire
+        // checkout.session.completed while still 'unpaid' (async settlement);
+        // for those, the authoritative customer.subscription.* event grants the
+        // plan once payment clears, so we don't hand out access prematurely.
+        if (session.payment_status === 'unpaid') break;
         const userId = await resolveUserId(
           session.metadata?.user_id,
           typeof session.customer === 'string' ? session.customer : null

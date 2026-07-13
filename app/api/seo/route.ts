@@ -3,6 +3,7 @@
 // Uses the OpenAI key already configured for the rest of the app.
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeUrl, BrandExtractError } from '@/lib/brand/extract';
+import { safeFetch, assertPublicUrl, BlockedUrlError } from '@/lib/safeFetch';
 import { createClient } from '@/lib/supabase/server';
 import { getUserPlan } from '@/lib/subscription/server';
 import { isPlatform, platformLabel } from '@/lib/seo/platforms';
@@ -38,22 +39,13 @@ export const maxDuration = 60;
 const FETCH_TIMEOUT_MS = 9000;
 const MAX_HTML_BYTES = 700_000;
 
-// Block obvious SSRF targets (localhost, link-local, private ranges).
-function isBlockedHost(host: string): boolean {
-  const h = host.toLowerCase();
-  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
-  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
-  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd')) return true;
-  return false;
-}
-
 async function fetchHtml(url: string): Promise<{ html: string; xRobotsTag: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    // safeFetch validates the target (and every redirect hop) against private/
+    // loopback/link-local IP ranges before connecting — see lib/safeFetch.ts.
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent':
@@ -82,7 +74,7 @@ async function fetchRobotsInfo(origin: string): Promise<{ hasRobotsTxt: boolean;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    const res = await fetch(`${origin}/robots.txt`, { redirect: 'follow', signal: controller.signal });
+    const res = await safeFetch(`${origin}/robots.txt`, { signal: controller.signal }, { maxRedirects: 2 });
     if (!res.ok) return { hasRobotsTxt: false, declaresSitemap: false };
     const text = (await res.text()).slice(0, 50_000);
     return { hasRobotsTxt: true, declaresSitemap: /^\s*sitemap\s*:/im.test(text) };
@@ -254,8 +246,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  if (isBlockedHost(new URL(url).hostname)) {
-    return NextResponse.json({ error: 'That address is not allowed.' }, { status: 400 });
+  try {
+    await assertPublicUrl(url);
+  } catch (err) {
+    const msg = err instanceof BlockedUrlError ? err.message : 'That address is not allowed.';
+    return NextResponse.json({ error: msg }, { status: 400 });
   }
 
   const origin = new URL(url).origin;

@@ -19,6 +19,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (!/^[A-Za-z0-9_-]{1,64}$/.test(params.id)) {
       return NextResponse.json({ error: 'Invalid project id' }, { status: 400 });
     }
+
+    // Confirm the project belongs to the caller before touching storage. The key
+    // is already namespaced to user.id, so this is defense-in-depth, but it keeps
+    // uploads from landing under an id the user doesn't own.
+    const { data: project } = await supabase
+      .from('editor_projects')
+      .select('id')
+      .eq('id', params.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+
     const ext =
       (file.name.split('.').pop() ?? '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10) ||
       'mp4';
