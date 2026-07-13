@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createChatCompletion } from '@/lib/ai-config';
 import { getPersonaContext } from '@/lib/personalization/context';
 import { saveToolRun } from '@/lib/toolRuns/store';
+import { rateLimit } from '@/lib/rateLimit';
 
 // Created lazily inside the handler — instantiating at module scope throws
 // when OPENAI_API_KEY is missing during `next build`, which breaks the build.
@@ -21,6 +22,15 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
+  }
+
+  // Throttle per user — each call spends GPT-4o tokens.
+  const limit = rateLimit(`compare-report:${user.id}`, 15, 10 * 60 * 1000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please wait a few minutes.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
+    );
   }
 
   let body: Record<string, unknown>;

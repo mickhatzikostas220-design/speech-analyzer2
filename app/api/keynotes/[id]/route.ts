@@ -14,11 +14,13 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
 
-  // RLS limits both queries to rows the signed-in user owns.
+  // RLS limits both queries to rows the signed-in user owns; the explicit
+  // user_id filter is a second layer so an accidental RLS change can't leak.
   const { data: keynote, error } = await supabase
     .from('keynotes')
     .select('*')
     .eq('id', params.id)
+    .eq('user_id', user.id)
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!keynote) return NextResponse.json({ error: 'Keynote not found.' }, { status: 404 });
@@ -69,6 +71,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     .from('keynotes')
     .update(update)
     .eq('id', params.id)
+    .eq('user_id', user.id)
     .select()
     .maybeSingle();
 
@@ -84,7 +87,11 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
 
-  const { error } = await supabase.from('keynotes').delete().eq('id', params.id);
+  const { error } = await supabase
+    .from('keynotes')
+    .delete()
+    .eq('id', params.id)
+    .eq('user_id', user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

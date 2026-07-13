@@ -13,8 +13,13 @@ export async function DELETE(
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
 
-  // RLS restricts the delete to variants the signed-in user owns.
-  const { error } = await supabase.from('keynote_variants').delete().eq('id', params.variantId);
+  // RLS restricts the delete to variants the signed-in user owns; the explicit
+  // user_id filter is a second layer in case RLS is ever changed.
+  const { error } = await supabase
+    .from('keynote_variants')
+    .delete()
+    .eq('id', params.variantId)
+    .eq('user_id', user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
