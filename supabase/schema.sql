@@ -62,17 +62,25 @@ create policy "Users insert own analyses" on analyses for insert with check (aut
 create policy "Users update own analyses" on analyses for update using (auth.uid() = user_id);
 create policy "Users delete own analyses" on analyses for delete using (auth.uid() = user_id);
 
--- Feedback points — readable by owner, writable by service role (API routes)
+-- Feedback points — scoped to the owning analysis for every action.
+-- NOTE: the service-role client (used by the API routes that write these rows)
+-- bypasses RLS entirely, so there is no need for a `with check (true)` insert
+-- policy — and such a policy would let any signed-in user insert feedback rows
+-- against another user's analysis. Insert is therefore owner-scoped too.
 create policy "Users view own feedback" on feedback_points for select using (
   analysis_id in (select id from analyses where user_id = auth.uid())
 );
-create policy "Service inserts feedback" on feedback_points for insert with check (true);
+create policy "Owners insert own feedback" on feedback_points for insert with check (
+  analysis_id in (select id from analyses where user_id = auth.uid())
+);
 
--- Engagement timeline
+-- Engagement timeline — same reasoning as feedback_points above.
 create policy "Users view own timeline" on engagement_timeline for select using (
   analysis_id in (select id from analyses where user_id = auth.uid())
 );
-create policy "Service inserts timeline" on engagement_timeline for insert with check (true);
+create policy "Owners insert own timeline" on engagement_timeline for insert with check (
+  analysis_id in (select id from analyses where user_id = auth.uid())
+);
 
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()
@@ -102,6 +110,7 @@ create policy "Users read own speeches" on storage.objects for select using (
 create policy "Users delete own speeches" on storage.objects for delete using (
   bucket_id = 'speeches' and auth.uid()::text = (storage.foldername(name))[1]
 );
-create policy "Service reads speeches" on storage.objects for select using (
-  bucket_id = 'speeches'
-);
+-- NOTE: do NOT add a blanket `for select using (bucket_id = 'speeches')` policy.
+-- The API reads speeches with the service-role client, which bypasses RLS, so
+-- it doesn't need one — and a blanket policy would let ANY signed-in user read
+-- EVERY user's uploaded speech. Read access stays owner-scoped above.

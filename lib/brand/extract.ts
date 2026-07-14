@@ -1,6 +1,7 @@
 import type { BrandKit } from './types';
 import { cloneDefaultBrand } from './defaults';
 import { normalizeHex, isNeutral, saturation, readableTextOn, hexToRgb } from './color';
+import { safeFetch, BlockedHostError } from '@/lib/net/ssrf';
 
 /**
  * Auto-extract a brand kit from a speaker's website. Pure server-side:
@@ -60,8 +61,9 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    // safeFetch validates the host (and every redirect hop) against private/
+    // internal ranges before connecting — the user controls this URL.
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         // A normal browser UA — speakers ask us to read their own public
@@ -91,6 +93,9 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
     return { html, finalUrl: res.url || url };
   } catch (err) {
     if (err instanceof BrandExtractError) throw err;
+    if (err instanceof BlockedHostError) {
+      throw new BrandExtractError("That address isn't allowed. Enter your public website.");
+    }
     throw new BrandExtractError(
       "Couldn't reach that website. Check the address, or set your brand by hand."
     );
@@ -104,8 +109,7 @@ async function fetchTextCapped(url: string, maxBytes: number): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CSS_FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent':
