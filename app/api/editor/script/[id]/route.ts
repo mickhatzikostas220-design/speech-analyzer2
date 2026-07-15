@@ -32,7 +32,9 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const admin = createAdminClient();
     const clips: ScriptClip[] = await Promise.all(
       (project.clips as ScriptClip[]).map(async (clip) => {
-        if (!clip.path) return clip;
+        // `clips` is user-writable (PATCH allow-list), so only sign paths inside
+        // the caller's own folder — never a path they could aim at another user.
+        if (!clip.path || !String(clip.path).startsWith(`${user.id}/`)) return clip;
         const { data } = await admin.storage
           .from('speeches')
           .createSignedUrl(clip.path, 3600);

@@ -48,13 +48,24 @@ export async function enqueue(
   return data.id;
 }
 
-/** Claim up to `limit` due jobs, flipping them to running. */
-export async function claimDueJobs(admin: SupabaseClient, limit = 5): Promise<Job[]> {
-  const { data: due } = await admin
+/**
+ * Claim up to `limit` due jobs, flipping them to running. Pass `userId` to
+ * claim only that user's jobs — used when a signed-in user flushes their own
+ * queue, so one user can never drain (or trigger work for) another user's jobs.
+ * The cron drain omits it to process the whole queue.
+ */
+export async function claimDueJobs(
+  admin: SupabaseClient,
+  limit = 5,
+  userId?: string
+): Promise<Job[]> {
+  let query = admin
     .from('clipflow_jobs')
     .select('*')
     .eq('status', 'queued')
-    .lte('run_after', new Date().toISOString())
+    .lte('run_after', new Date().toISOString());
+  if (userId) query = query.eq('user_id', userId);
+  const { data: due } = await query
     .order('run_after', { ascending: true })
     .limit(limit);
 

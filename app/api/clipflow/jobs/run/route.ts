@@ -17,14 +17,18 @@ export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const cronAuthorized = cronSecret && authHeader === `Bearer ${cronSecret}`;
 
+  // A signed-in user may only flush their OWN queued work. The cron drain
+  // (valid CRON_SECRET) processes every user's jobs.
+  let scopeUserId: string | undefined;
   if (!cronAuthorized) {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    scopeUserId = user.id;
   }
 
   const admin = createAdminClient();
-  const jobs = await claimDueJobs(admin, 5);
+  const jobs = await claimDueJobs(admin, 5, scopeUserId);
 
   const results = await Promise.all(
     jobs.map(async (job) => {

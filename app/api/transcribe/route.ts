@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { rateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
+
+// Transcription runs on billed compute (OpenAI Whisper, per-minute) or the
+// Parakeet GPU server, so cap request size and rate to blunt cost abuse.
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // 25 MB — matches OpenAI Whisper's limit
+const ALLOWED_AUDIO_PREFIXES = ['audio/', 'video/']; // clips arrive as either
 // Allow headroom for a Parakeet cold start (Vercel Pro honors up to 300s; Hobby
 // caps at 60s, in which case keep a warm Modal container via min_containers=1).
 export const maxDuration = 300;
@@ -13,9 +19,30 @@ export async function POST(request: NextRequest) {
     if (authErr) return NextResponse.json({ error: `Auth: ${authErr.message}` }, { status: 401 });
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Burst guard on expensive per-minute transcription compute.
+    const rl = rateLimit(`transcribe:${user.id}`, 20, 60_000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: 'Too many transcription requests — please wait a moment and try again.', code: 'rate_limited' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+      );
+    }
+
     const formData = await request.formData();
     const audio = formData.get('audio') as Blob | null;
     if (!audio) return NextResponse.json({ error: 'No audio provided' }, { status: 400 });
+    if (audio.size > MAX_AUDIO_BYTES) {
+      return NextResponse.json(
+        { error: 'Audio is too large. Keep clips under 25 MB.' },
+        { status: 413 }
+      );
+    }
+    if (audio.type && !ALLOWED_AUDIO_PREFIXES.some((p) => audio.type.startsWith(p))) {
+      return NextResponse.json(
+        { error: 'That file type is not supported. Upload an audio or video clip.' },
+        { status: 415 }
+      );
+    }
 
     // Prefer the self-hosted Parakeet (parakeet-tdt-0.6b-v3) GPU server when
     // configured; otherwise fall back to OpenAI Whisper. Both return the same
