@@ -20,7 +20,10 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     if (error || !project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     let video_url: string | null = null;
-    if (project.video_path) {
+    // Only ever sign a path inside the caller's own folder. video_path is a
+    // user-writable column (see PATCH allow-list), so without this guard a user
+    // could PATCH it to another user's storage key and get a signed URL for it.
+    if (project.video_path && String(project.video_path).startsWith(`${user.id}/`)) {
       const admin = createAdminClient();
       const { data } = await admin.storage
         .from('speeches')

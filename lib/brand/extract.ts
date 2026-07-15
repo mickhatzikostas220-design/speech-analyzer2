@@ -46,14 +46,29 @@ export function normalizeUrl(input: string): string {
 }
 
 // Block obvious SSRF targets (localhost, link-local, private ranges). Applied to
-// stylesheet URLs pulled from the page markup, which we don't fully control.
+// the user-supplied entry URL, every stylesheet URL we scrape, AND the final URL
+// after redirects — a public host can 302 us onto an internal one, so checking
+// only the initial host isn't enough.
 function isBlockedHost(host: string): boolean {
-  const h = host.toLowerCase();
+  const h = host.toLowerCase().replace(/^\[|\]$/g, ''); // strip IPv6 brackets
   if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
   if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return true;
   if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
-  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd')) return true;
+  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80')) return true;
   return false;
+}
+
+/** Throws BrandExtractError if a URL points at a blocked (internal) host. */
+function assertPublicUrl(rawUrl: string): void {
+  let host: string;
+  try {
+    host = new URL(rawUrl).hostname;
+  } catch {
+    throw new BrandExtractError("That doesn't look like a valid website address.");
+  }
+  if (isBlockedHost(host)) {
+    throw new BrandExtractError('That address points to a private network and cannot be read.');
+  }
 }
 
 async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
@@ -72,6 +87,8 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
         'Accept-Language': 'en-US,en;q=0.9',
       },
     });
+    // Re-check after redirects: a public URL can 302 onto an internal host.
+    if (res.url) assertPublicUrl(res.url);
     if (!res.ok) throw new BrandExtractError(`The site responded with ${res.status}.`);
     const reader = res.body?.getReader();
     if (!reader) return { html: await res.text(), finalUrl: res.url || url };
@@ -113,6 +130,10 @@ async function fetchTextCapped(url: string, maxBytes: number): Promise<string> {
         Accept: 'text/css,*/*;q=0.1',
       },
     });
+    // A stylesheet URL can redirect onto an internal host — re-check the final URL.
+    if (res.url) {
+      try { assertPublicUrl(res.url); } catch { return ''; }
+    }
     if (!res.ok) return '';
     const buf = await res.arrayBuffer();
     return new TextDecoder('utf-8').decode(buf.slice(0, maxBytes));
@@ -487,6 +508,8 @@ function prettifyHost(host: string): string {
 
 export async function extractBrandFromUrl(rawUrl: string): Promise<BrandKit> {
   const url = normalizeUrl(rawUrl);
+  // SSRF guard: refuse to fetch internal/loopback/link-local/metadata hosts.
+  assertPublicUrl(url);
   const { html, finalUrl } = await fetchHtml(url);
   // Pull the page's stylesheets so color/font scraping sees the real theme,
   // not just the (usually bare) initial HTML. Best-effort — failures degrade

@@ -40,12 +40,21 @@ const MAX_HTML_BYTES = 700_000;
 
 // Block obvious SSRF targets (localhost, link-local, private ranges).
 function isBlockedHost(host: string): boolean {
-  const h = host.toLowerCase();
+  const h = host.toLowerCase().replace(/^\[|\]$/g, ''); // strip IPv6 brackets
   if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
   if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return true;
   if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
-  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd')) return true;
+  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80')) return true;
   return false;
+}
+
+/** True if a redirect landed the fetch on a blocked (internal) host. */
+function finalUrlBlocked(res: Response): boolean {
+  try {
+    return !!res.url && isBlockedHost(new URL(res.url).hostname);
+  } catch {
+    return false;
+  }
 }
 
 async function fetchHtml(url: string): Promise<{ html: string; xRobotsTag: string }> {
@@ -61,6 +70,8 @@ async function fetchHtml(url: string): Promise<{ html: string; xRobotsTag: strin
         Accept: 'text/html,application/xhtml+xml',
       },
     });
+    // A public URL can 302 onto an internal host; re-check after redirects.
+    if (finalUrlBlocked(res)) throw new BrandExtractError('That address points to a private network and cannot be read.');
     if (!res.ok) throw new BrandExtractError(`The site responded with ${res.status}.`);
     const buf = await res.arrayBuffer();
     return {

@@ -24,9 +24,16 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const segments = (project.segments ?? []) as Array<{ clips: Array<{ clipPath: string }> }>;
     const pathToUrl = new Map<string, string>();
 
+    // clipPath comes from the user-writable `segments` column, so only sign
+    // paths inside the caller's own folder — otherwise a user could point a
+    // segment at another user's storage key and get a signed URL for it.
     for (const seg of segments) {
       for (const clip of seg.clips ?? []) {
-        if (clip.clipPath && !pathToUrl.has(clip.clipPath)) {
+        if (
+          clip.clipPath &&
+          String(clip.clipPath).startsWith(`${user.id}/`) &&
+          !pathToUrl.has(clip.clipPath)
+        ) {
           const { data } = await admin.storage.from('speeches').createSignedUrl(clip.clipPath, 3600);
           if (data?.signedUrl) pathToUrl.set(clip.clipPath, data.signedUrl);
         }

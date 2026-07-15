@@ -54,6 +54,14 @@ const sections: LegalSection[] = [
     ],
   },
   {
+    heading: 'Connected Google account (Assistant)',
+    paragraphs: [
+      'If you connect your Google account to the Assistant, you grant it read access to your Gmail and Google Calendar and the ability to draft and send email on your behalf. We use that access only to carry out the actions you ask the Assistant to take — for example, reading a message you point it at, checking your schedule, or sending a reply you approve.',
+      'We securely store the access tokens Google issues (encrypted at rest) and never store your Google password. Your email and calendar content is processed to fulfill your request and is not used to build advertising profiles or to train our own models. Depending on the autonomy level you choose, the Assistant will either draft actions for your confirmation or carry them out directly — you control this in settings.',
+      'You can disconnect Google at any time from your settings, which removes our stored tokens, and you can also revoke access from your Google Account security settings. Our use of information received from Google APIs follows the Google API Services User Data Policy, including its Limited Use requirements.',
+    ],
+  },
+  {
     heading: 'Personalization',
     paragraphs: [
       'To make the tools more useful, we may remember preferences and details you share across the app — such as your goals, speaking topics, and your website — so that features stay consistent and tailored to you. This memory powers personalized results across the app, including the SEO tips we generate for your site. You can view, change, or clear this information, or turn memory off entirely, from your account settings.',
@@ -76,7 +84,7 @@ const sections: LegalSection[] = [
   {
     heading: 'How we share information',
     paragraphs: [
-      'We share information only with the service providers that make the product work — for example authentication and database hosting (Supabase), AI processing (OpenAI and Anthropic, plus the open Speech Analyzer models from Meta and NVIDIA, which run on Modal GPU infrastructure), payments (Stripe), email delivery (Resend), and any social platforms you choose to connect (to publish the content you ask us to) — and only to the extent needed to provide the service.',
+      'We share information only with the service providers that make the product work — for example authentication and database hosting (Supabase), AI processing (OpenAI and Anthropic, plus the open Speech Analyzer models from Meta and NVIDIA, which run on Modal GPU infrastructure), payments (Stripe), email delivery (Resend), the Google account you may connect to the Assistant (Gmail and Calendar, used only to carry out the actions you request), and any social platforms you choose to connect (to publish the content you ask us to) — and only to the extent needed to provide the service.',
       'We may disclose information if required by law, to protect our rights, or as part of a business transfer such as a merger or acquisition. We do not sell your personal information.',
     ],
   },
@@ -113,7 +121,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      updated="July 7, 2026"
+      updated="July 15, 2026"
       intro={`This Privacy Policy explains what information ${SITE_NAME} collects, how we use it, and the choices you have. By using the service, you agree to the practices described here.`}
       sections={sections}
     />
