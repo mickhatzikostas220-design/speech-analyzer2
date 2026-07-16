@@ -8,8 +8,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe, stripeConfigured } from '@/lib/subscription/stripe';
 import { DONATE_MIN, DONATE_MAX } from '@/lib/donate/config';
+import { rateLimit, clientIp } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
+  // This endpoint is anonymous by design, so cap how often one caller can spin
+  // up Stripe Checkout sessions to keep it from being used for log/API spam.
+  const limit = rateLimit(`donate:${clientIp(request)}`, 10, 10 * 60 * 1000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Too many attempts. Please try again in a few minutes.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
+    );
+  }
+
   if (!stripeConfigured()) {
     return NextResponse.json(
       { error: 'Donations are not set up yet. Please check back soon.' },

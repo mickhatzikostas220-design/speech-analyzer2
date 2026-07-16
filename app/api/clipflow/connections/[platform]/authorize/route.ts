@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
-import { getAuthorizeUrl, PlatformError } from '@/lib/clipflow/platforms';
+import { getAuthorizeUrl, platformUsesPkce, createPkcePair, PlatformError } from '@/lib/clipflow/platforms';
 import { resolveOAuthCreds } from '@/lib/clipflow/secrets';
 import { PLATFORMS, type Platform } from '@/lib/clipflow/types';
 
@@ -24,16 +24,21 @@ export async function GET(request: NextRequest, { params }: { params: { platform
 
   try {
     const state = randomUUID();
+    const pkce = platformUsesPkce(platform) ? createPkcePair() : null;
     const creds = await resolveOAuthCreds(supabase, user.id, platform);
-    const url = getAuthorizeUrl(platform, state, creds);
+    const url = getAuthorizeUrl(platform, state, creds, pkce?.challenge);
     const res = NextResponse.redirect(url);
-    res.cookies.set('clipflow_oauth_state', state, {
+    const cookieOpts = {
       httpOnly: true,
       secure: true,
-      sameSite: 'lax',
+      sameSite: 'lax' as const,
       maxAge: 600,
       path: '/',
-    });
+    };
+    res.cookies.set('clipflow_oauth_state', state, cookieOpts);
+    // The PKCE verifier stays server-side (httpOnly) for the round trip; the
+    // callback reads it back to complete the token exchange.
+    if (pkce) res.cookies.set('clipflow_oauth_verifier', pkce.verifier, cookieOpts);
     return res;
   } catch (err) {
     const msg = err instanceof PlatformError ? err.message : 'Could not start OAuth';

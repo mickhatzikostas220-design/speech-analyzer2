@@ -37,7 +37,8 @@ export async function GET(request: NextRequest, { params }: { params: { platform
 
   try {
     const creds = await resolveOAuthCreds(supabase, user.id, platform);
-    const tokens = await exchangeCodeForTokens(platform, code, creds);
+    const codeVerifier = request.cookies.get('clipflow_oauth_verifier')?.value;
+    const tokens = await exchangeCodeForTokens(platform, code, creds, codeVerifier);
 
     const { error } = await supabase.from('clipflow_connections').upsert(
       {
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest, { params }: { params: { platform
 
     const res = back(`connect=success&platform=${platform}`);
     res.cookies.delete('clipflow_oauth_state');
+    res.cookies.delete('clipflow_oauth_verifier');
     return res;
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'OAuth failed';
