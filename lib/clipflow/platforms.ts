@@ -1,3 +1,4 @@
+import { randomBytes, createHash } from 'crypto';
 import type { Platform } from './types';
 
 // Platform OAuth + publishing. OAuth credentials live only in server env vars
@@ -19,6 +20,9 @@ interface PlatformConfig {
   scopes: string;
   // Extra static params for the authorize request.
   authParams?: Record<string, string>;
+  // Platforms that require PKCE on the authorization-code flow. We generate a
+  // fresh random verifier per flow and send its S256 challenge.
+  pkce?: boolean;
 }
 
 const CONFIG: Record<Platform, PlatformConfig> = {
@@ -38,7 +42,7 @@ const CONFIG: Record<Platform, PlatformConfig> = {
     authorizeUrl: 'https://twitter.com/i/oauth2/authorize',
     tokenUrl: 'https://api.twitter.com/2/oauth2/token',
     scopes: 'tweet.read tweet.write users.read offline.access',
-    authParams: { code_challenge: 'challenge', code_challenge_method: 'plain' },
+    pkce: true,
   },
   tiktok: {
     label: 'TikTok',
@@ -47,6 +51,7 @@ const CONFIG: Record<Platform, PlatformConfig> = {
     authorizeUrl: 'https://www.tiktok.com/v2/auth/authorize/',
     tokenUrl: 'https://open.tiktokapis.com/v2/oauth/token/',
     scopes: 'user.info.basic,video.publish,video.upload',
+    pkce: true,
   },
   instagram: {
     label: 'Instagram',
@@ -79,6 +84,24 @@ const CONFIG: Record<Platform, PlatformConfig> = {
 
 export function platformLabel(platform: Platform): string {
   return CONFIG[platform].label;
+}
+
+/** Whether a platform's authorize flow uses PKCE (per-flow verifier + S256). */
+export function platformUsesPkce(platform: Platform): boolean {
+  return Boolean(CONFIG[platform].pkce);
+}
+
+/**
+ * A single-use PKCE pair. `verifier` is a high-entropy random string kept
+ * server-side (in an httpOnly cookie) for the duration of the flow; `challenge`
+ * is its base64url SHA-256, sent on the authorize request. Redeeming the code
+ * requires proving knowledge of the verifier, so an intercepted authorization
+ * code is useless on its own.
+ */
+export function createPkcePair(): { verifier: string; challenge: string } {
+  const verifier = randomBytes(32).toString('base64url'); // 43 chars, RFC 7636
+  const challenge = createHash('sha256').update(verifier).digest('base64url');
+  return { verifier, challenge };
 }
 
 // A platform's OAuth client credentials. Users can bring their own (stored in
@@ -118,7 +141,8 @@ export function redirectUri(platform: Platform): string {
 export function getAuthorizeUrl(
   platform: Platform,
   state: string,
-  creds?: OAuthCreds | null
+  creds?: OAuthCreds | null,
+  codeChallenge?: string
 ): string {
   const c = CONFIG[platform];
   const resolved = creds ?? envCreds(platform);
@@ -135,6 +159,10 @@ export function getAuthorizeUrl(
     state,
     ...(c.authParams ?? {}),
   });
+  if (c.pkce && codeChallenge) {
+    params.set('code_challenge', codeChallenge);
+    params.set('code_challenge_method', 'S256');
+  }
   return `${c.authorizeUrl}?${params.toString()}`;
 }
 
@@ -151,7 +179,8 @@ export interface TokenResult {
 export async function exchangeCodeForTokens(
   platform: Platform,
   code: string,
-  creds?: OAuthCreds | null
+  creds?: OAuthCreds | null,
+  codeVerifier?: string
 ): Promise<TokenResult> {
   const c = CONFIG[platform];
   const resolved = creds ?? envCreds(platform);
@@ -171,12 +200,14 @@ export async function exchangeCodeForTokens(
   if (platform === 'tiktok') {
     body.delete('client_id');
     body.set('client_key', clientId);
-    body.set('code_verifier', 'challenge');
   }
-  // X/Twitter authorizes with a PKCE code_challenge (see authParams), so the
-  // token exchange must echo the matching code_verifier or it's rejected.
-  if (platform === 'twitter') {
-    body.set('code_verifier', 'challenge');
+  // PKCE platforms (X/Twitter, TikTok) must echo the verifier that matches the
+  // S256 challenge sent on authorize, or the exchange is rejected.
+  if (c.pkce) {
+    if (!codeVerifier) {
+      throw new PlatformError(`${c.label} sign-in expired. Please start the connection again.`);
+    }
+    body.set('code_verifier', codeVerifier);
   }
 
   const res = await fetch(c.tokenUrl, {
