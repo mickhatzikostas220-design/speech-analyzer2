@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { isOwnedStoragePath } from '@/lib/storage/ownership';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,11 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     if (error || !project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     let video_url: string | null = null;
-    if (project.video_path) {
+    // Only sign a path that belongs to the caller. `video_path` is user-editable
+    // via PATCH, so without this guard a user could point it at another user's
+    // storage key and get back a working signed URL (the admin client bypasses
+    // storage RLS).
+    if (isOwnedStoragePath(project.video_path, user.id)) {
       const admin = createAdminClient();
       const { data } = await admin.storage
         .from('speeches')
@@ -75,7 +80,9 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
       .eq('user_id', user.id)
       .single();
 
-    if (project?.video_path) {
+    // Guard against deleting another user's file: only remove a key under the
+    // caller's own `${user.id}/` prefix (video_path is user-editable via PATCH).
+    if (isOwnedStoragePath(project?.video_path, user.id)) {
       const admin = createAdminClient();
       await admin.storage.from('speeches').remove([project.video_path]);
     }

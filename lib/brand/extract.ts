@@ -1,6 +1,7 @@
 import type { BrandKit } from './types';
 import { cloneDefaultBrand } from './defaults';
 import { normalizeHex, isNeutral, saturation, readableTextOn, hexToRgb } from './color';
+import { safeFetch, isBlockedHost, BlockedHostError } from '@/lib/net/safeFetch';
 
 /**
  * Auto-extract a brand kit from a speaker's website. Pure server-side:
@@ -45,23 +46,13 @@ export function normalizeUrl(input: string): string {
   }
 }
 
-// Block obvious SSRF targets (localhost, link-local, private ranges). Applied to
-// stylesheet URLs pulled from the page markup, which we don't fully control.
-function isBlockedHost(host: string): boolean {
-  const h = host.toLowerCase();
-  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
-  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
-  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd')) return true;
-  return false;
-}
-
 async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    // safeFetch blocks private/internal hosts up front AND re-checks every
+    // redirect hop, so a public site can't 302 us into the metadata service.
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         // A normal browser UA — speakers ask us to read their own public
@@ -90,6 +81,7 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
     const html = new TextDecoder('utf-8').decode(concat(chunks));
     return { html, finalUrl: res.url || url };
   } catch (err) {
+    if (err instanceof BlockedHostError) throw new BrandExtractError(err.message);
     if (err instanceof BrandExtractError) throw err;
     throw new BrandExtractError(
       "Couldn't reach that website. Check the address, or set your brand by hand."
@@ -104,8 +96,9 @@ async function fetchTextCapped(url: string, maxBytes: number): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CSS_FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    // Same SSRF hardening as fetchHtml — stylesheet hrefs come from the fetched
+    // page, so they're only partly under our control and can redirect too.
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent':
