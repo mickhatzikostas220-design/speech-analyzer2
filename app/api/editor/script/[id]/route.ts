@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { isOwnedStoragePath } from '@/lib/storage/ownership';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,10 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const admin = createAdminClient();
     const clips: ScriptClip[] = await Promise.all(
       (project.clips as ScriptClip[]).map(async (clip) => {
-        if (!clip.path) return clip;
+        // Only sign clip paths the caller owns. `clips` is user-editable via
+        // PATCH, so a foreign key here must not be signed (admin client bypasses
+        // storage RLS).
+        if (!isOwnedStoragePath(clip.path, user.id)) return clip;
         const { data } = await admin.storage
           .from('speeches')
           .createSignedUrl(clip.path, 3600);
@@ -93,7 +97,9 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
       const admin = createAdminClient();
       const paths = (project.clips as ScriptClip[])
         .map((c) => c.path)
-        .filter(Boolean);
+        // Only delete keys under the caller's own prefix — a user-edited clip
+        // path could otherwise target another user's file.
+        .filter((p) => isOwnedStoragePath(p, user.id));
       if (paths.length > 0) {
         await admin.storage.from('speeches').remove(paths);
       }

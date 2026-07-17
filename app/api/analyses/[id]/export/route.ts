@@ -57,6 +57,16 @@ export async function GET(
   }
 
   if (format === 'feedback') {
+    // Quote a CSV cell and defuse spreadsheet formula injection: a value that
+    // starts with = + - @ (or a control char) is treated as a formula by Excel /
+    // Sheets, so prefix those with a single quote before quoting. The feedback
+    // text is AI-generated from the user's transcript, so this is low-risk, but
+    // it's a cheap guard on a downloadable file.
+    const csvCell = (value: string) => {
+      const needsGuard = /^[=+\-@\t\r]/.test(value);
+      const safe = (needsGuard ? `'${value}` : value).replace(/"/g, '""');
+      return `"${safe}"`;
+    };
     const rows = [
       ['Start', 'End', 'Score', 'Severity', 'Feedback', 'Suggestion'],
       ...feedback.map((fp) => [
@@ -64,8 +74,8 @@ export async function GET(
         formatTime(fp.timecode_end_ms),
         String(fp.engagement_score),
         fp.severity,
-        `"${fp.feedback_text.replace(/"/g, '""')}"`,
-        `"${fp.improvement_suggestion.replace(/"/g, '""')}"`,
+        csvCell(fp.feedback_text),
+        csvCell(fp.improvement_suggestion),
       ]),
     ];
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { isOwnedStoragePath } from '@/lib/storage/ownership';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,10 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 
     for (const seg of segments) {
       for (const clip of seg.clips ?? []) {
-        if (clip.clipPath && !pathToUrl.has(clip.clipPath)) {
+        // Only sign paths the caller owns. `segments` is user-editable via
+        // PATCH, so a foreign clipPath must not be signed (admin client bypasses
+        // storage RLS).
+        if (isOwnedStoragePath(clip.clipPath, user.id) && !pathToUrl.has(clip.clipPath)) {
           const { data } = await admin.storage.from('speeches').createSignedUrl(clip.clipPath, 3600);
           if (data?.signedUrl) pathToUrl.set(clip.clipPath, data.signedUrl);
         }
