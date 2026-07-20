@@ -66,13 +66,16 @@ create policy "Users delete own analyses" on analyses for delete using (auth.uid
 create policy "Users view own feedback" on feedback_points for select using (
   analysis_id in (select id from analyses where user_id = auth.uid())
 );
-create policy "Service inserts feedback" on feedback_points for insert with check (true);
+-- Feedback rows are written only by the server (service-role key, which
+-- bypasses RLS). Scope the policy to service_role so an unscoped
+-- `with check (true)` can't let a signed-in user forge feedback on any analysis.
+create policy "Service inserts feedback" on feedback_points for insert to service_role with check (true);
 
 -- Engagement timeline
 create policy "Users view own timeline" on engagement_timeline for select using (
   analysis_id in (select id from analyses where user_id = auth.uid())
 );
-create policy "Service inserts timeline" on engagement_timeline for insert with check (true);
+create policy "Service inserts timeline" on engagement_timeline for insert to service_role with check (true);
 
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()
@@ -102,6 +105,10 @@ create policy "Users read own speeches" on storage.objects for select using (
 create policy "Users delete own speeches" on storage.objects for delete using (
   bucket_id = 'speeches' and auth.uid()::text = (storage.foldername(name))[1]
 );
-create policy "Service reads speeches" on storage.objects for select using (
+-- Server-side reads use the service-role key, which bypasses RLS entirely, so
+-- this policy is only a safety net for that role. It MUST be scoped to
+-- service_role: an unscoped `using (bucket_id = 'speeches')` would let any
+-- signed-in (or anon) user read every user's uploaded speech files.
+create policy "Service reads speeches" on storage.objects for select to service_role using (
   bucket_id = 'speeches'
 );
