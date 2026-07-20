@@ -38,43 +38,98 @@ export function normalizeUrl(input: string): string {
   const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   try {
     const u = new URL(withScheme);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('bad scheme');
     if (!u.hostname.includes('.')) throw new Error('no tld');
+    // Reject private/internal targets up front so the API surfaces a clean
+    // error instead of attempting the fetch (SSRF guard — see isBlockedHost).
+    if (isBlockedHost(u.hostname)) {
+      throw new BrandExtractError('That address points to a private or internal host.');
+    }
     return u.toString();
-  } catch {
+  } catch (err) {
+    if (err instanceof BrandExtractError) throw err;
     throw new BrandExtractError("That doesn't look like a valid website address.");
   }
 }
 
-// Block obvious SSRF targets (localhost, link-local, private ranges). Applied to
-// stylesheet URLs pulled from the page markup, which we don't fully control.
+// Block SSRF targets (localhost, link-local, private/reserved ranges, cloud
+// metadata). This is applied to EVERY host we fetch — the primary page URL, each
+// redirect hop, and the stylesheet URLs pulled from the page markup — none of
+// which we fully control.
 function isBlockedHost(host: string): boolean {
-  const h = host.toLowerCase();
-  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
+  // Strip IPv6 brackets and any zone id, lowercase for comparison.
+  const h = host.toLowerCase().replace(/^\[|\]$/g, '').split('%')[0];
+  if (!h) return true;
+  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.localhost')) return true;
+  // IPv4 private, loopback, link-local (incl. 169.254.169.254 cloud metadata),
+  // "this host" 0.0.0.0/8, and carrier-grade NAT 100.64.0.0/10.
   if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return true;
   if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
-  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd')) return true;
+  if (/^100\.(6[4-9]|[7-9]\d|1[0-1]\d|12[0-7])\./.test(h)) return true;
+  // IPv6 loopback, unique-local (fc00::/7), link-local (fe80::/10), and any
+  // IPv4-mapped/embedded form that carries a blocked IPv4 literal.
+  if (h === '::1' || h === '::' || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe8') || h.startsWith('fe9') || h.startsWith('fea') || h.startsWith('feb')) return true;
+  const mapped = h.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (h.includes(':') && mapped && isBlockedHost(mapped[1])) return true;
   return false;
+}
+
+// How many redirect hops we'll follow before giving up. Each hop is re-checked
+// against isBlockedHost so a public URL can't 302 us onto an internal target.
+const MAX_REDIRECTS = 4;
+
+function assertPublicHttpUrl(raw: string): void {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    throw new BrandExtractError('Invalid URL.');
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+    throw new BrandExtractError('Only http and https URLs can be fetched.');
+  }
+  if (isBlockedHost(u.hostname)) {
+    throw new BrandExtractError('That address points to a private or internal host.');
+  }
 }
 
 async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        // A normal browser UA — speakers ask us to read their own public
-        // site, and many hosts reject obvious bot agents.
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-    });
+    // Follow redirects by hand so every hop's host is re-checked against
+    // isBlockedHost — `redirect: 'follow'` would let a public URL bounce us onto
+    // an internal target (cloud metadata, localhost) without another check.
+    let current = url;
+    let res: Response | null = null;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      assertPublicHttpUrl(current);
+      const hopRes = await fetch(current, {
+        redirect: 'manual',
+        signal: controller.signal,
+        headers: {
+          // A normal browser UA — speakers ask us to read their own public
+          // site, and many hosts reject obvious bot agents.
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      if (hopRes.status >= 300 && hopRes.status < 400) {
+        const loc = hopRes.headers.get('location');
+        hopRes.body?.cancel().catch(() => {});
+        if (!loc) throw new BrandExtractError(`The site responded with ${hopRes.status}.`);
+        current = new URL(loc, current).toString();
+        continue;
+      }
+      res = hopRes;
+      break;
+    }
+    if (!res) throw new BrandExtractError('That site redirected too many times.');
     if (!res.ok) throw new BrandExtractError(`The site responded with ${res.status}.`);
     const reader = res.body?.getReader();
-    if (!reader) return { html: await res.text(), finalUrl: res.url || url };
+    if (!reader) return { html: await res.text(), finalUrl: current };
     // Read at most MAX_HTML_BYTES so a huge page can't stall us.
     const chunks: Uint8Array[] = [];
     let total = 0;
@@ -88,7 +143,7 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
     }
     reader.cancel().catch(() => {});
     const html = new TextDecoder('utf-8').decode(concat(chunks));
-    return { html, finalUrl: res.url || url };
+    return { html, finalUrl: current };
   } catch (err) {
     if (err instanceof BrandExtractError) throw err;
     throw new BrandExtractError(
@@ -104,16 +159,32 @@ async function fetchTextCapped(url: string, maxBytes: number): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CSS_FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        Accept: 'text/css,*/*;q=0.1',
-      },
-    });
-    if (!res.ok) return '';
+    // Manual redirect handling with a per-hop host check (same SSRF guard as
+    // fetchHtml). Any block or bad hop just yields '' — best-effort by design.
+    let current = url;
+    let res: Response | null = null;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      assertPublicHttpUrl(current);
+      const hopRes = await fetch(current, {
+        redirect: 'manual',
+        signal: controller.signal,
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          Accept: 'text/css,*/*;q=0.1',
+        },
+      });
+      if (hopRes.status >= 300 && hopRes.status < 400) {
+        const loc = hopRes.headers.get('location');
+        hopRes.body?.cancel().catch(() => {});
+        if (!loc) return '';
+        current = new URL(loc, current).toString();
+        continue;
+      }
+      res = hopRes;
+      break;
+    }
+    if (!res || !res.ok) return '';
     const buf = await res.arrayBuffer();
     return new TextDecoder('utf-8').decode(buf.slice(0, maxBytes));
   } catch {
