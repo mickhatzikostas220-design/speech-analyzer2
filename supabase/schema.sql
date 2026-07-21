@@ -62,17 +62,24 @@ create policy "Users insert own analyses" on analyses for insert with check (aut
 create policy "Users update own analyses" on analyses for update using (auth.uid() = user_id);
 create policy "Users delete own analyses" on analyses for delete using (auth.uid() = user_id);
 
--- Feedback points — readable by owner, writable by service role (API routes)
+-- Feedback points — scoped to the owner of the parent analysis. Server routes
+-- use the service role, which bypasses RLS, so writes do NOT need a broad
+-- `with check (true)` policy — and such a policy would (since it applies to the
+-- public role) let any authenticated user insert feedback into any analysis.
 create policy "Users view own feedback" on feedback_points for select using (
   analysis_id in (select id from analyses where user_id = auth.uid())
 );
-create policy "Service inserts feedback" on feedback_points for insert with check (true);
+create policy "Owners insert own feedback" on feedback_points for insert with check (
+  analysis_id in (select id from analyses where user_id = auth.uid())
+);
 
--- Engagement timeline
+-- Engagement timeline — same owner-scoping as feedback_points.
 create policy "Users view own timeline" on engagement_timeline for select using (
   analysis_id in (select id from analyses where user_id = auth.uid())
 );
-create policy "Service inserts timeline" on engagement_timeline for insert with check (true);
+create policy "Owners insert own timeline" on engagement_timeline for insert with check (
+  analysis_id in (select id from analyses where user_id = auth.uid())
+);
 
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()
@@ -102,6 +109,8 @@ create policy "Users read own speeches" on storage.objects for select using (
 create policy "Users delete own speeches" on storage.objects for delete using (
   bucket_id = 'speeches' and auth.uid()::text = (storage.foldername(name))[1]
 );
-create policy "Service reads speeches" on storage.objects for select using (
-  bucket_id = 'speeches'
-);
+-- NOTE: do NOT add a broad "service reads all speeches" SELECT policy here.
+-- Server routes read via the service role, which bypasses RLS. A policy like
+-- `for select using (bucket_id = 'speeches')` applies to the public role and
+-- would let any authenticated user download every other user's private
+-- recordings. Production intentionally has no such policy.

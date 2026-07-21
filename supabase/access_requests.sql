@@ -11,8 +11,10 @@ create table if not exists access_requests (
 
 alter table access_requests enable row level security;
 
--- Anyone can submit a request (no auth required)
-create policy "Anyone can submit request" on access_requests
-  for insert with check (true);
-
--- Only service role can read and update (all admin actions go through server-side API)
+-- No RLS policies by design. The public submit form (POST /api/request-access)
+-- inserts via the service-role client, which bypasses RLS, and all admin
+-- reads/updates are server-side too. With RLS enabled and no policy, the anon
+-- and authenticated roles get NO direct access to this table — which is what we
+-- want, since it holds people's names/emails/reasons. Do not add a broad
+-- `for insert with check (true)` policy: it would let anyone write rows
+-- directly, bypassing the API's rate limiting and duplicate checks.
