@@ -1,6 +1,7 @@
 import type { BrandKit } from './types';
 import { cloneDefaultBrand } from './defaults';
 import { normalizeHex, isNeutral, saturation, readableTextOn, hexToRgb } from './color';
+import { safeFetch, isBlockedHost, BlockedUrlError } from '@/lib/security/ssrf';
 
 /**
  * Auto-extract a brand kit from a speaker's website. Pure server-side:
@@ -38,6 +39,7 @@ export function normalizeUrl(input: string): string {
   const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   try {
     const u = new URL(withScheme);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('scheme');
     if (!u.hostname.includes('.')) throw new Error('no tld');
     return u.toString();
   } catch {
@@ -45,23 +47,13 @@ export function normalizeUrl(input: string): string {
   }
 }
 
-// Block obvious SSRF targets (localhost, link-local, private ranges). Applied to
-// stylesheet URLs pulled from the page markup, which we don't fully control.
-function isBlockedHost(host: string): boolean {
-  const h = host.toLowerCase();
-  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
-  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
-  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd')) return true;
-  return false;
-}
-
 async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    // safeFetch validates the URL (and every redirect hop) against private /
+    // internal addresses before making the request — see lib/security/ssrf.
+    const { response: res, finalUrl } = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         // A normal browser UA — speakers ask us to read their own public
@@ -74,7 +66,7 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
     });
     if (!res.ok) throw new BrandExtractError(`The site responded with ${res.status}.`);
     const reader = res.body?.getReader();
-    if (!reader) return { html: await res.text(), finalUrl: res.url || url };
+    if (!reader) return { html: await res.text(), finalUrl };
     // Read at most MAX_HTML_BYTES so a huge page can't stall us.
     const chunks: Uint8Array[] = [];
     let total = 0;
@@ -88,9 +80,12 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
     }
     reader.cancel().catch(() => {});
     const html = new TextDecoder('utf-8').decode(concat(chunks));
-    return { html, finalUrl: res.url || url };
+    return { html, finalUrl };
   } catch (err) {
     if (err instanceof BrandExtractError) throw err;
+    // A blocked (private/internal) target should read back as a clean input
+    // error, not a generic "couldn't reach" — surface its message.
+    if (err instanceof BlockedUrlError) throw new BrandExtractError(err.message);
     throw new BrandExtractError(
       "Couldn't reach that website. Check the address, or set your brand by hand."
     );
@@ -104,8 +99,7 @@ async function fetchTextCapped(url: string, maxBytes: number): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CSS_FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    const { response: res } = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent':

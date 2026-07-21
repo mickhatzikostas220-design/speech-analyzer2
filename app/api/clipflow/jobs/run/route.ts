@@ -17,14 +17,19 @@ export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const cronAuthorized = cronSecret && authHeader === `Bearer ${cronSecret}`;
 
+  // When a signed-in user triggers this (not the cron), only their own queued
+  // jobs may be claimed. Otherwise any user could flush the whole queue and
+  // force-run everyone's scheduled posts / renders early. The cron drains all.
+  let scopeUserId: string | undefined;
   if (!cronAuthorized) {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    scopeUserId = user.id;
   }
 
   const admin = createAdminClient();
-  const jobs = await claimDueJobs(admin, 5);
+  const jobs = await claimDueJobs(admin, 5, scopeUserId);
 
   const results = await Promise.all(
     jobs.map(async (job) => {
