@@ -3,6 +3,7 @@
 // Uses the OpenAI key already configured for the rest of the app.
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeUrl, BrandExtractError } from '@/lib/brand/extract';
+import { safeFetch } from '@/lib/net/ssrfGuard';
 import { createClient } from '@/lib/supabase/server';
 import { getUserPlan } from '@/lib/subscription/server';
 import { isPlatform, platformLabel } from '@/lib/seo/platforms';
@@ -52,8 +53,9 @@ async function fetchHtml(url: string): Promise<{ html: string; xRobotsTag: strin
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    // safeFetch re-validates the URL and every redirect hop against private/
+    // metadata addresses so a public URL can't 302 the request inward (SSRF).
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent':

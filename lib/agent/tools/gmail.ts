@@ -79,7 +79,7 @@ export function gmailTools(connectionId: string): ToolDef[] {
         const rows = await Promise.all(
           list.messages.map(async (m) => {
             const r = await fetch(
-              `${GMAIL}/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+              `${GMAIL}/messages/${encodeURIComponent(m.id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
               { headers: { Authorization: `Bearer ${accessToken}` } }
             );
             if (!r.ok) return `- id=${m.id} (failed to load)`;
@@ -106,7 +106,7 @@ export function gmailTools(connectionId: string): ToolDef[] {
       },
       async execute(args, ctx) {
         const accessToken = await token(ctx.supabase);
-        const r = await fetch(`${GMAIL}/messages/${String(args.id)}?format=full`, {
+        const r = await fetch(`${GMAIL}/messages/${encodeURIComponent(String(args.id))}?format=full`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         if (!r.ok) return `Gmail error: ${await r.text()}`;
