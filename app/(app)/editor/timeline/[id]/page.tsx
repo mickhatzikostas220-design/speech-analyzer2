@@ -712,6 +712,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       </div>
                       {selPreview?.start ? (
                         <div className="relative rounded overflow-hidden border border-[var(--border-subtle)] aspect-video bg-[var(--surface-sunk)]">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- captured video-frame blob URL, next/image can't optimize it */}
                           <img src={selPreview.start} alt="" className="w-full h-full object-cover" />
                           <div className="absolute bottom-0 inset-x-0 bg-black/70 text-[10px] text-white px-1.5 py-0.5">
                             {fmtTime(selFirst ? selFirst.start + sel.trimStart : 0)}
@@ -738,6 +739,7 @@ export default function TimelineEditorPage({ params }: { params: { id: string } 
                       </div>
                       {selPreview?.end ? (
                         <div className="relative rounded overflow-hidden border border-[var(--border-subtle)] aspect-video bg-[var(--surface-sunk)]">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- captured video-frame blob URL, next/image can't optimize it */}
                           <img src={selPreview.end} alt="" className="w-full h-full object-cover" />
                           <div className="absolute bottom-0 inset-x-0 bg-black/70 text-[10px] text-white px-1.5 py-0.5">
                             {fmtTime(selLast ? selLast.end - sel.trimEnd : 0)}

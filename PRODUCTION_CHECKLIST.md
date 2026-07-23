@@ -1,107 +1,140 @@
 # Go-Live Checklist — Speaker Hub
 
-**Updated 2026-07-03.** The site is **LIVE at https://speaker-hub.com** ✅
-(www redirects to the apex; the old `speech-analyzer2-rkgj.vercel.app` alias is
-gone — the custom domain replaced it). Code side is done and build-verified.
-Work top to bottom.
+**Updated 2026-07-23.** The site is **LIVE at https://speaker-hub.com**.
+
+This is the plain-English list of what's already handled in the code and what
+*you* still need to do outside the code (in Vercel, Supabase, Stripe, and with a
+lawyer). Work top to bottom. Anything under "You need to do this" is a step only
+you can take — Claude can't set your secret keys or flip dashboard toggles.
 
 ---
 
-## 1. Merge / close the open PRs
+## What's already done in the code ✅
 
-- [ ] **Merge PR #63** (security hardening: editor IDOR, SSRF guard, storage
-      RLS doc fix, AI cost limits, Next.js 14.2.35). Reviewed line-by-line —
-      sound, clean against main, build passes. Note: its storage-policy SQL was
-      checked against prod — the dangerous policy is **already absent**, so no
-      database action is needed; the SQL file only fixes fresh installs.
-- [ ] **Merge the `production-fixes-jul2` branch** (open PR:
-      <https://github.com/mickhatzikostas220-design/speech-analyzer2/pull/new/production-fixes-jul2>)
-      — contains the Resend domains CSV + email/canonical URL fixes.
-- [ ] **Close PR #62 without merging** — it targets a months-old broken
-      snapshot of main, is unmergeable, and everything it fixed has since been
-      re-fixed on main.
+You don't need to touch any of this — it's noted so you know it's covered.
 
-## 2. Vercel environment variables (the one real config gap)
-
-The production build has **no `NEXT_PUBLIC_APP_URL`** — the sitemap/robots
-currently advertise an SSO-walled deployment URL, and (until the code fix in
-§1 deploys) access-approval emails would link to localhost.
-
-In Vercel → project → Settings → Environment Variables, add for Production:
-
-- [ ] `NEXT_PUBLIC_APP_URL` = `https://speaker-hub.com`
-- [ ] `EMAIL_FROM` = e.g. `Speaker Hub <hello@speaker-hub.com>` — the domain is
-      **already verified in Resend** (DKIM + SPF ✅, see docs/resend-domains.csv),
-      so real signups will receive their codes once this is set.
-- [ ] Redeploy after saving (env vars bake in at build time).
-
-## 3. Delete the duplicate Vercel project
-
-Two Vercel projects build this repo on every push: **speech-analyzer2** and
-**speech-analyzer2-rkgj** (the live one).
-
-- [ ] Delete the **speech-analyzer2** project (Settings → Delete Project) so
-      each push builds once.
-
-## 4. Environment variables (Vercel → Settings → Environment Variables)
-
-Copy from `.env.local.example`. Required for a real launch:
-
-- [ ] `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- [ ] `OPENAI_API_KEY` (powers analysis, feedback, Whisper, all app AI)
-- [ ] `NEXT_PUBLIC_APP_URL` = your real public URL (the code's fallback is an
-      SSO-protected deployment URL, so sitemap/canonical/emails need this set)
-- [ ] `RESEND_API_KEY` + `EMAIL_FROM` on a **verified domain** (the `resend.dev`
-      default only delivers to you — real signups won't get their code).
-      Note: `speakerhub.app` is currently just registrar parking — the legal
-      pages already use `privacy@`/`support@speakerhub.app`, so either finish
-      setting up that domain or change those addresses.
-- [ ] `ADMIN_EMAIL`, `ADMIN_ACTION_SECRET`
-- [ ] `APP_ENCRYPTION_KEY` (required for the AI Assistant — `openssl rand -hex 32`)
-- [ ] Stripe **live** keys + price IDs when ready to charge: `STRIPE_SECRET_KEY`,
-      `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_CORE`, `STRIPE_PRICE_FULL`
-
-Optional / per-feature (blank = feature disables gracefully): `TRIBE_SERVER_URL`,
-`PARAKEET_SERVER_URL`, `YOUTUBE_API_KEY`, `CLIPFLOW_RENDER_URL`, `UPLOAD_POST_API_KEY`,
-`GOOGLE_CLIENT_ID/SECRET`, `CRON_SECRET`.
-
-## 5. Supabase (one toggle left)
-
-Database is verified: all 28 tables have RLS, advisors are clean except one:
-
-- [ ] **Authentication → Passwords → enable "Prevent use of leaked passwords"**
-      (the only remaining security advisor warning; dashboard-only setting).
-- [ ] If you point a custom domain at the app: **Authentication → URL
-      Configuration** — add it to the redirect allow-list (email confirmation
-      + password reset return to `/auth/callback?next=/reset-password`).
-
-## 6. Paywalls (currently OFF on purpose)
-
-`lib/subscription/config.ts` → `PAYWALLS_DEFAULT = false`: every signed-in user
-gets full access; no quotas. To start enforcing tiers, flip it to `true` or set
-`PAYWALLS_ENABLED=true` in Vercel env (env var wins; no code change needed).
-
-## 7. Legal (gates charging money)
-
-- [ ] Counsel review of `/privacy` and `/terms` (drafted baselines).
-- [ ] Real contact emails in `app/privacy/page.tsx` / `app/terms/page.tsx`
-      (currently the parked `speakerhub.app` addresses).
-
-## 8. Post-launch smoke test
-
-- [ ] Sign up with a real email → verification code arrives → onboarding
-      (4 steps now — the new AI-memory step is step 2, skippable).
-- [ ] Upload a talk → processing screen → results with score, timeline,
-      transcript (words/wpm/pace).
-- [ ] Logged out, visit `/keynotes` → redirected to `/login` (the fix in the PR).
-- [ ] Rate limit: 11 rapid `POST /api/analyses` in a minute → 11th returns 429.
-- [ ] Password reset email arrives and the link sets a new password.
-- [ ] `/`, `/privacy`, `/terms`, `/robots.txt`, `/sitemap.xml` load logged-out.
-- [ ] When paywalls go ON: free user blocked after 3 analyses; ClipFlow /
-      AI Assistant / Talk Editor / Booking Inbox / one-sheet / Brand Kit show
-      upgrade screens; dashboard shows Core/Full badges on locked tools.
+- **Builds, type-checks, and lints clean.** `npm run build`, `npx tsc --noEmit`,
+  and `npm run lint` all pass with zero errors.
+- **Security basics are in place.** Every private page redirects logged-out
+  visitors to `/login`. API routes check who you are before returning data.
+  Admin routes are locked to your email. Stored secrets (users' own API keys,
+  Google tokens) are encrypted at rest. The Stripe webhook verifies its
+  signature before changing anyone's plan. Public URL-fetching tools block
+  requests to internal/private addresses (SSRF protection).
+- **Abuse limits.** Signup, resend-code, access requests, and the AI tools are
+  rate-limited so nobody can hammer them.
+- **Legal pages use the right domain.** `/privacy`, `/terms`, and `/cookies`
+  all use `@speaker-hub.com` addresses — not the old parked `speakerhub.app`.
+- **SEO plumbing works.** `/robots.txt` and `/sitemap.xml` point at
+  `speaker-hub.com`, and published one-sheets are added to the sitemap
+  automatically.
+- **Error screens are friendly.** A crash shows an on-brand "something went
+  wrong" page with a reference code, never a raw stack trace.
 
 ---
 
-*§1–2 put the verified site back on the public internet. §4–5 make signup and
-email real. §6–7 gate charging money. §8 confirms the flows end-to-end.*
+## You need to do this before launch
+
+### 1. Set the environment variables in Vercel
+
+This is the one real gap. Vercel → your project → Settings → Environment
+Variables. Copy the values from `.env.local.example`. **Set them for every
+environment (Production *and* Preview)** — if a Supabase variable is missing at
+build time, the whole deploy fails, not just one page.
+
+Required for the app to work at all:
+
+- [ ] `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+      `SUPABASE_SERVICE_ROLE_KEY` — from Supabase → Settings → API.
+- [ ] `OPENAI_API_KEY` — powers analysis, feedback, transcription, and every AI
+      tool. This is the only AI key the app itself needs. (The AI Assistant lets
+      users paste their *own* OpenAI or Anthropic key, so you don't set an
+      Anthropic key here.)
+- [ ] `NEXT_PUBLIC_APP_URL` = `https://speaker-hub.com` — used in emailed links,
+      Google sign-in redirects, and SEO. The code defaults to the right domain
+      in production, but set this so previews and emails are always correct.
+- [ ] `RESEND_API_KEY` + `EMAIL_FROM` on a **verified domain**, e.g.
+      `Speaker Hub <hello@speaker-hub.com>`. The domain is already verified in
+      Resend (see `docs/resend-domains.csv`). Without this, real signups won't
+      receive their verification code.
+- [ ] `ADMIN_EMAIL` = your email (defaults to yours if unset).
+- [ ] `ADMIN_ACTION_SECRET` — a long random string, e.g. run
+      `openssl rand -hex 32`. Signs the one-click approve/deny links in
+      access-request emails. If it's unset, those links are simply left out and
+      you approve requests from the `/admin` page instead.
+- [ ] `APP_ENCRYPTION_KEY` — another `openssl rand -hex 32`. Required for the AI
+      Assistant to encrypt users' saved keys and tokens.
+
+Then **redeploy** — Vercel bakes these in at build time, so a save alone doesn't
+apply them.
+
+### 2. Flip one Supabase security toggle
+
+Supabase → Authentication → Passwords → turn on **"Prevent use of leaked
+passwords."** It's the only outstanding security-advisor warning, and it's a
+dashboard-only setting.
+
+If you ever point a new domain at the app: Supabase → Authentication → URL
+Configuration → add it to the redirect allow-list, or email confirmation and
+password reset links will bounce.
+
+### 3. Have a lawyer look at the legal pages
+
+- [ ] Get counsel to review `/privacy` and `/terms`. They're solid drafted
+      baselines, but they're not legal advice — a real review matters most
+      before you start charging money.
+
+---
+
+## When you're ready to charge money
+
+Right now the app is in **free beta**: every signed-in user gets everything, and
+billing is switched off on purpose. Two switches control this, and both can be
+flipped with a Vercel environment variable — no code change needed:
+
+- **`FREE_BETA`** (currently `true`): while true, checkout is disabled and the
+  Plans page shows every tier as included. Set `FREE_BETA=false` to turn billing
+  on.
+- **`PAYWALLS_ENABLED`** (currently `false`): while false, no feature is gated by
+  plan. Set `PAYWALLS_ENABLED=true` to start enforcing Free / Core / Full tiers.
+
+Before you flip those, add your **live** Stripe values in Vercel:
+
+- [ ] `STRIPE_SECRET_KEY` (live mode), `STRIPE_WEBHOOK_SECRET`,
+      `STRIPE_PRICE_CORE`, `STRIPE_PRICE_FULL`. The code currently falls back to
+      test-mode sandbox price IDs, so real charges won't work until you set the
+      live ones.
+- [ ] Point a Stripe webhook at `https://speaker-hub.com/api/subscription/webhook`
+      and paste its signing secret into `STRIPE_WEBHOOK_SECRET`.
+
+Per-feature keys are all optional — leave them blank and that feature just stays
+off gracefully: `TRIBE_SERVER_URL`, `PARAKEET_SERVER_URL`, `YOUTUBE_API_KEY`,
+`CLIPFLOW_RENDER_URL`, `CRON_SECRET`, `GOOGLE_CLIENT_ID/SECRET`, and the
+per-platform ClipFlow OAuth keys.
+
+---
+
+## After you deploy — quick smoke test
+
+- [ ] Sign up with a real email → the verification code arrives → onboarding.
+- [ ] Upload a talk → processing → results with score, timeline, transcript.
+- [ ] Logged out, open `/keynotes` → you get redirected to `/login`.
+- [ ] Fire 11 rapid uploads in a minute → the 11th is refused (rate limit works).
+- [ ] Request a password reset → the email link lets you set a new password.
+- [ ] `/`, `/privacy`, `/terms`, `/robots.txt`, `/sitemap.xml` all load when
+      logged out.
+- [ ] If you've turned paywalls on: a free user is blocked after their free
+      analyses, and the premium tools show upgrade screens.
+
+---
+
+## Nice-to-have, not blocking
+
+These aren't launch blockers — note them for later:
+
+- The AI transcription and compare-report routes are behind login but aren't
+  rate-limited. If AI costs ever spike, add a per-user limit there like the
+  other AI routes have.
+- `robots.txt` currently allows crawling everything. The private app pages
+  redirect crawlers to login anyway, so nothing sensitive leaks, but you could
+  explicitly disallow `/api` and the app routes for tidiness.
