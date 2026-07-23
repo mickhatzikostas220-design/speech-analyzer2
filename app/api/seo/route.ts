@@ -3,6 +3,7 @@
 // Uses the OpenAI key already configured for the rest of the app.
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeUrl, BrandExtractError } from '@/lib/brand/extract';
+import { safeFetch } from '@/lib/ssrfGuard';
 import { createClient } from '@/lib/supabase/server';
 import { getUserPlan } from '@/lib/subscription/server';
 import { isPlatform, platformLabel } from '@/lib/seo/platforms';
@@ -52,8 +53,9 @@ async function fetchHtml(url: string): Promise<{ html: string; xRobotsTag: strin
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    // safeFetch blocks private/internal targets and re-checks each redirect hop,
+    // so a public URL can't bounce us into the internal network (SSRF).
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent':
@@ -82,7 +84,7 @@ async function fetchRobotsInfo(origin: string): Promise<{ hasRobotsTxt: boolean;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    const res = await fetch(`${origin}/robots.txt`, { redirect: 'follow', signal: controller.signal });
+    const res = await safeFetch(`${origin}/robots.txt`, { signal: controller.signal });
     if (!res.ok) return { hasRobotsTxt: false, declaresSitemap: false };
     const text = (await res.text()).slice(0, 50_000);
     return { hasRobotsTxt: true, declaresSitemap: /^\s*sitemap\s*:/im.test(text) };

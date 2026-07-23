@@ -38,6 +38,18 @@ function apiKey(): string {
   return key;
 }
 
+// A YouTube video id is always exactly 11 chars of this alphabet. Enforcing it
+// here means the id we later interpolate into the yt-dlp shell command (see
+// lib/clipflow/clipper.ts) can never carry shell metacharacters — closes off
+// command injection at the source rather than relying on downstream gates.
+const YT_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+function asVideoId(id: string | undefined, raw: string): ParsedSource {
+  if (id && YT_VIDEO_ID.test(id)) return { type: 'video', videoId: id, raw };
+  throw new YouTubeError(
+    'Unrecognized YouTube video link. Paste a standard video URL (youtube.com/watch?v=…).'
+  );
+}
+
 /** Parse a YouTube channel or video URL into its component identifiers. */
 export function parseSourceUrl(input: string): ParsedSource {
   const raw = input.trim();
@@ -54,17 +66,17 @@ export function parseSourceUrl(input: string): ParsedSource {
   // youtu.be/<id>
   if (host === 'youtu.be') {
     const id = path.slice(1).split('/')[0];
-    if (id) return { type: 'video', videoId: id, raw };
+    if (id) return asVideoId(id, raw);
   }
 
   if (host.endsWith('youtube.com')) {
     // watch?v=<id>
     const v = url.searchParams.get('v');
-    if (v) return { type: 'video', videoId: v, raw };
+    if (v) return asVideoId(v, raw);
 
     // /shorts/<id>, /embed/<id>, /v/<id>
     const m = path.match(/^\/(shorts|embed|v)\/([^/?]+)/);
-    if (m) return { type: 'video', videoId: m[2], raw };
+    if (m) return asVideoId(m[2], raw);
 
     // /channel/<UC...>
     const ch = path.match(/^\/channel\/([^/?]+)/);
