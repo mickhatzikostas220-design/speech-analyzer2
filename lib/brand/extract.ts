@@ -1,6 +1,7 @@
 import type { BrandKit } from './types';
 import { cloneDefaultBrand } from './defaults';
 import { normalizeHex, isNeutral, saturation, readableTextOn, hexToRgb } from './color';
+import { safeFetch } from '@/lib/ssrfGuard';
 
 /**
  * Auto-extract a brand kit from a speaker's website. Pure server-side:
@@ -60,8 +61,9 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    // safeFetch blocks private/loopback/link-local targets and re-checks every
+    // redirect hop, so a user can't point us at internal infrastructure.
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         // A normal browser UA — speakers ask us to read their own public
@@ -104,8 +106,7 @@ async function fetchTextCapped(url: string, maxBytes: number): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CSS_FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent':
