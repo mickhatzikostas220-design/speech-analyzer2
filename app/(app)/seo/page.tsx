@@ -415,7 +415,7 @@ export default function SeoPage() {
               className="card flex items-center justify-between gap-4 p-5 transition hover:border-strong"
             >
               <div>
-                <p className="font-bold text-strong">That's your free tip for this week.</p>
+                <p className="font-bold text-strong">That&apos;s your free tip for this week.</p>
                 <p className="mt-0.5 text-sm text-muted">
                   Upgrade for unlimited SEO checks, every tip from each scan, and the ability to save
                   fixes to your plan and check them off.

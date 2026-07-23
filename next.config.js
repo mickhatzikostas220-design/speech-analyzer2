@@ -19,6 +19,9 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  // Don't advertise the framework to every visitor (drops the default
+  // `X-Powered-By: Next.js` response header — minor fingerprinting hygiene).
+  poweredByHeader: false,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
