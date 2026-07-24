@@ -51,11 +51,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ error: 'Tell us which industry to tailor this to.' }, { status: 400 });
   }
 
-  // RLS ensures the keynote belongs to the signed-in user.
+  // RLS ensures the keynote belongs to the signed-in user; the explicit user_id
+  // filter is belt-and-suspenders, matching the rest of the app.
   const { data: keynote, error: loadErr } = await supabase
     .from('keynotes')
     .select('*')
     .eq('id', params.id)
+    .eq('user_id', user.id)
     .maybeSingle();
   if (loadErr) return NextResponse.json({ error: loadErr.message }, { status: 500 });
   if (!keynote) return NextResponse.json({ error: 'Keynote not found.' }, { status: 404 });

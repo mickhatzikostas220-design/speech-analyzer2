@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { rateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 // Allow headroom for a Parakeet cold start (Vercel Pro honors up to 300s; Hobby
@@ -12,6 +13,16 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
     if (authErr) return NextResponse.json({ error: `Auth: ${authErr.message}` }, { status: 401 });
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Transcription forwards the audio to a paid model (Whisper/Parakeet), so cap
+    // how often one account can call it to blunt cost/abuse from a runaway client.
+    const limit = rateLimit(`transcribe:${user.id}`, 30, 10 * 60 * 1000);
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: 'Too many transcription requests. Please wait a moment and try again.' },
+        { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
+      );
+    }
 
     const formData = await request.formData();
     const audio = formData.get('audio') as Blob | null;

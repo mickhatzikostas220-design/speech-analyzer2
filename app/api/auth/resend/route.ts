@@ -28,6 +28,17 @@ export async function POST(request: NextRequest) {
   if (!EMAIL_RE.test(email)) {
     return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
   }
+
+  // Also cap per-target-email: the client IP comes from an X-Forwarded-For header
+  // that a caller can rotate, so an IP-only limit is bypassable. Rate-limiting on
+  // the destination address stops someone mail-bombing one inbox regardless of IP.
+  const emailLimit = rateLimit(`resend-email:${email}`, 4, 10 * 60 * 1000);
+  if (!emailLimit.ok) {
+    return NextResponse.json(
+      { error: 'Too many requests for this email. Please wait a few minutes before trying again.' },
+      { status: 429, headers: { 'Retry-After': String(emailLimit.retryAfter) } }
+    );
+  }
   if (!process.env.RESEND_API_KEY) {
     return NextResponse.json(
       { error: 'Email delivery is not configured yet. Please contact support.' },
