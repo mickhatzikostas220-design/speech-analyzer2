@@ -12,6 +12,7 @@ import { saveMemory } from '@/lib/memory/store';
 import { getPersonaContext } from '@/lib/personalization/context';
 import { saveToolRun } from '@/lib/toolRuns/store';
 import { scoreSignals, auditToPromptBlock } from '@/lib/seo/audit';
+import { safeFetch } from '@/lib/security/ssrfGuard';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const SEVERITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -52,8 +53,8 @@ async function fetchHtml(url: string): Promise<{ html: string; xRobotsTag: strin
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: 'follow',
+    // safeFetch validates the URL (and each redirect hop) against the SSRF guard.
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent':
@@ -82,7 +83,7 @@ async function fetchRobotsInfo(origin: string): Promise<{ hasRobotsTxt: boolean;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    const res = await fetch(`${origin}/robots.txt`, { redirect: 'follow', signal: controller.signal });
+    const res = await safeFetch(`${origin}/robots.txt`, { signal: controller.signal });
     if (!res.ok) return { hasRobotsTxt: false, declaresSitemap: false };
     const text = (await res.text()).slice(0, 50_000);
     return { hasRobotsTxt: true, declaresSitemap: /^\s*sitemap\s*:/im.test(text) };

@@ -11,6 +11,17 @@ import type { PlanId } from '@/lib/subscription/plans';
 // Stripe needs the raw, unparsed body to verify the signature.
 export const runtime = 'nodejs';
 
+const VALID_PLANS: PlanId[] = ['free', 'core', 'full'];
+
+// Only ever write a known plan id to profiles. The event is signature-verified,
+// but the plan lives in free-form checkout metadata, so validate it before use
+// rather than casting a raw string straight into the plan column.
+function safePlan(value: unknown): PlanId {
+  return typeof value === 'string' && (VALID_PLANS as string[]).includes(value)
+    ? (value as PlanId)
+    : 'free';
+}
+
 export async function POST(request: NextRequest) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) {
@@ -66,7 +77,7 @@ export async function POST(request: NextRequest) {
           session.metadata?.user_id,
           typeof session.customer === 'string' ? session.customer : null
         );
-        const plan = (session.metadata?.plan as PlanId) || 'free';
+        const plan = safePlan(session.metadata?.plan);
         if (userId) {
           await setPlan(
             userId,

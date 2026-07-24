@@ -19,7 +19,67 @@ function htmlPage(title: string, message: string, color: string) {
   );
 }
 
+// Interactive confirmation page. The approve/deny link in the email is a GET, so
+// it must NOT change anything — corporate mail scanners (SafeLinks, Proofpoint,
+// Gmail prefetch) routinely fetch links in inbound mail, and a GET that mutated
+// state would let a scanner silently approve/deny the first pending request. So
+// GET only shows this page; the actual decision happens when the admin clicks
+// the button, which submits a POST that scanners don't make.
+function confirmPage(token: string, action: 'approve' | 'deny', name: string, email: string) {
+  const isApprove = action === 'approve';
+  const accent = isApprove ? '#16a34a' : '#ef4444';
+  const verb = isApprove ? 'Approve' : 'Deny';
+  return new NextResponse(
+    `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="robots" content="noindex"/><title>${verb} access request</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:system-ui,sans-serif;background:#09090b;color:#fafafa;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
+    .card{max-width:420px;width:100%;background:#18181b;border:1px solid #27272a;border-radius:16px;padding:32px;text-align:center;}
+    h1{font-size:18px;font-weight:600;margin-bottom:8px;}p{color:#a1a1aa;font-size:14px;line-height:1.6;margin-bottom:24px;}
+    .who{color:#fafafa;font-weight:600;}
+    button{width:100%;border:none;border-radius:10px;padding:12px 16px;font-size:14px;font-weight:600;color:#fff;background:${accent};cursor:pointer;}
+    </style></head><body><div class="card">
+    <h1>${verb} this access request?</h1>
+    <p>You're about to <strong>${isApprove ? 'approve' : 'deny'}</strong> the request from <span class="who">${escapeHtml(name)}</span> (${escapeHtml(email)}).</p>
+    <form method="POST" action="/api/admin/action?token=${encodeURIComponent(token)}">
+      <button type="submit">${verb}${isApprove ? ' and send invite' : ''}</button>
+    </form>
+    </div></body></html>`,
+    { headers: { 'Content-Type': 'text/html' } }
+  );
+}
+
+// GET → show a confirmation page (no side effects). POST → perform the action.
 export async function GET(request: NextRequest) {
+  const token = request.nextUrl.searchParams.get('token');
+  if (!token) return htmlPage('Invalid Link', 'This link is missing a token.', '#ef4444');
+
+  const payload = verifyToken(token);
+  if (!payload) return htmlPage('Link Expired', 'This link has expired or is invalid. Log in to the admin panel to review requests.', '#ef4444');
+
+  const adminSupabase = createAdminClient();
+  const { data: req } = await adminSupabase
+    .from('access_requests')
+    .select('*')
+    .eq('id', payload.id)
+    .single();
+
+  if (!req) return htmlPage('Not Found', 'This access request no longer exists.', '#ef4444');
+
+  if (req.status !== 'pending') {
+    return htmlPage(
+      'Already Reviewed',
+      `This request from ${escapeHtml(String(req.name ?? ''))} was already ${escapeHtml(String(req.status))}.`,
+      '#f59e0b'
+    );
+  }
+
+  if (payload.action !== 'approve' && payload.action !== 'deny') {
+    return htmlPage('Invalid Action', 'Unknown action in token.', '#ef4444');
+  }
+
+  return confirmPage(token, payload.action, String(req.name ?? ''), String(req.email ?? ''));
+}
+
+export async function POST(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token');
   if (!token) return htmlPage('Invalid Link', 'This link is missing a token.', '#ef4444');
 

@@ -35,6 +35,18 @@ export async function POST(request: NextRequest) {
   if (password.length < 8) {
     return NextResponse.json({ error: 'Use at least 8 characters for your password.' }, { status: 400 });
   }
+
+  // Also cap per-target-email. The client IP is read from an X-Forwarded-For
+  // header the caller can rotate, so an IP-only limit is bypassable; limiting on
+  // the email too stops signup/verification spam aimed at one address.
+  const emailLimit = rateLimit(`signup-email:${email}`, 5, 10 * 60 * 1000);
+  if (!emailLimit.ok) {
+    return NextResponse.json(
+      { error: 'Too many attempts for this email. Please try again in a few minutes.' },
+      { status: 429, headers: { 'Retry-After': String(emailLimit.retryAfter) } }
+    );
+  }
+
   if (!process.env.RESEND_API_KEY) {
     return NextResponse.json(
       { error: 'Email delivery is not configured yet. Please contact support.' },

@@ -8,12 +8,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe, stripeConfigured } from '@/lib/subscription/stripe';
 import { DONATE_MIN, DONATE_MAX } from '@/lib/donate/config';
+import { rateLimit, clientIp } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
   if (!stripeConfigured()) {
     return NextResponse.json(
       { error: 'Donations are not set up yet. Please check back soon.' },
       { status: 503 }
+    );
+  }
+
+  // Public, unauthenticated endpoint that creates Stripe Checkout Sessions — cap
+  // it so a bot can't spin up sessions in a loop and burn Stripe API quota.
+  const limit = rateLimit(`donate-checkout:${clientIp(request)}`, 10, 10 * 60 * 1000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again in a few minutes.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
     );
   }
 
